@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Roboto+Mono:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800;900&family=Roboto+Mono:wght@400;500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -9,8 +9,8 @@
   :root {
     --font-sans: "Inter", var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
     --font-mono: "Roboto Mono", var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
-    --font-serif: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-    --font-display: "Inter", var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    --font-serif: "Instrument Serif", Georgia, ui-serif, serif;
+    --font-display: "Instrument Serif", Georgia, ui-serif, serif;
     --radius: 1.25rem;
     --landing-max-width: 74rem;
     --landing-card-radius: 1.75rem;
@@ -18,29 +18,43 @@
     --landing-shell-radius: 2rem;
     --landing-eyebrow-tracking: 0.02em;
 
-    --canvas: 208 100% 98%;
+    --hero-sky-top: 203 91% 55%;
+    --hero-sky-mid: 194 92% 68%;
+    --hero-sky-low: 55 95% 93%;
+    --hero-horizon: 203 100% 92%;
+    --hero-mountain: 213 82% 49%;
+    --hero-mountain-soft: 208 62% 79%;
+    --desktop-warm: 29 100% 69%;
+    --desktop-warm-2: 336 91% 77%;
+    --desktop-cool: 213 98% 51%;
+    --assistant-glass: 223 20% 8%;
+    --assistant-glass-border: 0 0% 100%;
+    --hero-bg-image: url("/illustrations/cluely-style-hero-bg.png");
+    --hero-bg-position: center bottom;
+
+    --canvas: 203 100% 98%;
     --panel: 0 0% 100%;
-    --elevated: 211 79% 96%;
-    --background: 208 100% 98%;
-    --foreground: 222 45% 10%;
+    --elevated: 205 82% 96%;
+    --background: 203 100% 98%;
+    --foreground: 223 41% 9%;
 
     --card: 0 0% 100%;
     --card-foreground: 222 45% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 45% 10%;
 
-    --muted: 215 44% 94%;
-    --muted-foreground: 218 13% 42%;
+    --muted: 211 53% 94%;
+    --muted-foreground: 219 12% 39%;
 
-    --accent: 211 100% 50%;
+    --accent: 221 100% 55%;
     --accent-foreground: 0 0% 100%;
-    --accent-muted: 211 100% 94%;
-    --accent-bright: 218 100% 58%;
+    --accent-muted: 208 100% 94%;
+    --accent-bright: 211 100% 61%;
 
-    --primary: 211 100% 50%;
+    --primary: 221 100% 55%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 215 44% 94%;
-    --secondary-foreground: 222 45% 10%;
+    --secondary: 211 53% 94%;
+    --secondary-foreground: 223 41% 9%;
 
     --destructive: 358 70% 48%;
     --destructive-foreground: 0 0% 100%;
@@ -49,11 +63,11 @@
     --warning: 34 89% 45%;
     --warning-foreground: 0 0% 100%;
 
-    --border: 214 32% 86%;
-    --border-strong: 216 18% 68%;
-    --input: 214 32% 86%;
-    --ring: 211 100% 50%;
-    --glow-accent: 210 100% 72%;
+    --border: 211 36% 86%;
+    --border-strong: 214 19% 66%;
+    --input: 211 36% 86%;
+    --ring: 221 100% 55%;
+    --glow-accent: 202 100% 70%;
 
     --chart-1: 211 100% 50%;
     --chart-2: 218 100% 58%;
@@ -70,7 +84,7 @@
     --sidebar-border: 214 32% 86%;
     --sidebar-ring: 211 100% 50%;
 
-    --shadow-color: 216 48% 26%;
+    --shadow-color: 210 74% 25%;
     --shadow-blur: 48px;
     --shadow-spread: -22px;
     --shadow-opacity: 0.2;
@@ -153,9 +167,9 @@
     @apply bg-canvas text-foreground antialiased;
     min-width: 320px;
     background:
-      linear-gradient(180deg, hsl(209 100% 93% / 0.9) 0%, hsl(var(--canvas)) 24rem),
-      radial-gradient(ellipse at 50% 4%, hsl(var(--glow-accent) / 0.34), transparent 36rem),
-      radial-gradient(ellipse at 18% 9%, hsl(199 100% 82% / 0.28), transparent 28rem),
+      linear-gradient(180deg, hsl(var(--hero-sky-mid) / 0.34) 0%, hsl(var(--canvas)) 25rem),
+      radial-gradient(ellipse at 50% 3%, hsl(var(--glow-accent) / 0.42), transparent 36rem),
+      radial-gradient(ellipse at 18% 9%, hsl(var(--hero-sky-low) / 0.48), transparent 28rem),
       hsl(var(--canvas));
     font-feature-settings: "cv01" 1, "cv03" 1, "ss03" 1, "calt" 1;
   }
@@ -204,6 +218,31 @@
     background: hsl(var(--panel) / 0.92);
     border-color: hsl(var(--accent) / 0.36);
     box-shadow: 0 28px 80px hsl(var(--glow-accent) / 0.22);
+  }
+
+  .cluely-hero-backdrop {
+    background-image:
+      linear-gradient(180deg, hsl(var(--hero-sky-top) / 0.05), hsl(var(--hero-sky-low) / 0.08)),
+      var(--hero-bg-image);
+    background-position: center, var(--hero-bg-position);
+    background-size: cover, cover;
+    background-repeat: no-repeat;
+  }
+
+  .cluely-hero-backdrop::after {
+    content: "";
+    position: absolute;
+    inset: 42% 0 0;
+    background:
+      linear-gradient(
+        180deg,
+        hsl(var(--hero-horizon) / 0.18) 0%,
+        hsl(var(--hero-horizon) / 0.78) 22%,
+        hsl(var(--hero-sky-mid) / 0.72) 58%,
+        hsl(var(--hero-mountain) / 0.62) 100%
+      ),
+      radial-gradient(ellipse at 28% 22%, hsl(var(--hero-sky-mid) / 0.42), transparent 28rem),
+      radial-gradient(ellipse at 78% 12%, hsl(var(--hero-horizon) / 0.68), transparent 24rem);
   }
 
   .instrument-panel {
@@ -427,6 +466,259 @@
 
   .landing-use-case-container {
     max-width: var(--landing-max-width);
+  }
+
+  .landing-agent-card-visual {
+    min-height: 18rem;
+  }
+
+  .landing-agent-mini-scene {
+    inset: 0.75rem;
+    overflow: hidden;
+  }
+
+  .landing-agent-mini-browser-panel {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid hsl(var(--border) / 0.55);
+    border-radius: 0.85rem;
+    background: hsl(var(--panel) / 0.82);
+    box-shadow: 0 18px 50px hsl(var(--shadow-color) / 0.12);
+    animation: landing-agent-panel-float 6s ease-in-out infinite;
+  }
+
+  .landing-agent-mini-chat-window {
+    inset: 0;
+    border-radius: 0.85rem;
+  }
+
+  .landing-agent-mini-voice-component {
+    top: 50%;
+    width: min(92%, 16.5rem);
+    min-height: 12.5rem;
+    padding: 0.75rem;
+  }
+
+  .landing-agent-mini-voice-component .landing-voice-core {
+    width: 4.6rem;
+    height: 4.6rem;
+    margin-top: 0.45rem;
+  }
+
+  .landing-agent-mini-voice-component .landing-voice-avatar {
+    width: 3.2rem;
+    height: 3.2rem;
+    font-size: 0.68rem;
+  }
+
+  .landing-agent-mini-voice-component .landing-waveform {
+    height: 2.2rem;
+    margin-top: 0.2rem;
+  }
+
+  .landing-agent-mini-voice-component .landing-voice-transcript-card {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    margin-top: 0.45rem;
+    animation: none;
+  }
+
+  .landing-browser-slot-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+    margin-top: 0.65rem;
+  }
+
+  .landing-browser-slot {
+    border: 1px solid hsl(var(--border) / 0.55);
+    border-radius: 0.55rem;
+    background: hsl(var(--elevated) / 0.72);
+    padding: 0.42rem 0.5rem;
+    color: hsl(var(--muted-foreground));
+    font-size: 0.58rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .landing-browser-slot-active {
+    border-color: hsl(var(--accent) / 0.35);
+    background: hsl(var(--accent-muted) / 0.88);
+    color: hsl(var(--accent));
+    animation: landing-browser-slot-pulse 4.8s ease-in-out infinite;
+  }
+
+  .landing-agent-mini-cursor {
+    animation: landing-agent-mini-cursor-path 4.8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  }
+
+  .landing-agent-mini-click-ring {
+    animation: landing-agent-mini-click-ring 4.8s ease-in-out infinite;
+  }
+
+  .landing-instrumentation-loop {
+    display: grid;
+    gap: 1rem;
+    min-height: 28rem;
+    padding: 1rem;
+  }
+
+  .landing-loop-install-panel,
+  .landing-loop-stream-panel {
+    position: relative;
+    isolation: isolate;
+    min-height: 24rem;
+    overflow: hidden;
+    border: 1px solid hsl(var(--scene-primary) / 0.22);
+    border-radius: 1.15rem;
+    background:
+      radial-gradient(circle at 10% 0%, hsl(var(--scene-muted) / 0.88), transparent 10rem),
+      radial-gradient(circle at 74% 50%, hsl(var(--panel) / 0.72), transparent 10rem),
+      linear-gradient(135deg, hsl(var(--scene-muted) / 0.78), hsl(var(--panel) / 0.9) 48%, hsl(var(--scene-muted) / 0.62));
+    box-shadow:
+      inset 0 1px 0 hsl(var(--panel) / 0.85),
+      0 20px 56px hsl(var(--scene-primary) / 0.14);
+  }
+
+  .landing-loop-install-sequence {
+    position: absolute;
+    inset: 1rem;
+    z-index: 1;
+    display: grid;
+    grid-template-rows: 0.72fr 1.28fr;
+    gap: 0.75rem;
+  }
+
+  .landing-loop-terminal,
+  .landing-loop-editor {
+    overflow: hidden;
+    border: 1px solid hsl(var(--border) / 0.58);
+    border-radius: 1rem;
+    background: hsl(var(--panel) / 0.88);
+    box-shadow:
+      0 1rem 2.2rem hsl(var(--scene-primary) / 0.14),
+      inset 0 1px 0 hsl(var(--panel) / 0.88);
+    backdrop-filter: blur(14px);
+  }
+
+  .landing-loop-terminal {
+    animation: landing-loop-terminal-pop 8s ease-in-out infinite;
+  }
+
+  .landing-loop-editor {
+    animation: landing-loop-editor-float 8s ease-in-out infinite;
+  }
+
+  .landing-loop-panel-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 2rem;
+    border-bottom: 1px solid hsl(var(--border) / 0.5);
+    padding-inline: 0.72rem;
+  }
+
+  .landing-loop-panel-bar span {
+    width: 0.48rem;
+    height: 0.48rem;
+    border-radius: 999px;
+    background: hsl(var(--scene-primary) / 0.34);
+  }
+
+  .landing-loop-panel-bar p {
+    margin-left: 0.25rem;
+    color: hsl(var(--muted-foreground));
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    line-height: 1;
+  }
+
+  .landing-loop-terminal-lines,
+  .landing-loop-editor-lines {
+    display: grid;
+    gap: 0.42rem;
+    padding: 0.72rem;
+  }
+
+  .landing-loop-editor-lines {
+    gap: 0.48rem;
+    padding-top: 0.82rem;
+  }
+
+  .landing-loop-terminal-lines code,
+  .landing-loop-editor-lines code {
+    display: block;
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .landing-loop-terminal-lines code {
+    color: hsl(var(--muted-foreground));
+    opacity: 0;
+    transform: translateY(0.32rem);
+    animation: landing-loop-terminal-line 8s ease-in-out infinite;
+    animation-delay: calc(var(--loop-index) * 0.35s);
+  }
+
+  .landing-loop-terminal-command {
+    color: hsl(var(--accent)) !important;
+    font-weight: 800;
+  }
+
+  .landing-loop-code-import {
+    color: hsl(var(--success)) !important;
+    opacity: 0;
+    transform: translateX(-0.34rem);
+    animation: landing-loop-code-reveal 8s ease-in-out infinite;
+    animation-delay: 1.4s;
+  }
+
+  .landing-loop-code-decorator {
+    color: hsl(var(--warning)) !important;
+    opacity: 0;
+    transform: translateX(-0.34rem);
+    animation: landing-loop-code-reveal 8s ease-in-out infinite;
+    animation-delay: 2.8s;
+  }
+
+  .landing-loop-code-existing {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  .landing-loop-install-badge {
+    position: absolute;
+    right: -0.35rem;
+    bottom: 1rem;
+    border: 1px solid hsl(var(--success) / 0.24);
+    border-radius: 999px;
+    background: hsl(var(--panel) / 0.82);
+    padding: 0.45rem 0.62rem;
+    color: hsl(var(--success));
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    font-weight: 900;
+    line-height: 1;
+    box-shadow: 0 1rem 2rem hsl(var(--success) / 0.12);
+    animation: landing-loop-install-badge 8s ease-in-out infinite;
+    backdrop-filter: blur(14px);
+  }
+
+  .landing-loop-stream-window {
+    position: absolute;
+    inset: 1rem;
+    min-height: 22rem;
+  }
+
+  .landing-loop-stream-lane {
+    --stream-cycle-duration: 5.6s;
   }
 
   .landing-use-case-card {
@@ -2042,6 +2334,21 @@
       min-height: 19rem;
     }
 
+    .landing-agent-card-visual {
+      min-height: 22rem;
+    }
+
+    .landing-instrumentation-loop {
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+      min-height: 32rem;
+      padding: 1.25rem;
+    }
+
+    .landing-loop-install-panel,
+    .landing-loop-stream-panel {
+      min-height: 28rem;
+    }
+
     .landing-workflow-card {
       padding: 1.2rem 1.2rem 1.55rem;
     }
@@ -2105,6 +2412,142 @@
 
     .landing-workflow-asset {
       min-height: 20rem;
+    }
+  }
+
+  @keyframes landing-agent-mini-cursor-path {
+    0%,
+    14% {
+      transform: translate(8%, 12%) rotate(-10deg);
+      opacity: 0.72;
+    }
+
+    38%,
+    54% {
+      transform: translate(38%, 52%) rotate(-10deg);
+      opacity: 1;
+    }
+
+    72%,
+    100% {
+      transform: translate(62%, 48%) rotate(-10deg);
+      opacity: 0.86;
+    }
+  }
+
+  @keyframes landing-agent-mini-click-ring {
+    0%,
+    34%,
+    60%,
+    100% {
+      opacity: 0;
+      transform: translate(34%, 46%) scale(0.5);
+    }
+
+    42% {
+      opacity: 1;
+      transform: translate(34%, 46%) scale(1);
+    }
+
+    52% {
+      opacity: 0;
+      transform: translate(34%, 46%) scale(1.45);
+    }
+  }
+
+  @keyframes landing-browser-slot-pulse {
+    0%,
+    34%,
+    60%,
+    100% {
+      box-shadow: none;
+    }
+
+    42%,
+    52% {
+      box-shadow: 0 0 0 2px hsl(var(--accent) / 0.35);
+    }
+  }
+
+  @keyframes landing-loop-terminal-pop {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-0.18rem);
+    }
+  }
+
+  @keyframes landing-loop-terminal-line {
+    0%,
+    8% {
+      opacity: 0;
+      transform: translateY(0.32rem);
+    }
+
+    18%,
+    88% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    100% {
+      opacity: 0.72;
+      transform: translateY(-0.08rem);
+    }
+  }
+
+  @keyframes landing-loop-editor-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-0.14rem);
+    }
+  }
+
+  @keyframes landing-loop-code-reveal {
+    0%,
+    12% {
+      opacity: 0;
+      transform: translateX(-0.34rem);
+      clip-path: inset(0 100% 0 0);
+    }
+
+    28%,
+    88% {
+      opacity: 1;
+      transform: translateX(0);
+      clip-path: inset(0 0 0 0);
+    }
+
+    100% {
+      opacity: 0.92;
+      transform: translateX(0);
+      clip-path: inset(0 0 0 0);
+    }
+  }
+
+  @keyframes landing-loop-install-badge {
+    0%,
+    52% {
+      opacity: 0;
+      transform: translateY(0.35rem) scale(0.96);
+    }
+
+    64%,
+    88% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    100% {
+      opacity: 0.88;
+      transform: translateY(-0.08rem) scale(1);
     }
   }
 
