@@ -3,10 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, GitPullRequest, ShieldCheck } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
-import { SeverityBadge } from "@/components/common/severity-badge";
-import { StatusPill } from "@/components/common/status-pill";
 import type { Incident, Severity } from "@/lib/types";
 import { cn, fmtRelative } from "@/lib/utils";
 
@@ -104,10 +102,9 @@ export function IncidentList({ incidents }: { incidents: Incident[] }) {
               index === activeIndex && "bg-panel shadow-glow-sm",
             )}
           >
-            <SeverityBadge
-              severity={incident.severity}
-              className="self-start px-2 py-1.5 text-[10px] uppercase tracking-wide xl:self-center xl:justify-self-start"
-            />
+            <span className="mono self-start text-[10px] uppercase tracking-[0.16em] text-muted-foreground xl:self-center xl:justify-self-start">
+              {incident.severity}
+            </span>
 
             <span className="min-w-0 xl:pr-4">
               <span className="flex min-w-0 items-center gap-2">
@@ -115,8 +112,8 @@ export function IncidentList({ incidents }: { incidents: Incident[] }) {
                   {incident.title}
                 </span>
                 {incident.pr_url ? (
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-accent/25 bg-accent-muted text-accent">
-                    <GitPullRequest className="size-3.5" aria-label="Pull request linked" />
+                  <span className="mono shrink-0 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                    PR
                   </span>
                 ) : null}
               </span>
@@ -130,16 +127,12 @@ export function IncidentList({ incidents }: { incidents: Incident[] }) {
                 </span>
               </span>
               <span className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground xl:hidden">
-                <StatusPill status={incident.status} className="text-[10px]" />
-                <span className="text-muted-foreground/50">·</span>
+                <span className="capitalize">{incident.status}</span>
                 <span className="mono max-w-[170px] truncate">{incident.label}</span>
-                <span className="text-muted-foreground/50">·</span>
                 <span className="tabular-nums">
                   {incident.session_ids.length} run{incident.session_ids.length === 1 ? "" : "s"}
                 </span>
-                <span className="text-muted-foreground/50">·</span>
                 <span>{covered ? "covered" : "not covered"}</span>
-                <span className="text-muted-foreground/50">·</span>
                 <span className="tabular-nums">{fmtRelative(incident.updated_at)}</span>
               </span>
             </span>
@@ -147,18 +140,13 @@ export function IncidentList({ incidents }: { incidents: Incident[] }) {
             <span className="mono hidden truncate text-[10px] text-muted-foreground xl:block">
               {incident.label}
             </span>
-            <StatusPill status={incident.status} className="hidden text-[10px] xl:inline-flex" />
+            <span className="hidden text-xs capitalize text-muted-foreground xl:block">
+              {incident.status}
+            </span>
             <span className="mono hidden text-[10px] tabular-nums text-muted-foreground xl:block">
               {incident.session_ids.length}
             </span>
-            <span
-              className={cn(
-                "mono hidden items-center gap-1.5 rounded-full border px-2 py-1 text-[9px] uppercase tracking-[0.14em] xl:inline-flex",
-                covered ? "text-accent" : "text-warning",
-                covered ? "border-accent/25 bg-accent-muted" : "border-warning/25 bg-warning/10",
-              )}
-            >
-              <ShieldCheck className="size-3.5" />
+            <span className="mono hidden text-[10px] uppercase tracking-[0.14em] text-muted-foreground xl:block">
               {covered ? "covered" : "not covered"}
             </span>
             <span className="mono hidden text-[10px] tabular-nums text-muted-foreground xl:block">

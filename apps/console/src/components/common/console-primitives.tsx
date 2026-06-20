@@ -3,11 +3,9 @@ import type { HTMLAttributes } from "react";
 import type { LucideIcon } from "lucide-react";
 
 import {
-  Eyebrow,
   LandingAppContent,
   LandingAppHeader,
   LandingAppShell,
-  LandingCard,
 } from "@/components/landing/landing-primitives";
 import { cn } from "@/lib/utils";
 
@@ -65,7 +63,7 @@ interface ConsoleEyebrowProps extends HTMLAttributes<HTMLParagraphElement> {
   icon?: React.ReactNode;
 }
 
-/** Pill-shaped eyebrow label placed above the page heading. */
+/** Small plain eyebrow label placed above the page heading. */
 export function ConsoleEyebrow({
   children,
   className,
@@ -73,9 +71,20 @@ export function ConsoleEyebrow({
   ...props
 }: ConsoleEyebrowProps) {
   return (
-    <Eyebrow className={className} icon={icon} {...props}>
+    <p
+      className={cn(
+        "mb-5 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground",
+        className,
+      )}
+      {...props}
+    >
+      {icon ? (
+        <span className="text-muted-foreground/70" aria-hidden>
+          {icon}
+        </span>
+      ) : null}
       {children}
-    </Eyebrow>
+    </p>
   );
 }
 
@@ -93,29 +102,24 @@ interface MetricReadoutProps {
 export function MetricReadout({
   label,
   value,
-  tone,
   className,
 }: MetricReadoutProps) {
   const numStr =
     typeof value === "number" ? String(value).padStart(2, "0") : value;
   return (
-    <LandingCard size="compact" className={cn("min-w-0 sm:min-w-[150px]", className)}>
+    <div
+      className={cn(
+        "min-w-0 border-t border-border-strong/45 px-1 py-4 sm:min-w-[150px]",
+        className,
+      )}
+    >
       <dt className="text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
         {label}
       </dt>
-      <dd
-        className={cn(
-          "display order-first text-4xl leading-none tabular-nums",
-          tone === "warning"
-            ? "text-warning"
-            : tone === "signal"
-              ? "text-success"
-              : "text-foreground",
-        )}
-      >
+      <dd className="display order-first text-4xl leading-none text-foreground tabular-nums">
         {numStr}
       </dd>
-    </LandingCard>
+    </div>
   );
 }
 
@@ -127,16 +131,16 @@ interface SignalChipProps {
   className?: string;
 }
 
-/** Feature/signal pill chip placed below the page heading. */
+/** Plain feature/signal label placed below the page heading. */
 export function SignalChip({ Icon, label, className }: SignalChipProps) {
   return (
     <span
       className={cn(
-        "inline-flex min-h-8 items-center gap-1.5 rounded-full border border-border/70 bg-panel/70 px-3 text-[11px] font-medium text-muted-foreground backdrop-blur",
+        "inline-flex min-h-6 items-center gap-1.5 text-[11px] font-medium text-muted-foreground",
         className,
       )}
     >
-      <Icon className="size-3.5 text-accent" aria-hidden="true" strokeWidth={1.8} />
+      <Icon className="size-3.5 text-muted-foreground/55" aria-hidden="true" strokeWidth={1.8} />
       {label}
     </span>
   );
@@ -152,9 +156,9 @@ export function ConsoleSurface({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <LandingCard className={className} {...props}>
+    <div className={cn("landing-framed-surface", className)} {...props}>
       {children}
-    </LandingCard>
+    </div>
   );
 }
 

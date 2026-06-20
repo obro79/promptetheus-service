@@ -55,7 +55,7 @@ export function IncidentFilters({
     <div className="landing-framed-surface flex flex-col overflow-hidden sm:flex-row sm:items-stretch">
       <label className="relative min-w-0 flex-1 border-b border-border/50 transition-colors focus-within:bg-elevated/55 sm:border-b-0 sm:border-r">
         <span className="sr-only">Search incidents</span>
-        <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-accent" />
+        <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <input
           ref={inputRef}
           value={query}
@@ -73,7 +73,7 @@ export function IncidentFilters({
             <X className="size-3.5" />
           </button>
         ) : (
-          <span className="mono absolute right-4 top-1/2 -translate-y-1/2 rounded-full border border-border/60 px-2 py-0.5 text-[10px] text-muted-foreground">
+          <span className="mono absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
             /
           </span>
         )}
@@ -92,7 +92,7 @@ export function IncidentFilters({
           options={SEVERITY_OPTIONS}
         />
         <div className="flex h-14 min-w-[86px] items-center justify-end gap-1.5 px-3 sm:border-l sm:border-border/50">
-          <span className="mono whitespace-nowrap rounded-full bg-accent-muted px-2 py-1 text-[10px] text-accent">
+          <span className="mono whitespace-nowrap text-[10px] text-muted-foreground">
             {resultCount}<span className="hidden min-[460px]:inline"> results</span>
           </span>
           {hasFilters ? (
