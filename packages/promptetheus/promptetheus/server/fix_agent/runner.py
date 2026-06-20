@@ -210,6 +210,8 @@ def build_incident_bundle(store: Any, incident: dict[str, Any]) -> dict[str, Any
         "policy": "server-side bundle redaction (secrets/cookies/auth/PII)",
     }
 
+    source = _incident_source(incident, session)
+
     return {
         "incident": {
             "id": incident.get("id"),
@@ -221,6 +223,7 @@ def build_incident_bundle(store: Any, incident: dict[str, Any]) -> dict[str, Any
             "confidence": incident.get("confidence"),
             "session_count": len(incident.get("session_ids") or []),
         },
+        "source": source,
         "representative_session_id": representative_session_id,
         "user_goal": user_goal,
         "critical_step_seq": critical_step_seq,
@@ -234,6 +237,32 @@ def build_incident_bundle(store: Any, incident: dict[str, Any]) -> dict[str, Any
         "connected_repo": connected_repo,
         "redaction_summary": redaction_summary,
     }
+
+
+def _incident_source(
+    incident: dict[str, Any], session: dict[str, Any] | None
+) -> str:
+    """Derive the agent's origin (browserbase / lambda / ...) for the heal loop.
+
+    The source is an agnostic tag flowing end-to-end so the same remediation
+    pipeline visibly heals incidents from any deployment. Resolution order:
+    explicit incident.source, then the representative session's source or its
+    metadata.source, else "unknown".
+    """
+
+    raw = incident.get("source")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    if isinstance(session, dict):
+        candidate = session.get("source")
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip()
+        metadata = session.get("metadata")
+        if isinstance(metadata, dict):
+            meta_source = metadata.get("source")
+            if isinstance(meta_source, str) and meta_source.strip():
+                return meta_source.strip()
+    return "unknown"
 
 
 def _resolve_allowed_paths(source: dict[str, Any]) -> tuple[str, ...]:

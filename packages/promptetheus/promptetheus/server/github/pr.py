@@ -358,6 +358,7 @@ def _pr_body(
             "",
             f"- Incident: `{incident.get('id')}`",
             f"- Label: `{incident.get('label')}`",
+            f"- Source: `{bundle.get('source') or 'unknown'}`",
             f"- Representative session: `{bundle.get('representative_session_id')}`",
             f"- Root cause: {root_cause}",
             f"- Evidence refs: {evidence_refs}",

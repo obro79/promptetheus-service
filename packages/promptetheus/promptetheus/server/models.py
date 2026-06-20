@@ -120,3 +120,48 @@ class FixAgentResult:
             "evidence_refs": list(self.evidence_refs),
             "fallback": self.fallback,
         }
+
+
+# ---------------------------------------------------------------------------
+# Self-healing loop contract (orchestrated remediation)
+# ---------------------------------------------------------------------------
+
+#: Terminal states for a heal loop. pr_opened = verified fix awaiting human merge;
+#: escalated = attempt budget exhausted without a verified fix.
+HEAL_STATUSES: tuple[str, ...] = ("pr_opened", "escalated")
+
+
+@dataclass
+class HealReport:
+    """Outcome of the bounded self-healing loop for one incident.
+
+    The loop iterates diagnose -> verify (LLM critique + regression) up to
+    max_attempts. On the first verified attempt it opens a PR and STOPS (a human
+    merges); if the budget is exhausted it escalates. `trail` carries one entry per
+    attempt for the console timeline + audit. `source` threads the agent's origin
+    (browserbase / lambda / unknown) through unchanged so the same loop visibly
+    heals incidents from any deployment.
+    """
+
+    status: str
+    incident_id: str
+    attempts: int = 0
+    source: str = "unknown"
+    pr: dict[str, Any] | None = None
+    trail: list[dict[str, Any]] = field(default_factory=list)
+    reason: str | None = None
+    workflow_run_id: str | None = None
+    orchestrator: str = "inprocess"
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "incident_id": self.incident_id,
+            "attempts": self.attempts,
+            "source": self.source,
+            "pr": self.pr,
+            "trail": list(self.trail),
+            "reason": self.reason,
+            "workflow_run_id": self.workflow_run_id,
+            "orchestrator": self.orchestrator,
+        }
