@@ -42,7 +42,7 @@ export function SessionFilters({
 }: SessionFiltersProps) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="surface flex items-center gap-1 rounded-2xl p-1">
+      <div className="landing-framed-surface flex items-center gap-1 p-1">
         {FILTERS.map((f) => {
           const active = status === f.value;
           const count = counts[f.value];

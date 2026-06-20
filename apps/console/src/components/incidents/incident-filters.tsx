@@ -52,7 +52,7 @@ export function IncidentFilters({
   }, []);
 
   return (
-    <div className="surface flex flex-col overflow-hidden rounded-[1.6rem] border-border/70 bg-panel/78 sm:flex-row sm:items-stretch">
+    <div className="landing-framed-surface flex flex-col overflow-hidden sm:flex-row sm:items-stretch">
       <label className="relative min-w-0 flex-1 border-b border-border/50 transition-colors focus-within:bg-elevated/55 sm:border-b-0 sm:border-r">
         <span className="sr-only">Search incidents</span>
         <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-accent" />

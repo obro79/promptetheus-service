@@ -64,7 +64,7 @@ export function ApiKeyRow({ project }: ApiKeyRowProps) {
   }, [project.id]);
 
   return (
-    <div className="surface flex flex-col gap-3 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="landing-framed-surface flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
         <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-accent/20 bg-accent-muted text-accent">
           <KeyRound className="size-4" />

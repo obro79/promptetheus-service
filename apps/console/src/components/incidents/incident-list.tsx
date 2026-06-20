@@ -52,7 +52,7 @@ export function IncidentList({ incidents }: { incidents: Incident[] }) {
 
   return (
     <div
-      className="surface overflow-hidden rounded-[1.75rem] border-border/70 bg-panel/78"
+      className="landing-framed-surface overflow-hidden"
       role="list"
       aria-label="Failure inbox"
       onKeyDown={(event) => {

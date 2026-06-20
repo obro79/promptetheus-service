@@ -116,6 +116,65 @@ export function LandingCard({
   );
 }
 
+export function LandingAppShell({
+  children,
+  className,
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cn("landing-page min-h-dvh overflow-y-auto", className)} {...props}>
+      <DecorativeField />
+      {children}
+    </div>
+  );
+}
+
+export function LandingAppHeader({
+  children,
+  className,
+  containerClassName,
+  compact = false,
+  ...props
+}: HTMLAttributes<HTMLElement> & {
+  compact?: boolean;
+  containerClassName?: string;
+}) {
+  return (
+    <LandingSection
+      className={className}
+      containerClassName={cn(
+        "landing-use-case-container flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between",
+        compact && "max-w-3xl",
+        containerClassName,
+      )}
+      density="compact"
+      {...props}
+    >
+      {children}
+    </LandingSection>
+  );
+}
+
+export function LandingAppContent({
+  children,
+  className,
+  compact = false,
+  ...props
+}: HTMLAttributes<HTMLDivElement> & { compact?: boolean }) {
+  return (
+    <div
+      className={cn(
+        "landing-container landing-use-case-container relative z-10 pb-16",
+        compact && "max-w-3xl",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function IconFrame({ children, className, ...props }: HTMLAttributes<HTMLSpanElement>) {
   return (
     <span className={cn("landing-icon-frame", className)} {...props}>

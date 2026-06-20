@@ -36,7 +36,7 @@ export default function IncidentsPage() {
           <ConsoleEyebrow icon={<Inbox className="size-3.5" strokeWidth={1.8} aria-hidden />}>
             Failure inbox
           </ConsoleEyebrow>
-          <h1 className="display max-w-4xl text-5xl leading-[0.92] text-foreground sm:text-6xl lg:text-7xl">
+          <h1 className="landing-display-lg max-w-4xl">
             Incidents requiring judgment
           </h1>
           <p className="mt-5 max-w-2xl text-sm leading-6 text-muted-foreground">
