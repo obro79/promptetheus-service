@@ -1,0 +1,39 @@
+[
+  {
+    "type": "user_message",
+    "session_id": "01J9XQABCDEFGHJKMNPQRSTVW",
+    "timestamp": "2026-06-12T12:34:56.000Z",
+    "seq": 1,
+    "idempotency_key": "01J9XQABCDEFGHJKMNPQRSTVW:a1b2c3d4:1",
+    "payload": { "content": "book Tuesday 2pm Pacific" }
+  },
+  {
+    "type": "browser_action",
+    "session_id": "01J9XQABCDEFGHJKMNPQRSTVW",
+    "timestamp": "2026-06-12T12:34:57.000Z",
+    "seq": 2,
+    "idempotency_key": "01J9XQABCDEFGHJKMNPQRSTVW:a1b2c3d4:2",
+    "payload": { "action": "click", "target": "[data-day=tuesday]" }
+  },
+  {
+    "type": "replay_artifact",
+    "session_id": "01J9XQABCDEFGHJKMNPQRSTVW",
+    "timestamp": "2026-06-12T12:35:00.000Z",
+    "seq": 10,
+    "idempotency_key": "01J9XQABCDEFGHJKMNPQRSTVW:a1b2c3d4:10",
+    "payload": {
+      "artifact_id": "art_1",
+      "storage_path": "artifacts/ws/sess/art_1/recording.webm",
+      "artifact_type": "screen_recording",
+      "event_time_map": { "2": 1200 }
+    }
+  },
+  {
+    "type": "session_end",
+    "session_id": "01J9XQABCDEFGHJKMNPQRSTVW",
+    "timestamp": "2026-06-12T12:35:01.000Z",
+    "seq": 11,
+    "idempotency_key": "01J9XQABCDEFGHJKMNPQRSTVW:a1b2c3d4:11",
+    "payload": { "status": "failed" }
+  }
+]

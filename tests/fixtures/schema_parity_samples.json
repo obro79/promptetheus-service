@@ -1,0 +1,31 @@
+[
+  {
+    "type": "user_message",
+    "session_id": "01J0000000000000000000000",
+    "timestamp": "2026-01-01T00:00:00Z",
+    "seq": 0,
+    "idempotency_key": "01J0000000000000000000000:abc12345:0",
+    "payload": { "content": "Book a room for Tuesday" }
+  },
+  {
+    "type": "replay_artifact",
+    "session_id": "01J0000000000000000000000",
+    "timestamp": "2026-01-01T00:00:01Z",
+    "seq": 1,
+    "idempotency_key": "01J0000000000000000000000:abc12345:1",
+    "payload": {
+      "artifact_id": "artifact_1",
+      "artifact_type": "screen_recording",
+      "storage_path": "artifacts/ws_dev/01J.../artifact_1/recording.webm",
+      "event_time_map": { "0": 0, "1": 1200 }
+    }
+  },
+  {
+    "type": "session_end",
+    "session_id": "01J0000000000000000000000",
+    "timestamp": "2026-01-01T00:00:02Z",
+    "seq": 2,
+    "idempotency_key": "01J0000000000000000000000:abc12345:2",
+    "payload": { "status": "failed", "error": "goal_check failed" }
+  }
+]

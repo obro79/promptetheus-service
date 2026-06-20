@@ -1,0 +1,100 @@
+{
+  "create_trace": {
+    "request": {
+      "user_goal": "Book a meeting room for Tuesday",
+      "agent": "acme-meet-agent",
+      "id": "trace_demo_1"
+    },
+    "response": {
+      "trace": {
+        "id": "trace_demo_1",
+        "workspace_id": "ws_dev",
+        "project_id": "proj_dev",
+        "user_goal": "Book a meeting room for Tuesday",
+        "agent": "acme-meet-agent"
+      }
+    },
+    "status": 201
+  },
+  "append_events_batch": {
+    "request": {
+      "events": [
+        {
+          "type": "user_message",
+          "session_id": "trace_demo_1",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "seq": 0,
+          "idempotency_key": "trace_demo_1:n1:0",
+          "payload": { "content": "Book Tuesday" }
+        }
+      ]
+    },
+    "response": { "accepted": 1, "rejected": [] },
+    "status": 200
+  },
+  "upload_artifact": {
+    "request": {
+      "content_type": "image/png",
+      "size_bytes": 1024,
+      "filename": "step-3.png",
+      "artifact_type": "screenshot"
+    },
+    "response": {
+      "artifact": {
+        "artifact_id": "artifact_1",
+        "storage_path": "artifacts/ws_dev/trace_demo_1/artifact_1/step-3.png"
+      }
+    },
+    "status": 201
+  },
+  "list_sessions": {
+    "response": {
+      "sessions": [
+        {
+          "id": "trace_demo_1",
+          "labels": ["browser_goal_mismatch"]
+        }
+      ]
+    },
+    "status": 200
+  },
+  "analyze": {
+    "response": {
+      "analysis": {
+        "labels": ["browser_goal_mismatch"],
+        "fallback": false
+      },
+      "incidents": [],
+      "fallback": false
+    },
+    "status": 200
+  },
+  "fix_agent": {
+    "response": {
+      "incident_id": "incident_ws_dev_browser_goal_mismatch",
+      "plan": [],
+      "diff": "",
+      "fallback": true
+    },
+    "status": 200
+  },
+  "regression_run": {
+    "response": {
+      "regression_run": { "fallback": true },
+      "fallback": true
+    },
+    "status": 200
+  },
+  "error_422_single_event": {
+    "request": {
+      "type": "not_a_real_type",
+      "session_id": "trace_demo_1",
+      "timestamp": "2026-01-01T00:00:00Z",
+      "seq": 0,
+      "idempotency_key": "bad",
+      "payload": {}
+    },
+    "response": { "detail": "unknown event type" },
+    "status": 422
+  }
+}
