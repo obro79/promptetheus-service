@@ -54,6 +54,7 @@ from promptetheus.server.fix_agent.runner import (
     connected_repo_stub,
 )
 from promptetheus.server.fix_agent.runners import get_runner
+from promptetheus.server.fix_agent.orchestrator import run_loop
 from promptetheus.server.github import (
     GitHubConfig,
     create_pull_request,
@@ -319,6 +320,10 @@ def create_app(
             "workspace_id": ctx.workspace_id,
             "project_id": ctx.project_id,
         }
+        # Agnostic source tag (browserbase / lambda / ...) threaded through the heal
+        # loop so the same pipeline visibly heals incidents from any deployment.
+        if body.get("source") is not None:
+            session["source"] = body["source"]
         if body.get("id") is not None:
             session["id"] = body["id"]
         created = app.state.store.create_session(session)
@@ -856,6 +861,50 @@ def create_app(
             "fallback": result_dict.get("fallback", True),
             "github_pr": github_pr,
         }
+
+    @app.post("/api/incidents/{id}/heal")
+    async def heal_incident_endpoint(id: str, request: Request) -> dict[str, Any]:
+        """Run the bounded self-healing loop for an incident.
+
+        Diagnose -> verify (LLM critique + regression) up to the attempt cap, then
+        open a PR and stop for a human to merge (or escalate if unverified). The
+        orchestrator (in-process or Agentspan) is selected by env; the heal steps
+        are the same callables either way.
+        """
+
+        ctx = _authenticate(request)
+        _require_principal(ctx, ("console",))
+        incident = _require_incident_in_workspace(id, ctx)
+
+        body = await _json_body(request)
+        max_attempts = body.get("max_attempts") if isinstance(body, dict) else None
+        if max_attempts is not None and (
+            isinstance(max_attempts, bool) or not isinstance(max_attempts, int)
+        ):
+            raise _HTTPError(400, "max_attempts must be an integer")
+
+        try:
+            report = run_loop(app.state.store, incident, max_attempts=max_attempts)
+        except ValueError as exc:
+            raise _HTTPError(400, str(exc)) from exc
+
+        app.state.store.add_audit(
+            {
+                "workspace_id": incident.get("workspace_id"),
+                "project_id": incident.get("project_id"),
+                "action": "heal_loop",
+                "incident_id": id,
+                "actor_kind": ctx.kind,
+                "metadata": {
+                    "status": report.status,
+                    "attempts": report.attempts,
+                    "source": report.source,
+                    "orchestrator": report.orchestrator,
+                    "workflow_run_id": report.workflow_run_id,
+                },
+            }
+        )
+        return report.as_dict()
 
     @app.post("/api/incidents/{id}/regression-runs")
     async def trigger_regression_run(id: str, request: Request) -> dict[str, Any]:

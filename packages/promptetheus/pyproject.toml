@@ -32,6 +32,13 @@ server = [
     "uvicorn>=0.29",
     "psycopg[binary]>=3.2",
 ]
+# Self-healing loop: real Claude fix runner + verifier, Redis fix-memory/timeline,
+# Voyage embeddings. All lazy-imported and degrade to safe defaults when absent.
+agent = [
+    "anthropic>=0.45",
+    "redis>=5.0",
+    "voyageai>=0.3",
+]
 mcp = [
     "mcp>=1.0",
     "httpx>=0.27",
@@ -84,6 +91,12 @@ module = [
     "psycopg",
     "psycopg.*",
     "cryptography.*",
+    "anthropic",
+    "anthropic.*",
+    "redis",
+    "redis.*",
+    "voyageai",
+    "conductor.*",
 ]
 ignore_missing_imports = true
 
