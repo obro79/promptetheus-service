@@ -1,0 +1,145 @@
+{
+  "ses_acmemeet_tue2pm": [
+    {
+      "artifact_id": "art_video_tue2pm",
+      "session_id": "ses_acmemeet_tue2pm",
+      "storage_path": "/mock-artifacts/acmemeet-tue2pm.mp4",
+      "content_type": "video/mp4",
+      "size_bytes": 4823104,
+      "event_time_map": {
+        "4": 3,
+        "6": 5,
+        "10": 9,
+        "13": 11,
+        "14": 12,
+        "15": 13,
+        "17": 15,
+        "18": 24
+      },
+      "duration_s": 24,
+      "kind": "video"
+    },
+    {
+      "artifact_id": "art_shot_2am",
+      "session_id": "ses_acmemeet_tue2pm",
+      "storage_path": "/mock-artifacts/acmemeet-tue2pm/02-time-selected-2am.png",
+      "content_type": "image/png",
+      "size_bytes": 184320,
+      "event_time_map": { "13": 11 },
+      "duration_s": 0,
+      "kind": "screenshot"
+    },
+    {
+      "artifact_id": "art_shot_warning",
+      "session_id": "ses_acmemeet_tue2pm",
+      "storage_path": "/mock-artifacts/acmemeet-tue2pm/03-warning-visible.png",
+      "content_type": "image/png",
+      "size_bytes": 196608,
+      "event_time_map": { "15": 13 },
+      "duration_s": 0,
+      "kind": "screenshot"
+    },
+    {
+      "artifact_id": "art_dom_warning",
+      "session_id": "ses_acmemeet_tue2pm",
+      "storage_path": "/mock-artifacts/acmemeet-tue2pm/dom-warning.json",
+      "content_type": "application/json",
+      "size_bytes": 8192,
+      "event_time_map": { "14": 12 },
+      "duration_s": 0,
+      "kind": "dom_snapshot"
+    }
+  ],
+  "ses_book_thu3pm": [
+    {
+      "artifact_id": "art_video_thu3pm",
+      "session_id": "ses_book_thu3pm",
+      "storage_path": "/mock-artifacts/book-thu3pm.mp4",
+      "content_type": "video/mp4",
+      "size_bytes": 3211264,
+      "event_time_map": { "3": 3, "6": 8, "8": 10, "10": 19 },
+      "duration_s": 19,
+      "kind": "video"
+    },
+    {
+      "artifact_id": "art_shot_thu3pm",
+      "session_id": "ses_book_thu3pm",
+      "storage_path": "/mock-artifacts/book-thu3pm/time-selected.png",
+      "content_type": "image/png",
+      "size_bytes": 172032,
+      "event_time_map": { "8": 10 },
+      "duration_s": 0,
+      "kind": "screenshot"
+    }
+  ],
+  "ses_refund_ticket": [
+    {
+      "artifact_id": "art_video_refund",
+      "session_id": "ses_refund_ticket",
+      "storage_path": "/mock-artifacts/refund-ticket.mp4",
+      "content_type": "video/mp4",
+      "size_bytes": 3604480,
+      "event_time_map": { "3": 3, "5": 6, "7": 9, "9": 21 },
+      "duration_s": 21,
+      "kind": "video"
+    },
+    {
+      "artifact_id": "art_shot_refund",
+      "session_id": "ses_refund_ticket",
+      "storage_path": "/mock-artifacts/refund-ticket/cart.png",
+      "content_type": "image/png",
+      "size_bytes": 165888,
+      "event_time_map": { "7": 9 },
+      "duration_s": 0,
+      "kind": "screenshot"
+    }
+  ],
+  "ses_form_submit": [
+    {
+      "artifact_id": "art_shot_form",
+      "session_id": "ses_form_submit",
+      "storage_path": "/mock-artifacts/form-submit/errors.png",
+      "content_type": "image/png",
+      "size_bytes": 158720,
+      "event_time_map": { "4": 6 },
+      "duration_s": 0,
+      "kind": "screenshot"
+    }
+  ],
+  "ses_delete_workspace": [
+    {
+      "artifact_id": "art_shot_delete",
+      "session_id": "ses_delete_workspace",
+      "storage_path": "/mock-artifacts/delete-workspace/modal.png",
+      "content_type": "image/png",
+      "size_bytes": 142336,
+      "event_time_map": { "5": 6 },
+      "duration_s": 0,
+      "kind": "screenshot"
+    }
+  ],
+  "ses_coding_falsefix": [
+    {
+      "artifact_id": "art_dom_coding",
+      "session_id": "ses_coding_falsefix",
+      "storage_path": "/mock-artifacts/coding-falsefix/pytest-output.txt",
+      "content_type": "text/plain",
+      "size_bytes": 4096,
+      "event_time_map": { "6": 35 },
+      "duration_s": 0,
+      "kind": "dom_snapshot"
+    }
+  ],
+  "ses_voice_refund_false_success": [
+    {
+      "artifact_id": "art_voice_refund_call",
+      "session_id": "ses_voice_refund_false_success",
+      "storage_path": "/mock-artifacts/voice/refund-false-success.wav",
+      "content_type": "audio/wav",
+      "size_bytes": 967680,
+      "event_time_map": { "0": 0, "2": 4, "3": 7.4, "5": 8.7, "6": 12, "7": 13.1, "8": 17.4, "9": 19.2, "10": 30 },
+      "duration_s": 30.2,
+      "kind": "audio"
+    }
+  ]
+}

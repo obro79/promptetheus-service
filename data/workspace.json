@@ -1,0 +1,27 @@
+{
+  "workspace": {
+    "id": "ws_acme",
+    "name": "Acme Corp",
+    "created_at": "2026-04-02T09:14:00.000Z"
+  },
+  "projects": [
+    {
+      "id": "prj_acmemeet",
+      "workspace_id": "ws_acme",
+      "name": "AcmeMeet Agent",
+      "api_key_preview": "pk_live_…a1b2",
+      "connected_repo": "acme/acmemeet-agent",
+      "retention_days": 30,
+      "created_at": "2026-04-02T09:21:00.000Z"
+    },
+    {
+      "id": "prj_acmesupport",
+      "workspace_id": "ws_acme",
+      "name": "AcmeSupport Agent",
+      "api_key_preview": "pk_live_…7f3c",
+      "connected_repo": "acme/acmesupport-agent",
+      "retention_days": 30,
+      "created_at": "2026-04-09T13:02:00.000Z"
+    }
+  ]
+}

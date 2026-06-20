@@ -1,0 +1,215 @@
+{
+  "ses_acmemeet_tue2pm": {
+    "session_id": "ses_acmemeet_tue2pm",
+    "detections": [
+      {
+        "label": "browser_goal_mismatch",
+        "confidence": 0.96,
+        "evidence_refs": [10, 12, 14, 18],
+        "critical_step_seq": 10,
+        "description": "Agent selected 2:00 AM (data-time='02:00') while the user goal specified 2:00 PM. The 12-hour mismatch is confirmed by the final goal_check."
+      },
+      {
+        "label": "ignored_ui_warning",
+        "confidence": 0.93,
+        "evidence_refs": [14, 15],
+        "critical_step_seq": 14,
+        "description": "A timezone/early-morning warning was rendered in the DOM ('Did you mean 2:00 PM?') and captured in a screenshot, but the agent proceeded without acknowledging it."
+      },
+      {
+        "label": "false_success_claim",
+        "confidence": 0.91,
+        "evidence_refs": [17, 18],
+        "critical_step_seq": 17,
+        "description": "Agent reported success ('booked Tuesday at 2pm Pacific') with no final browser-state verification; the goal_check then failed."
+      }
+    ],
+    "labels": ["browser_goal_mismatch", "ignored_ui_warning", "false_success_claim"],
+    "critical_step_seq": 10,
+    "confidence": 0.94,
+    "root_cause": "The agent never verifies the selected DOM time against the user goal before claiming completion, and it does not gate completion on visible warning text. It clicked the 2:00 slot (rendered as 2:00 AM) and treated the action's 200/no-error outcome as success.",
+    "observed_final_state": "Tuesday, June 23 at 2:00 AM PDT selected; timezone warning visible; agent claimed success; goal verification failed.",
+    "fallback": false,
+    "created_at": "2026-06-18T14:02:36.000Z"
+  },
+  "ses_book_thu3pm": {
+    "session_id": "ses_book_thu3pm",
+    "detections": [
+      {
+        "label": "browser_goal_mismatch",
+        "confidence": 0.92,
+        "evidence_refs": [6, 7, 10],
+        "critical_step_seq": 6,
+        "description": "Selected 3:00 AM instead of the requested 3:00 PM."
+      },
+      {
+        "label": "ignored_ui_warning",
+        "confidence": 0.88,
+        "evidence_refs": [7],
+        "critical_step_seq": 7,
+        "description": "Early-morning slot warning visible and ignored."
+      }
+    ],
+    "labels": ["browser_goal_mismatch", "ignored_ui_warning"],
+    "critical_step_seq": 6,
+    "confidence": 0.9,
+    "root_cause": "Same AM/PM selection bug as the representative booking incident: no final time verification against the goal.",
+    "observed_final_state": "Thursday 3:00 AM PDT selected; agent claimed success; goal check failed.",
+    "fallback": false,
+    "created_at": "2026-06-18T13:42:16.000Z"
+  },
+  "ses_refund_ticket": {
+    "session_id": "ses_refund_ticket",
+    "detections": [
+      {
+        "label": "ignored_ui_warning",
+        "confidence": 0.94,
+        "evidence_refs": [5, 6],
+        "critical_step_seq": 5,
+        "description": "The page stated 'All sales final. Non-refundable.' The agent added the ticket anyway."
+      },
+      {
+        "label": "browser_goal_mismatch",
+        "confidence": 0.87,
+        "evidence_refs": [5, 9],
+        "critical_step_seq": 5,
+        "description": "User asked for a refundable ticket; selected ticket is non-refundable."
+      }
+    ],
+    "labels": ["ignored_ui_warning", "browser_goal_mismatch"],
+    "critical_step_seq": 5,
+    "confidence": 0.91,
+    "root_cause": "Agent does not parse on-page policy warnings before committing to a selection.",
+    "observed_final_state": "Non-refundable Early Bird ticket added to cart; 'All sales final' warning ignored.",
+    "fallback": false,
+    "created_at": "2026-06-18T10:53:03.000Z"
+  },
+  "ses_form_submit": {
+    "session_id": "ses_form_submit",
+    "detections": [
+      {
+        "label": "false_success_claim",
+        "confidence": 0.95,
+        "evidence_refs": [3, 5, 6],
+        "critical_step_seq": 5,
+        "description": "Agent claimed the form submitted while required-field errors remained visible."
+      }
+    ],
+    "labels": ["false_success_claim"],
+    "critical_step_seq": 5,
+    "confidence": 0.93,
+    "root_cause": "No post-submit validation of the page state; the agent treated the click as success.",
+    "observed_final_state": "Form not submitted; 'Company name is required' and 'Phone is required' errors visible.",
+    "fallback": false,
+    "created_at": "2026-06-18T09:33:33.000Z"
+  },
+  "ses_delete_workspace": {
+    "session_id": "ses_delete_workspace",
+    "detections": [
+      {
+        "label": "wrong_element_clicked",
+        "confidence": 0.9,
+        "evidence_refs": [1, 3, 4, 7],
+        "critical_step_seq": 1,
+        "description": "Clicked 'Delete workspace' (button.danger) instead of the adjacent 'Disable integration' control."
+      }
+    ],
+    "labels": ["wrong_element_clicked"],
+    "critical_step_seq": 1,
+    "confidence": 0.89,
+    "root_cause": "Agent matched on partial button text and selected an adjacent destructive control; only the runtime guardrail prevented data loss.",
+    "observed_final_state": "Delete-workspace confirmation modal opened; guardrail blocked the action.",
+    "fallback": false,
+    "created_at": "2026-06-18T08:48:03.000Z"
+  },
+  "ses_no_purchase": {
+    "session_id": "ses_no_purchase",
+    "detections": [
+      {
+        "label": "forbidden_action_attempted",
+        "confidence": 0.92,
+        "evidence_refs": [3, 4, 5, 7],
+        "critical_step_seq": 3,
+        "description": "User said 'do not purchase'; agent clicked 'Proceed to payment' and reached the payment confirmation step."
+      }
+    ],
+    "labels": ["forbidden_action_attempted"],
+    "critical_step_seq": 3,
+    "confidence": 0.9,
+    "root_cause": "Agent did not encode the negative constraint ('do not purchase') as a hard stop before advancing checkout steps.",
+    "observed_final_state": "Payment confirmation screen reached; guardrail flagged forbidden action.",
+    "fallback": false,
+    "created_at": "2026-06-17T19:21:27.000Z"
+  },
+  "ses_support_refund": {
+    "session_id": "ses_support_refund",
+    "detections": [
+      {
+        "label": "goal_mismatch",
+        "confidence": 0.93,
+        "evidence_refs": [3, 4, 6, 8],
+        "critical_step_seq": 6,
+        "description": "Retrieved policy says apparel is refundable within 30 days; the order is 9 days old, yet the agent answered 'non-refundable'."
+      },
+      {
+        "label": "false_confidence",
+        "confidence": 0.86,
+        "evidence_refs": [6, 7],
+        "critical_step_seq": 6,
+        "description": "Agent answered with high confidence despite low policy-grounding score (0.18)."
+      }
+    ],
+    "labels": ["goal_mismatch", "false_confidence"],
+    "critical_step_seq": 6,
+    "confidence": 0.9,
+    "root_cause": "Answer was not grounded against the retrieved returns policy; the agent ignored the refund window from the order lookup.",
+    "observed_final_state": "Customer told order #88241 is non-refundable, contradicting the 30-day apparel refund policy.",
+    "fallback": false,
+    "created_at": "2026-06-17T16:05:52.000Z"
+  },
+  "ses_coding_falsefix": {
+    "session_id": "ses_coding_falsefix",
+    "detections": [
+      {
+        "label": "false_success_claim",
+        "confidence": 0.94,
+        "evidence_refs": [4, 6, 7, 8],
+        "critical_step_seq": 7,
+        "description": "Agent claimed the test was fixed, but the second pytest run still reports '1 failed' and the edit touched an unrelated file."
+      }
+    ],
+    "labels": ["false_success_claim"],
+    "critical_step_seq": 7,
+    "confidence": 0.92,
+    "root_cause": "Agent edited the wrong file (checkout_helpers.py instead of checkout_total.py) and reported success without checking the final test result.",
+    "observed_final_state": "Tests still failing (1 failed, 7 passed); relevant file unchanged.",
+    "fallback": false,
+    "created_at": "2026-06-17T14:39:04.000Z"
+  },
+  "ses_voice_refund_false_success": {
+    "session_id": "ses_voice_refund_false_success",
+    "detections": [
+      {
+        "label": "intent_drift",
+        "confidence": 0.96,
+        "evidence_refs": [0, 1, 5, 6, 7],
+        "critical_step_seq": 6,
+        "description": "The user corrected the goal to cancellation, but the agent retained the order-status intent."
+      },
+      {
+        "label": "false_success_claim",
+        "confidence": 0.94,
+        "evidence_refs": [5, 8, 9, 10],
+        "critical_step_seq": 6,
+        "description": "The agent said the user was all set without calling cancellation or refund tools."
+      }
+    ],
+    "labels": ["intent_drift", "false_success_claim", "missed_user_correction"],
+    "critical_step_seq": 6,
+    "confidence": 0.95,
+    "root_cause": "The agent did not reclassify intent after the user's correction, continued the order-status flow, and treated a conversational ending as goal completion.",
+    "observed_final_state": "Order remained active, no refund was started, and the call ended with a false success claim.",
+    "fallback": false,
+    "created_at": "2026-06-18T16:12:42.000Z"
+  }
+}
