@@ -8,9 +8,9 @@ import { TopBar } from "@/components/shell/top-bar";
 
 export function AppFrame({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isLanding = pathname === "/";
+  const isStandalone = pathname === "/" || pathname === "/demo";
 
-  if (isLanding) {
+  if (isStandalone) {
     return (
       <main id="main-content" className="min-h-dvh overflow-x-hidden">
         {children}

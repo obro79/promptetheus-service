@@ -1,20 +1,33 @@
-import { notFound } from "next/navigation";
+import {
+  LandingCard,
+  LandingSection,
+} from "@/components/landing/landing-primitives";
 
-import { ForensicConsole } from "@/components/forensics/forensic-console";
-import { getIncidentContext } from "@/lib/data";
+const demoAgents = ["Browser Agent", "Voice Agent", "Chat Agent"] as const;
 
 export default function DemoPage() {
-  const context = getIncidentContext("inc_voice_false_success");
-  if (!context) notFound();
-
   return (
-    <ForensicConsole
-      session={context.session}
-      events={context.events}
-      analysis={context.analysis}
-      artifacts={context.artifacts}
-      incident={context.incident}
-      regressionRuns={context.regression_runs}
-    />
+    <div className="landing-page min-h-dvh overflow-y-auto">
+      <LandingSection
+        className="min-h-dvh py-5 sm:py-6 lg:h-dvh lg:min-h-0 lg:py-8"
+        containerClassName="landing-use-case-container flex min-h-[calc(100dvh-2.5rem)] items-stretch lg:min-h-[calc(100dvh-4rem)]"
+      >
+        <h1 className="sr-only">Promptetheus demo agents</h1>
+        <div className="landing-use-case-grid min-h-full w-full">
+          {demoAgents.map((agent) => (
+            <LandingCard
+              key={agent}
+              as="article"
+              size="compact"
+              className="landing-use-case-card group min-h-full transition-transform duration-200 hover:-translate-y-1"
+            >
+              <div className="landing-use-case-copy">
+                <h2 className="text-2xl font-semibold text-foreground">{agent}</h2>
+              </div>
+            </LandingCard>
+          ))}
+        </div>
+      </LandingSection>
+    </div>
   );
 }
