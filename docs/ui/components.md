@@ -83,7 +83,8 @@ panels that need assistant-window styling.
 Card patterns:
 
 - Basic card: neutral grouped content.
-- Agent card: top agent state, main surface, attached terminal stream.
+- Agent card: compact incident postcard with state, visual replay, failure capture, evidence chips,
+  fix target, and attached stream.
 - Evidence card: highlighted event with type, sequence, and replay context.
 - Metric card: high-contrast value with explicit label.
 - Assistant panel: conversational bubbles plus command input.
@@ -95,11 +96,18 @@ surface is part of a repeated component, such as an agent terminal strip.
 
 ### Three-Agent Card
 
-Each demo card has three zones:
+Each demo card has six compact zones:
 
 1. Header with agent name, modality icon, and fixture/status chip.
-2. Agent surface showing the visible task failure.
-3. Attached terminal stream with the latest 3-5 events.
+2. Visual replay surface showing the visible task failure.
+3. Production-task caption in muted body text.
+4. Failure-captured strip with icon, destructive tone, and one sharp failure sentence.
+5. Evidence chips for the state, artifact, transcript, tool, or turn signals.
+6. Fix-target strip plus an attached one-line terminal stream.
+
+Keep the card closer to an incident postcard than a dashboard form. Avoid separate task, failure,
+evidence, fix, and stream cards stacked vertically; only the visual replay, failure strip, fix strip,
+and terminal should have visible containment.
 
 Required states:
 
@@ -160,6 +168,52 @@ Render fix dispatch as a three-step progression:
 
 Each step uses an icon, label, and short detail. Passed state uses `--success`; in-progress uses
 `--warning`.
+
+## Homepage Composition
+
+The homepage should use the `/design-system` stack directly, not a separate marketing style.
+
+First viewport:
+
+- Generated sky, mountain, and desktop backdrop via `--hero-bg-image`.
+- Large white display-serif headline with no hero eyebrow/tag.
+- Brand/nav at the top.
+- Primary CTA: `See the demo`.
+- Secondary CTA: `Open console`.
+- Floating desktop-app stage peeking from the bottom of the hero.
+- Dark assistant overlay describing one concrete Promptetheus failure and fix path.
+
+Current hero copy:
+
+```text
+Purpose-built incident response for AI agents
+
+Promptetheus records messy agent runs, detects likely failures, replays the exact bad step, and
+packages a verified fix path for the coding agent.
+```
+
+Below the hero:
+
+- Three `HomeAgentCard` variants for browser, chat, and voice agents. Each uses the compact
+  incident-postcard structure from the demo component spec.
+- Proof cards: root-cause speed, locked API contract, one incident loop.
+- A six-step `HomeIncidentLoop` timeline with install, event stream, incident, and fix-pipeline surfaces.
+- A lower-page `CaseFilePreview` that preserves the dashboard-style product evidence.
+- Final CTA using the same rounded panel system.
+
+Homepage implementation surfaces:
+
+- `LandingHero`
+- `LandingHeroNav`
+- `LandingDesktopStage`
+- `HomeAgentCard`
+- `AgentVisualSlot`
+- `HomeIncidentLoop`
+- `CaseFilePreview`
+- `HomeCodeBlock`
+- `HomeTerminalStrip`
+- `HomeIncidentRow`
+- `HomeFixPipeline`
 
 ## Navigation Samples
 

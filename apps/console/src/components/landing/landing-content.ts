@@ -8,14 +8,14 @@ import {
 
 // Primary edit surface for landing copy, nav, cards, and mockup labels.
 export const landingNavItems = [
-  { label: "Use cases", href: "#use-cases" },
-  { label: "How it works", href: "#how-it-works" },
-  { label: "Results", href: "#results" },
+  { label: "Agents", href: "#agents" },
+  { label: "Incident loop", href: "#incident-loop" },
+  { label: "Proof", href: "#proof" },
   { label: "Docs", href: "/docs" },
 ] as const;
 
 export const landingHero = {
-  title: "Purpose-built incident response for AI agents",
+  title: "When agents fail in production, know why",
   body:
     "Promptetheus records messy agent runs, detects likely failures, replays the exact bad step, and packages a verified fix path for the coding agent.",
   primaryCta: { label: "See the demo", href: "/demo" },
@@ -23,22 +23,30 @@ export const landingHero = {
 } as const;
 
 export const landingSections = {
-  results: {
-    eyebrow: "Results",
-    title: "From bad run to fix-ready case file",
-  },
-  useCases: {
-    eyebrow: "Use cases",
-    title: "Debug every agent workflow with the same loop",
+  agents: {
+    eyebrow: "Agent coverage",
+    title: "Every workflow fails through evidence",
     body:
-      "Browser, chat, and voice agents all fail through observable moments: clicks, turns, transcripts, tools, artifacts, and outcome signals.",
+      "Browser, chat, and voice agents look different in production, but their failures still reduce to observable moments: actions, turns, transcripts, tools, state, artifacts, and outcomes.",
   },
-  workflow: {
-    eyebrow: "How it works",
-    title: "From setup to prevention in one incident loop",
+  proof: {
+    eyebrow: "Proof",
+    title: "Credibility without turning the homepage into a dashboard",
+  },
+  incidentLoop: {
+    eyebrow: "Incident loop",
+    title: "From trace to regression in one incident loop",
+    body:
+      "Observe the production run, isolate the bad step, replay the evidence, package the fix, and keep the regression target around.",
+  },
+  caseFile: {
+    eyebrow: "Case file",
+    title: "The homepage promise resolves into a fix-ready incident",
+    body:
+      "The console turns live traces into a compact case file: failure volume, critical replay, evidence, fix bundle, and regression status.",
   },
   finalCta: {
-    eyebrow: "Ready for the demo gate",
+    eyebrow: "Demo gate",
     title: "Show the failure, explain it, patch it, and prove it will not regress.",
     primaryCta: { label: "Run the demo", href: "/demo" },
     secondaryCta: { label: "Read API docs", href: "/docs" },
@@ -58,39 +66,133 @@ export const landingProofCards = [
   },
   {
     value: "1",
-    label: "failure loop",
+    label: "incident loop",
     body: "Observe, detect, replay, attribute, patch, and prevent without switching tools.",
   },
 ] as const;
 
-export const landingUseCases: Array<{
-  assetKind: "browser" | "chat" | "voice";
+export const landingAgents: Array<{
+  kind: "browser" | "chat" | "voice";
   assetLabel: string;
   title: string;
-  description: string;
+  task: string;
+  failure: string;
+  evidence: string;
+  fixAction: string;
+  videoSrc?: string;
+  posterSrc?: string;
 }> = [
   {
-    assetKind: "browser",
-    assetLabel: "Pastel product scene showing browser replay evidence cards around a glowing orb",
+    kind: "browser",
+    assetLabel:
+      "Animated browser-agent replay showing a wrong click, ignored warning, and pinned evidence cards",
     title: "Browser agents",
-    description:
-      "Catch wrong clicks, ignored UI warnings, false success claims, and hidden state mismatches.",
+    task: "Complete a checkout or booking flow",
+    failure: "Wrong click after an ignored UI warning",
+    evidence: "DOM state, screenshot, cursor path, warning text",
+    fixAction: "Replay the critical step and hand the UI-state mismatch to the fix agent",
   },
   {
-    assetKind: "chat",
-    assetLabel: "Pastel product scene showing chat drift and clustered unresolved sessions",
+    kind: "chat",
+    assetLabel:
+      "Animated chat-agent replay showing conversation drift, matching sessions, and turn evidence",
     title: "Chat agents",
-    description:
-      "Cluster unresolved conversations and replay the turn that sent the customer off path.",
+    task: "Resolve a customer support issue",
+    failure: "Conversation drift and repeated stale advice",
+    evidence: "User turn, agent turn, cluster count, unresolved outcome",
+    fixAction: "Replay the bad turn and package the prompt/tool context that caused the loop",
   },
   {
-    assetKind: "voice",
-    assetLabel: "Animated voice trace showing a speaking agent, waveform, transcript, and escalation signals",
+    kind: "voice",
+    assetLabel:
+      "Animated voice-agent trace showing waveform, transcript, silence, and failed handoff evidence",
     title: "Voice agents",
-    description:
-      "Trace calls, transcripts, silence, tool handoffs, and escalation moments before they repeat.",
+    task: "Handle a live escalation",
+    failure: "Missed handoff after silence and escalation language",
+    evidence: "Transcript segment, silence duration, tool handoff result, latency",
+    fixAction: "Pin the transcript and failed handoff as a regression target",
   },
 ];
+
+export const landingIncidentLoopSteps = [
+  {
+    label: "Wrap the run",
+    body: "Add Promptetheus around the existing agent entrypoint.",
+  },
+  {
+    label: "Stream every signal",
+    body:
+      "Capture messages, tool calls, model outputs, artifacts, browser state, transcript state, and outcome checks.",
+  },
+  {
+    label: "Detect the bad step",
+    body:
+      "Mark false success claims, drift, policy contradictions, state mismatches, and failed handoffs.",
+  },
+  {
+    label: "Replay the evidence",
+    body: "Open the exact step with trace context, artifact context, and outcome mismatch.",
+  },
+  {
+    label: "Package the fix",
+    body: "Generate a fix brief with root cause, patch context, and the regression target.",
+  },
+  {
+    label: "Prevent repeats",
+    body: "Queue a regression replay so the same failure mode cannot silently return.",
+  },
+] as const;
+
+export const landingIncidentLoopStreamEvents = [
+  {
+    type: "message",
+    body: "user: book Tuesday 2:00 PM Pacific",
+    meta: "+12ms",
+    tone: "prompt",
+  },
+  {
+    type: "tool_call",
+    body: "browser.navigate checkout.acme.test",
+    meta: "+24ms",
+    tone: "tool",
+  },
+  {
+    type: "browser_action",
+    body: "click li[data-time='02:00']",
+    meta: "+31ms",
+    tone: "tool",
+  },
+  {
+    type: "message",
+    body: "agent: booked 2pm slot",
+    meta: "+38ms",
+    tone: "model",
+  },
+  {
+    type: "goal_check",
+    body: "selected slot != requested slot",
+    meta: "+48ms",
+    tone: "warning",
+  },
+  {
+    type: "replay_artifact",
+    body: "dom snapshot + screenshot pinned",
+    meta: "+57ms",
+    tone: "artifact",
+  },
+  {
+    type: "state",
+    body: "checkout warning still visible",
+    meta: "+63ms",
+    tone: "state",
+  },
+  {
+    type: "message",
+    body: "detect: false success claim",
+    meta: "+71ms",
+    tone: "warning",
+  },
+] as const;
 
 export const landingWorkflowSteps: Array<{
   assetKind: "install" | "stream" | "dashboard" | "fix";

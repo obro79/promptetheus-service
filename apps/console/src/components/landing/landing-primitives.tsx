@@ -67,7 +67,7 @@ type SectionHeaderProps = {
   align?: "left" | "center";
   body?: ReactNode;
   className?: string;
-  eyebrow: string;
+  eyebrow?: string;
   eyebrowTone?: "accent" | "muted";
   title: string;
 };
@@ -82,7 +82,7 @@ export function SectionHeader({
 }: SectionHeaderProps) {
   return (
     <div className={cn(align === "center" && "mx-auto max-w-3xl text-center", className)}>
-      <Eyebrow tone={eyebrowTone}>{eyebrow}</Eyebrow>
+      {eyebrow ? <Eyebrow tone={eyebrowTone}>{eyebrow}</Eyebrow> : null}
       <h2 className="landing-display-lg">{title}</h2>
       {body ? <p className="landing-copy mt-5">{body}</p> : null}
     </div>

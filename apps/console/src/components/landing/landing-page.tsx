@@ -4,7 +4,7 @@ import {
   ArrowRight,
   CheckCircle2,
   GitPullRequest,
-  PlayCircle,
+  Play,
   SearchCheck,
   Sparkles,
 } from "lucide-react";
@@ -15,18 +15,16 @@ import {
   heroMockup,
   heroMockupTabs,
   heroSidebarItems,
+  landingAgents,
   landingHero,
+  landingIncidentLoopStreamEvents,
   landingMetricTiles,
   landingNavItems,
   landingProofCards,
   landingSections,
-  landingUseCases,
-  landingWorkflowSteps,
   streamWorkflowEvents,
 } from "@/components/landing/landing-content";
 import {
-  DecorativeField,
-  Eyebrow,
   LandingCard,
   LandingSection,
   SectionHeader,
@@ -65,52 +63,40 @@ const streamEventToneClassNames = {
 export function LandingPage({ stats }: { stats: LandingStats }) {
   return (
     <div className="landing-page">
-      <DecorativeField />
-      <LandingNav />
+      <LandingHero />
 
-      <LandingSection density="hero" containerClassName="landing-hero-content">
-        <h1 className="landing-display-xl max-w-[1120px]">{landingHero.title}</h1>
-        <p className="landing-copy mt-7 max-w-2xl sm:text-lg">{landingHero.body}</p>
+      <LandingSection
+        id="agents"
+        containerClassName="landing-use-case-container grid gap-10"
+      >
+        <SectionHeader
+          align="center"
+          body={landingSections.agents.body}
+          title={landingSections.agents.title}
+        />
 
-        <div className="landing-action-row mt-9">
-          <Button asChild size="lg" className="min-h-12 rounded-full px-6 shadow-glow">
-            <Link href={landingHero.primaryCta.href}>
-              {landingHero.primaryCta.label}
-              <PlayCircle className="size-4" aria-hidden="true" />
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            size="lg"
-            className="min-h-12 rounded-full border-border-strong/70 bg-panel/55 px-6 backdrop-blur"
-          >
-            <Link href={landingHero.secondaryCta.href}>
-              {landingHero.secondaryCta.label}
-              <ArrowRight className="size-4" aria-hidden="true" />
-            </Link>
-          </Button>
+        <div className="grid gap-4 md:grid-cols-3 md:items-start">
+          {landingAgents.map((agent) => (
+            <HomeAgentCard key={agent.title} agent={agent} />
+          ))}
         </div>
-
-        <HeroMockup stats={stats} />
       </LandingSection>
 
       <LandingSection
-        id="results"
+        id="proof"
+        className="bg-canvas"
         density="compact"
-        tone="band"
-        containerClassName="grid gap-5 lg:grid-cols-[0.9fr_1.7fr] lg:items-start"
+        containerClassName="grid gap-8 lg:grid-cols-[0.8fr_1.7fr] lg:items-start"
       >
         <SectionHeader
-          eyebrow={landingSections.results.eyebrow}
-          eyebrowTone="muted"
-          title={landingSections.results.title}
+          className="max-w-md"
+          title={landingSections.proof.title}
         />
         <div className="grid gap-4 sm:grid-cols-3">
           {landingProofCards.map((card) => (
             <LandingCard key={card.label} as="article" className="min-h-[260px]">
-              <p className="display text-6xl leading-none text-foreground">{card.value}</p>
-              <h3 className="mt-6 text-sm font-semibold uppercase tracking-[0.16em] text-accent">
+              <p className="font-display text-7xl leading-none text-foreground">{card.value}</p>
+              <h3 className="mt-6 text-sm font-semibold text-accent">
                 {card.label}
               </h3>
               <p className="mt-4 text-sm leading-6 text-muted-foreground">{card.body}</p>
@@ -119,64 +105,36 @@ export function LandingPage({ stats }: { stats: LandingStats }) {
         </div>
       </LandingSection>
 
-      <LandingSection id="use-cases" containerClassName="landing-use-case-container grid gap-10">
+      <LandingSection
+        id="incident-loop"
+        tone="band"
+        containerClassName="landing-use-case-container grid gap-10"
+      >
         <SectionHeader
           align="center"
-          body={landingSections.useCases.body}
-          eyebrow={landingSections.useCases.eyebrow}
-          title={landingSections.useCases.title}
+          body={landingSections.incidentLoop.body}
+          title={landingSections.incidentLoop.title}
         />
 
-        <div className="landing-use-case-grid">
-          {landingUseCases.map(({ assetKind, assetLabel, title, description }) => (
-            <LandingCard
-              key={title}
-              as="article"
-              size="compact"
-              className="landing-use-case-card group transition-transform duration-200 hover:-translate-y-1"
-            >
-              <UseCaseVideoAsset kind={assetKind} label={assetLabel} />
-              <div className="landing-use-case-copy">
-                <h3 className="text-2xl font-semibold text-foreground">{title}</h3>
-                <p className="mt-3 text-sm leading-6 text-muted-foreground">{description}</p>
-              </div>
-            </LandingCard>
-          ))}
-        </div>
+        <HomeIncidentLoop />
       </LandingSection>
 
-      <LandingSection id="how-it-works" tone="band">
+      <LandingSection
+        id="case-file"
+        containerClassName="landing-use-case-container grid gap-10"
+      >
         <SectionHeader
           align="center"
-          eyebrow={landingSections.workflow.eyebrow}
-          title={landingSections.workflow.title}
+          body={landingSections.caseFile.body}
+          title={landingSections.caseFile.title}
         />
 
-        <div className="landing-workflow-grid">
-          {landingWorkflowSteps.map(({ assetKind, assetLabel, eyebrow, title, body }) => (
-            <LandingCard
-              key={title}
-              as="article"
-              size="compact"
-              className="landing-workflow-card group transition-transform duration-200 hover:-translate-y-1"
-            >
-              <WorkflowVideoAsset kind={assetKind} label={assetLabel} />
-              <div className="landing-workflow-copy">
-                <span className="landing-workflow-number">{eyebrow}</span>
-                <h3 className="mt-5 text-2xl font-semibold text-foreground">{title}</h3>
-                <p className="mt-3 text-sm leading-6 text-muted-foreground">{body}</p>
-              </div>
-            </LandingCard>
-          ))}
-        </div>
+        <CaseFilePreview stats={stats} />
       </LandingSection>
 
       <LandingSection className="text-center" containerClassName="flex flex-col items-center">
-        <LandingCard size="hero" className="landing-cta-card">
-          <div className="absolute inset-x-0 top-0 h-40 bg-accent/10 blur-3xl" aria-hidden="true" />
-          <Eyebrow tone="muted" className="relative">
-            {landingSections.finalCta.eyebrow}
-          </Eyebrow>
+        <LandingCard size="hero" className="landing-cta-card max-w-5xl">
+          <div className="absolute inset-x-0 top-0 h-40 bg-accent/12 blur-3xl" aria-hidden="true" />
           <h2 className="landing-display-lg relative mx-auto max-w-4xl">
             {landingSections.finalCta.title}
           </h2>
@@ -196,6 +154,342 @@ export function LandingPage({ stats }: { stats: LandingStats }) {
       </LandingSection>
     </div>
   );
+}
+
+function LandingHero() {
+  return (
+    <section className="relative isolate min-h-[42rem] overflow-hidden bg-[hsl(var(--hero-sky-top))] pb-20 text-white sm:min-h-[46rem] sm:pb-24">
+      <div className="cluely-hero-backdrop pointer-events-none absolute inset-0" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,hsl(203_91%_55%/0.08)_0%,transparent_38%,hsl(55_95%_93%/0.1)_100%)]" />
+      <LandingHeroNav />
+      <div className="relative z-30 mx-auto flex max-w-6xl flex-col items-center px-4 pt-24 text-center sm:px-6 sm:pt-28 lg:pt-32">
+        <h1 className="max-w-6xl font-display text-[4.4rem] font-normal leading-[0.82] tracking-normal text-white drop-shadow-[0_2px_16px_hsl(205_86%_31%/0.16)] sm:text-[6.4rem] lg:text-[7.8rem]">
+          {landingHero.title}
+        </h1>
+        <p className="mt-9 max-w-3xl text-balance text-xl font-semibold leading-8 text-white/90 drop-shadow-[0_1px_8px_hsl(205_86%_31%/0.18)] sm:text-2xl">
+          {landingHero.body}
+        </p>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <Button
+            asChild
+            className="min-h-14 px-8 text-base shadow-[0_12px_28px_hsl(221_100%_40%/0.34)]"
+            size="lg"
+          >
+            <Link href={landingHero.primaryCta.href}>
+              <Play className="size-4" aria-hidden="true" />
+              {landingHero.primaryCta.label}
+            </Link>
+          </Button>
+          <Button
+            asChild
+            className="border-white/30 bg-foreground/45 px-8 text-base text-white shadow-[0_12px_28px_hsl(205_86%_31%/0.12)] hover:bg-foreground/55"
+            size="lg"
+            variant="outline"
+          >
+            <Link href={landingHero.secondaryCta.href}>
+              {landingHero.secondaryCta.label}
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function LandingHeroNav() {
+  return (
+    <header className="relative z-40 mx-auto flex h-20 max-w-6xl items-center gap-8 px-5 text-white sm:px-8">
+      <nav className="hidden items-center gap-7 text-lg font-semibold text-white/90 md:flex">
+        {landingNavItems.map((item) => (
+          <Link key={item.href} href={item.href} className="transition-colors hover:text-white">
+            {item.label}
+          </Link>
+        ))}
+      </nav>
+      <Button
+        asChild
+        className="ml-auto min-h-11 border-white/35 bg-white/16 px-5 text-white hover:bg-white/24"
+        variant="outline"
+      >
+        <Link href="/demo">See demo</Link>
+      </Button>
+    </header>
+  );
+}
+
+function HomeAgentCard({
+  agent,
+}: {
+  agent: (typeof landingAgents)[number];
+}) {
+  return (
+    <article className="surface flex flex-col overflow-hidden rounded-[1.45rem] border-border/80 bg-panel/90 shadow-[0_22px_64px_hsl(var(--shadow-color)/0.13)]">
+      <div className="border-b border-border/50 px-4 py-3">
+        <h3 className="text-sm font-semibold text-foreground">{agent.title}</h3>
+      </div>
+
+      <div className="flex flex-1 flex-col p-3 pb-0">
+        <AgentVisualSlot agent={agent} />
+      </div>
+
+      <div className="px-4 py-3">
+        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/75">
+          Production task
+        </p>
+        <p className="mt-1 text-sm leading-snug text-muted-foreground">{agent.task}</p>
+      </div>
+    </article>
+  );
+}
+
+function AgentVisualSlot({ agent }: { agent: (typeof landingAgents)[number] }) {
+  const sceneToneClass = {
+    browser: "landing-video-asset-browser",
+    chat: "landing-video-asset-chat",
+    voice: "landing-video-asset-voice",
+  }[agent.kind];
+
+  if (agent.videoSrc) {
+    return (
+      <video
+        aria-label={agent.assetLabel}
+        autoPlay
+        className={cn(
+          "landing-agent-card-visual w-full rounded-[1rem] border border-border/75 bg-white/60 object-cover",
+          sceneToneClass,
+        )}
+        loop
+        muted
+        playsInline
+        poster={agent.posterSrc}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "landing-agent-card-visual relative w-full overflow-hidden rounded-[1rem] border border-border/75 bg-[linear-gradient(180deg,hsl(var(--elevated)/0.86),hsl(var(--panel)/0.92))] shadow-inner",
+        sceneToneClass,
+      )}
+      role="img"
+      aria-label={agent.assetLabel}
+    >
+      {agent.kind === "browser" ? <BrowserMiniScene /> : null}
+      {agent.kind === "chat" ? <ChatMiniScene /> : null}
+      {agent.kind === "voice" ? <VoiceMiniScene /> : null}
+    </div>
+  );
+}
+
+function BrowserMiniScene() {
+  return (
+    <div className="landing-agent-scene landing-agent-mini-scene" aria-hidden="true">
+      <div className="landing-agent-mini-browser-panel">
+        <div className="landing-browser-chrome">
+          <span />
+          <span />
+          <span />
+          <div>checkout.acme.test/book</div>
+        </div>
+        <div className="landing-browser-page">
+          <div className="landing-browser-hero-line" />
+          <div className="landing-browser-row landing-browser-row-short" />
+          <div className="landing-browser-row" />
+          <div className="landing-browser-slot-grid">
+            <div className="landing-browser-slot">Mon 10:00 AM</div>
+            <div className="landing-browser-slot landing-browser-slot-active">Tue 2:00 PM</div>
+          </div>
+          <div className="landing-browser-target">Confirm order</div>
+          <div className="landing-browser-click-ring landing-agent-mini-click-ring" />
+          <div className="landing-browser-cursor landing-agent-mini-cursor" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChatMiniScene() {
+  return (
+    <div className="landing-agent-scene landing-agent-mini-scene" aria-hidden="true">
+      <div className="landing-chat-reel landing-chat-window landing-agent-mini-chat-window">
+        <div className="landing-chat-bubble landing-chat-user">
+          I still cannot access my workspace.
+        </div>
+        <div className="landing-chat-bubble landing-chat-agent">
+          Try refreshing and signing in again.
+        </div>
+        <div className="landing-chat-bubble landing-chat-user">
+          That loops me back to billing.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const voiceWaveHeights = [36, 62, 44, 78, 54, 88, 48, 70, 40] as const;
+
+function VoiceMiniScene() {
+  return (
+    <div
+      className="landing-agent-scene landing-agent-mini-scene landing-speaking-scene"
+      aria-hidden="true"
+    >
+      <div className="landing-voice-component landing-agent-mini-voice-component">
+        <div className="landing-voice-status">
+          <span />
+          Live trace
+        </div>
+        <div className="landing-voice-core">
+          <span className="landing-voice-ring landing-voice-ring-one" />
+          <span className="landing-voice-ring landing-voice-ring-two" />
+          <span className="landing-voice-avatar">AI</span>
+        </div>
+        <div className="landing-waveform">
+          {voiceWaveHeights.map((height, index) => (
+            <span
+              key={`${height}-${index}`}
+              style={
+                {
+                  "--wave-height": `${height}%`,
+                  "--wave-index": index,
+                } as CSSProperties
+              }
+            />
+          ))}
+        </div>
+        <div className="landing-voice-transcript-card">
+          <span>Caller: I need a human now.</span>
+          <span>Agent: I can continue helping.</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HomeIncidentLoop() {
+  return (
+    <div className="landing-instrumentation-loop surface overflow-hidden rounded-[1.6rem] border-border/80 bg-panel/90">
+      <IncidentInstrumentationPanel />
+      <IncidentTraceStreamPanel />
+    </div>
+  );
+}
+
+const loopTerminalLines = [
+  "$ uv add promptetheus",
+  "resolved 18 packages in 142ms",
+  "installed promptetheus, httpx, pydantic",
+] as const;
+
+function IncidentInstrumentationPanel() {
+  return (
+    <div
+      className="landing-loop-install-panel landing-workflow-asset-install"
+      aria-label="Animated instrumentation setup with package install and trace wrapper"
+    >
+      <div className="landing-loop-install-sequence" aria-hidden="true">
+        <div className="landing-loop-terminal">
+          <div className="landing-loop-panel-bar">
+            <span />
+            <span />
+            <span />
+            <p>terminal</p>
+          </div>
+          <div className="landing-loop-terminal-lines">
+            {loopTerminalLines.map((line, index) => (
+              <code
+                key={line}
+                className={index === 0 ? "landing-loop-terminal-command" : undefined}
+                style={{ "--loop-index": index } as CSSProperties}
+              >
+                {line}
+              </code>
+            ))}
+          </div>
+        </div>
+
+        <div className="landing-loop-editor">
+          <div className="landing-loop-panel-bar">
+            <span />
+            <span />
+            <span />
+            <p>agent.py</p>
+          </div>
+          <div className="landing-loop-editor-lines">
+            <code className="landing-loop-code-import" style={{ "--loop-index": 0 } as CSSProperties}>
+              + import promptetheus as pt
+            </code>
+            <code className="landing-loop-code-existing">  from agents import refund_agent</code>
+            <code className="landing-loop-code-decorator" style={{ "--loop-index": 1 } as CSSProperties}>
+              + @pt.observe(&quot;refund-agent&quot;)
+            </code>
+            <code className="landing-loop-code-existing">  def run_agent(task):</code>
+            <code className="landing-loop-code-existing">      return refund_agent.run(task)</code>
+          </div>
+        </div>
+
+        <div className="landing-loop-install-badge">wrapper added</div>
+      </div>
+    </div>
+  );
+}
+
+function IncidentTraceStreamPanel() {
+  const centerEventIndex = landingIncidentLoopStreamEvents.findIndex(
+    (event) => event.type === "browser_action",
+  );
+  const streamCenterIndex = centerEventIndex >= 0 ? centerEventIndex : 0;
+  const centerPhase = 4;
+
+  return (
+    <div
+      className="landing-loop-stream-panel landing-workflow-asset-stream"
+      aria-label="Live trace event stream"
+    >
+      <div className="landing-stream-window landing-loop-stream-window" aria-hidden="true">
+        <div className="landing-stream-header">
+          <span />
+          <p>trace bus</p>
+          <strong>2.4k events/min</strong>
+        </div>
+
+        <div className="landing-stream-viewport">
+          <div className="landing-stream-highlight" />
+          <div className="landing-stream-lane landing-loop-stream-lane">
+            {landingIncidentLoopStreamEvents.map((event, index) => {
+              const streamPhase =
+                (index - streamCenterIndex + centerPhase + landingIncidentLoopStreamEvents.length) %
+                landingIncidentLoopStreamEvents.length;
+
+              return (
+                <div
+                  key={`${event.type}-${index}`}
+                  className={cn("landing-stream-event", streamEventToneClassNames[event.tone])}
+                  style={{ "--stream-phase": streamPhase } as CSSProperties}
+                >
+                  <span>{event.type.replaceAll("_", " ")}</span>
+                  <p>{event.body}</p>
+                  <em>{event.meta}</em>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="landing-stream-footer">
+          <span>WebSocket ingest</span>
+          <span>FastAPI gateway</span>
+          <span>Supabase write</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CaseFilePreview({ stats }: { stats: LandingStats }) {
+  return <HeroMockup stats={stats} />;
 }
 
 function LandingNav() {

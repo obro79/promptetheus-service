@@ -65,11 +65,11 @@ export default function DesignSystemPage() {
 
   return (
     <main className="min-h-dvh overflow-hidden bg-canvas text-foreground">
+      <Hero />
       <section className="relative isolate px-4 py-6 sm:px-6 lg:px-8">
-        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[36rem] bg-[linear-gradient(180deg,hsl(var(--glow-accent)/0.32),transparent_76%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[linear-gradient(180deg,hsl(var(--hero-sky-mid)/0.2),transparent_76%)]" />
         <div className="mx-auto flex max-w-7xl flex-col gap-6">
           <TopSample />
-          <Hero />
           <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(360px,0.6fr)]">
             <TypographySection />
             <AssistantPanel />
@@ -120,77 +120,141 @@ function TopSample() {
 
 function Hero() {
   return (
-    <section className="grid min-h-[26rem] overflow-hidden rounded-[2rem] border border-white/70 bg-white/60 shadow-[0_36px_120px_hsl(var(--shadow-color)/0.14)] backdrop-blur-2xl lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.7fr)]">
-      <div className="flex flex-col justify-center p-6 sm:p-10 lg:p-12">
-        <p className="mb-5 inline-flex w-fit items-center gap-2 rounded-full border border-border/80 bg-panel/80 px-3 py-1.5 text-sm font-medium text-muted-foreground shadow-sm">
-          <Sparkles className="size-4 text-accent" />
-          Cluely-inspired Promptetheus UI system
-        </p>
-        <h1 className="max-w-3xl text-5xl font-black leading-[0.92] tracking-[-0.04em] text-foreground sm:text-6xl lg:text-7xl">
-          A light assistant interface for agent repair.
+    <section className="relative isolate min-h-[58rem] overflow-hidden bg-[hsl(var(--hero-sky-top))] text-white sm:min-h-[62rem] lg:min-h-[64rem]">
+      <div className="cluely-hero-backdrop pointer-events-none absolute inset-0" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,hsl(203_91%_55%/0.06)_0%,transparent_36%,hsl(55_95%_93%/0.12)_100%)]" />
+      <HeroNav />
+      <div className="relative z-30 mx-auto flex max-w-6xl flex-col items-center px-4 pt-24 text-center sm:px-6 sm:pt-28 lg:pt-32">
+        <h1 className="max-w-5xl font-display text-[4.6rem] font-normal leading-[0.82] tracking-normal text-white drop-shadow-[0_2px_16px_hsl(205_86%_31%/0.16)] sm:text-[6.7rem] lg:text-[8rem]">
+          Fix failing agents as they happen
         </h1>
-        <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-          Blue signal color, floating panels, rounded desktop windows, and compact evidence streams
-          for the next Promptetheus demo rebuild.
+        <p className="mt-9 max-w-3xl text-balance text-xl font-semibold leading-8 text-white/90 drop-shadow-[0_1px_8px_hsl(205_86%_31%/0.18)] sm:text-2xl">
+          Promptetheus streams the trace, isolates the bad step, and hands a tested patch to your
+          coding agent.
         </p>
-        <div className="mt-8 flex flex-wrap items-center gap-3">
-          <Button size="lg">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <Button className="min-h-14 px-8 text-base shadow-[0_12px_28px_hsl(221_100%_40%/0.34)]" size="lg">
             <Play />
             Play demo
           </Button>
-          <Button size="lg" variant="secondary">
-            View components
+          <Button
+            className="border-white/35 bg-white/15 px-8 text-base text-white shadow-[0_12px_28px_hsl(205_86%_31%/0.1)] hover:bg-white/24"
+            size="lg"
+            variant="outline"
+          >
+            View tokens
             <ArrowRight />
           </Button>
         </div>
       </div>
-      <div className="relative min-h-[28rem] overflow-hidden bg-[linear-gradient(155deg,hsl(var(--accent-muted)),hsl(0_0%_100%/0.2))] p-5">
-        <div className="absolute inset-x-8 top-8 rounded-[1.6rem] border border-white/80 bg-panel/75 p-3 shadow-[0_26px_80px_hsl(var(--shadow-color)/0.16)] backdrop-blur-2xl">
-          <div className="mb-3 flex items-center gap-2">
-            <span className="size-3 rounded-full bg-destructive/70" />
-            <span className="size-3 rounded-full bg-warning/70" />
-            <span className="size-3 rounded-full bg-success/70" />
-            <span className="ml-2 h-7 flex-1 rounded-full border border-border/70 bg-white/60" />
-          </div>
-          <div className="grid gap-2">
-            <div className="h-24 rounded-[1.1rem] border border-border/70 bg-white/80 p-4">
-              <div className="h-3 w-32 rounded-full bg-foreground/12" />
-              <div className="mt-3 h-2 w-full rounded-full bg-accent/20" />
-              <div className="mt-2 h-2 w-3/4 rounded-full bg-accent/14" />
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {["01:00", "02:00", "14:00"].map((time) => (
-                <div
-                  key={time}
-                  className={cn(
-                    "rounded-2xl border px-3 py-4 text-center text-sm font-semibold",
-                    time === "02:00"
-                      ? "border-destructive/35 bg-destructive/10 text-destructive"
-                      : time === "14:00"
-                        ? "border-success/35 bg-success/10 text-success"
-                        : "border-border/70 bg-white/70 text-muted-foreground",
-                  )}
-                >
-                  {time}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="absolute bottom-8 right-6 w-[min(22rem,calc(100%-3rem))] rounded-[1.5rem] border border-white/80 bg-foreground p-4 text-background shadow-[0_30px_90px_hsl(var(--shadow-color)/0.28)]">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <span className="inline-flex items-center gap-2 text-sm font-semibold">
-              <ShieldCheck className="size-4 text-accent" />
-              Promptetheus detected
-            </span>
-            <span className="rounded-full bg-white/10 px-2 py-1 text-[11px]">critical</span>
-          </div>
-          <p className="text-sm leading-6 text-background/78">
-            User asked for 2:00 PM. The browser agent selected 02:00 and ignored the page warning.
-          </p>
+      <DesktopStage />
+    </section>
+  );
+}
+
+function HeroNav() {
+  return (
+    <header className="relative z-20 mx-auto flex h-20 max-w-6xl items-center gap-8 px-5 text-white sm:px-8">
+      <div className="flex items-center gap-2.5 text-2xl font-bold">
+        <span className="flex size-8 items-center justify-center rounded-full border-2 border-white/95 text-sm font-black">
+          P
+        </span>
+        Promptetheus
+      </div>
+      <nav className="hidden items-center gap-9 text-lg font-semibold text-white/90 md:flex">
+        {["Demo", "Replay", "Dashboard"].map((item) => (
+          <span key={item} className="transition-colors hover:text-white">
+            {item}
+          </span>
+        ))}
+      </nav>
+    </header>
+  );
+}
+
+function DesktopStage() {
+  return (
+    <div className="absolute inset-x-4 bottom-[-18rem] z-10 mx-auto h-[30rem] max-w-[78rem] overflow-hidden rounded-t-[1.6rem] border border-white/35 bg-white/5 shadow-[0_-24px_90px_hsl(206_82%_40%/0.18),0_34px_100px_hsl(223_41%_9%/0.22)] backdrop-blur-[1px] sm:bottom-[-15rem] sm:h-[31rem]">
+      <div className="absolute inset-x-0 top-0 flex h-12 items-center justify-between bg-white/14 px-5 text-white">
+        <Circle className="size-4 fill-white/30 text-white/85" />
+        <div className="flex items-center gap-4 text-white/90">
+          <Radio className="size-4" />
+          <Command className="size-4" />
         </div>
       </div>
-    </section>
+      <FloatingControl />
+      <BrowserWindow />
+      <AssistantGlassOverlay />
+    </div>
+  );
+}
+
+function FloatingControl() {
+  return (
+    <div className="absolute left-1/2 top-14 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-[hsl(var(--assistant-glass)/0.82)] p-2 text-sm font-semibold text-white shadow-[0_18px_42px_hsl(223_41%_9%/0.26)] backdrop-blur-2xl">
+      <span className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/12 font-bold">
+        P
+      </span>
+      <span className="rounded-full border border-white/10 bg-white/8 px-4 py-2">Observe</span>
+      <span className="flex size-9 items-center justify-center rounded-full border border-white/10 bg-white/12">
+        <Circle className="size-4 fill-white text-white" />
+      </span>
+    </div>
+  );
+}
+
+function BrowserWindow() {
+  return (
+    <div className="absolute left-1/2 top-28 z-20 h-[21rem] w-[min(66rem,76vw)] -translate-x-1/2 overflow-hidden rounded-t-[1.35rem] border border-white/12 bg-[hsl(223_41%_9%)] shadow-[0_30px_90px_hsl(223_41%_9%/0.38)]">
+      <div className="flex h-10 items-center gap-2 border-b border-white/10 bg-[hsl(225_20%_13%)] px-4">
+        <span className="size-3 rounded-full bg-destructive" />
+        <span className="size-3 rounded-full bg-warning" />
+        <span className="size-3 rounded-full bg-success" />
+      </div>
+      <div className="grid h-[calc(100%-2.5rem)] grid-cols-2 gap-3 p-4">
+        <div className="overflow-hidden rounded-[1rem] bg-[linear-gradient(140deg,hsl(190_90%_50%/0.78),hsl(222_70%_18%)_48%,hsl(25_56%_52%))]">
+          <div className="h-full bg-[radial-gradient(circle_at_28%_14%,hsl(184_100%_70%/0.9),transparent_8rem),linear-gradient(180deg,transparent,hsl(0_0%_0%/0.2))]" />
+        </div>
+        <div className="overflow-hidden rounded-[1rem] bg-[linear-gradient(145deg,hsl(201_38%_89%),hsl(220_18%_65%)_62%,hsl(26_46%_58%))]">
+          <div className="h-full bg-[radial-gradient(circle_at_54%_38%,hsl(34_80%_84%/0.82),transparent_7rem),linear-gradient(180deg,transparent,hsl(0_0%_0%/0.22))]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AssistantGlassOverlay() {
+  return (
+    <div className="absolute left-1/2 top-32 z-40 w-[min(44rem,70vw)] -translate-x-1/2 rounded-[1.45rem] border border-[hsl(var(--assistant-glass-border)/0.22)] bg-[hsl(var(--assistant-glass)/0.72)] p-4 text-white shadow-[0_22px_70px_hsl(223_41%_9%/0.34)] backdrop-blur-2xl">
+      <div className="mb-4 flex justify-end">
+        <span className="rounded-full border border-accent/45 bg-accent px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_32px_hsl(var(--accent)/0.36)]">
+          What failed here?
+        </span>
+      </div>
+      <p className="text-sm leading-6 text-white/82 sm:text-base">
+        The browser agent selected 02:00 after the page warned that 2:00 PM was likely intended.
+      </p>
+      <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-white/12 pt-4 text-sm text-white/72">
+        <span className="inline-flex items-center gap-2">
+          <Sparkles className="size-4" />
+          Assist
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <ShieldCheck className="size-4" />
+          Evidence
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <Terminal className="size-4" />
+          Replay
+        </span>
+      </div>
+      <div className="mt-4 flex min-h-12 items-center gap-2 rounded-[0.95rem] border border-white/14 bg-white/8 px-4 text-sm text-white/52">
+        Ask about the trace, or dispatch a fix
+        <Button className="ml-auto size-9 shrink-0 p-0" size="icon" aria-label="Dispatch fix">
+          <Play />
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -398,31 +462,87 @@ function AgentCard() {
     <Card className="lg:col-span-1">
       <CardHeader>
         <CardTitle>Agent card</CardTitle>
-        <CardDescription>Surface plus attached stream, designed for the demo grid.</CardDescription>
+        <CardDescription>Compact incident postcard for the homepage and demo grid.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="rounded-[1.25rem] border border-border/75 bg-white/75 p-4">
-          <div className="mb-6 flex items-center justify-between">
+        <div className="rounded-[1.35rem] border border-border/75 bg-panel/90 p-3 shadow-[0_18px_48px_hsl(var(--shadow-color)/0.12)]">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <span className="inline-flex items-center gap-2 text-sm font-semibold">
-              <Monitor className="size-4 text-accent" />
+              <span className="flex size-8 items-center justify-center rounded-full border border-border/80 bg-white/80">
+                <Monitor className="size-4 text-destructive" />
+              </span>
               Browser Agent
             </span>
             <span className="rounded-full bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
               failed
             </span>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            {["1 AM", "2 AM", "2 PM"].map((slot) => (
-              <div
-                key={slot}
-                className={cn(
-                  "rounded-2xl border px-2 py-3 text-center text-xs font-semibold",
-                  slot === "2 AM" ? "border-destructive/35 bg-destructive/10 text-destructive" : "border-border bg-panel",
-                )}
-              >
-                {slot}
+          <div className="rounded-[1.1rem] border border-border/75 bg-[linear-gradient(180deg,hsl(var(--elevated)/0.86),hsl(var(--panel)/0.92))] p-3">
+            <div className="rounded-[0.9rem] border border-border/70 bg-panel/80 p-3 shadow-sm">
+              <div className="mb-3 flex items-center gap-1.5 border-b border-border/70 pb-2">
+                <span className="size-2.5 rounded-full bg-destructive" />
+                <span className="size-2.5 rounded-full bg-warning" />
+                <span className="size-2.5 rounded-full bg-success" />
+                <span className="ml-2 h-4 flex-1 rounded-full bg-elevated" />
               </div>
+              <div className="grid gap-2">
+                <span className="h-3 w-3/4 rounded-full bg-accent/25" />
+                <span className="h-3 w-1/2 rounded-full bg-accent/20" />
+              </div>
+              <div className="mt-5 flex items-center justify-between gap-3">
+                <span className="rounded-full bg-accent px-3 py-1.5 text-xs font-semibold text-accent-foreground">
+                  Confirm order
+                </span>
+                <span className="rounded-full border border-destructive/25 bg-destructive/10 px-3 py-1.5 text-xs font-semibold text-destructive">
+                  Warning visible
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 px-1">
+            <p className="font-mono text-[10px] font-semibold uppercase text-muted-foreground/75">
+              Production task
+            </p>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Complete a checkout or booking flow
+            </p>
+            <div className="mt-3 flex items-start gap-2.5 rounded-[1rem] border border-destructive/20 bg-destructive/10 px-3 py-2.5">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
+              <div>
+                <p className="font-mono text-[10px] font-semibold uppercase text-destructive/70">
+                  Failure captured
+                </p>
+                <p className="mt-0.5 text-sm font-semibold leading-5 text-destructive">
+                  Wrong click after an ignored UI warning
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5 px-1">
+            {["DOM state", "screenshot", "cursor path"].map((item) => (
+              <span
+                key={item}
+                className="rounded-full border border-border/70 bg-elevated/75 px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
+              >
+                {item}
+              </span>
             ))}
+          </div>
+          <div className="mt-4 grid gap-2">
+            <div className="rounded-[1rem] border border-accent/20 bg-accent-muted/60 px-3 py-2.5 text-sm leading-6">
+              <span className="mb-1 inline-flex items-center gap-2 text-xs font-semibold text-accent">
+                <ShieldCheck className="size-3.5" />
+                Fix target
+              </span>
+              <p>Replay the critical step and hand the UI-state mismatch to the fix agent.</p>
+            </div>
+            <div className="flex min-h-10 items-center gap-2 rounded-[0.95rem] border border-foreground/10 bg-foreground px-3 font-mono text-[11px] text-background">
+              <Terminal className="size-3.5 shrink-0 text-background/50" />
+              <span className="text-background/50">latest</span>
+              <span className="min-w-0 truncate text-background/80">
+                dom_snapshot warning visible
+              </span>
+            </div>
           </div>
         </div>
       </CardContent>
