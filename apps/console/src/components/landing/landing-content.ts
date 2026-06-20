@@ -15,7 +15,6 @@ export const landingNavItems = [
 ] as const;
 
 export const landingHero = {
-  eyebrow: "Production failures, replayed as evidence",
   title: "Purpose-built incident response for AI agents",
   body:
     "Promptetheus records messy agent runs, detects likely failures, replays the exact bad step, and packages a verified fix path for the coding agent.",

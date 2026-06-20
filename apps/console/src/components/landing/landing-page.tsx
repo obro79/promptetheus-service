@@ -69,14 +69,7 @@ export function LandingPage({ stats }: { stats: LandingStats }) {
       <LandingNav />
 
       <LandingSection density="hero" containerClassName="landing-hero-content">
-        <Eyebrow
-          variant="hero"
-          icon={<Sparkles className="size-3.5" aria-hidden="true" />}
-        >
-          {landingHero.eyebrow}
-        </Eyebrow>
-
-        <h1 className="landing-display-xl mt-7 max-w-[1120px]">{landingHero.title}</h1>
+        <h1 className="landing-display-xl max-w-[1120px]">{landingHero.title}</h1>
         <p className="landing-copy mt-7 max-w-2xl sm:text-lg">{landingHero.body}</p>
 
         <div className="landing-action-row mt-9">
