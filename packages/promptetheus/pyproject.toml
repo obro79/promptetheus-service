@@ -1,0 +1,95 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "promptetheus"
+version = "0.0.1"
+description = "Promptetheus service infrastructure for trace ingestion, failure detection, replay artifacts, and fix handoff."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+authors = [{ name = "Owen Fisher", email = "owenfisher46@gmail.com" }]
+keywords = ["ai", "agents", "observability", "debugging", "tracing", "fastapi"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Debuggers",
+]
+dependencies = []
+
+[project.optional-dependencies]
+server = [
+    "fastapi>=0.110",
+    "cryptography>=42",
+    "httpx>=0.27",
+    "PyJWT>=2.8",
+    "uvicorn>=0.29",
+    "psycopg[binary]>=3.2",
+]
+mcp = [
+    "mcp>=1.0",
+    "httpx>=0.27",
+]
+dev = [
+    "fastapi>=0.110",
+    "cryptography>=42",
+    "PyJWT>=2.8",
+    "uvicorn>=0.29",
+    "httpx>=0.27",
+    "psycopg[binary]>=3.2",
+    "pytest>=8.0",
+    "hypothesis>=6.0",
+    "mypy>=1.8",
+]
+
+[project.urls]
+Homepage = "https://github.com/obro79/promptetheus-service"
+Repository = "https://github.com/obro79/promptetheus-service"
+Documentation = "https://github.com/obro79/promptetheus-service#readme"
+
+[project.scripts]
+promptetheus = "promptetheus.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["promptetheus"]
+# py.typed lives under the package dir so it is included in the wheel by
+# default; listed explicitly here as a guard against future include filters
+# stripping it (PEP 561 typed-package marker must ship).
+force-include = { "promptetheus/py.typed" = "promptetheus/py.typed" }
+
+[tool.mypy]
+# Strict-ish baseline for the service package. The whole package is type-hinted and
+# ships py.typed, so untyped defs are a regression and unused ignores are noise.
+python_version = "3.12"
+files = ["promptetheus"]
+disallow_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+# Optional integration adapters import third-party libs that may be absent in a
+# bare dev env; do not fail type-checking on their missing stubs.
+module = [
+    "mcp.*",
+    "httpx",
+    "jwt",
+    "psycopg",
+    "psycopg.*",
+    "cryptography.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# The per-event TypedDicts intentionally narrow the shared "type" field to a
+# Literal to form a discriminated union; mypy disallows TypedDict field override
+# (misc), which is a known limitation here, not a real defect.
+module = ["promptetheus.schema"]
+disable_error_code = ["misc"]

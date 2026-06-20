@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install service dependencies
+        run: python -m pip install -e "packages/promptetheus[dev,mcp]"
+
+      - name: Generate schema.ts
+        run: python scripts/generate_schema_ts.py
+
+      - name: Check schema.ts drift
+        run: git diff --exit-code apps/console/src/lib/schema.ts
+
+      - name: Verify migrations
+        run: python scripts/verify_migrations.py
+
+      - name: Run service tests
+        run: python -m pytest tests/server tests/analysis tests/fix_agent tests/regression tests/schema tests/db tests/mcp -q
+
+  console:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install console dependencies
+        run: pnpm install
+
+      - name: Typecheck console
+        working-directory: apps/console
+        run: pnpm exec tsc --noEmit
