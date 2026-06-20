@@ -64,7 +64,7 @@ export function SessionsTable({ sessions }: SessionsTableProps) {
   }
 
   return (
-    <div className="surface overflow-x-auto rounded-2xl">
+    <div className="landing-framed-surface overflow-x-auto">
       <Table>
         <TableHeader className="bg-muted/35">
           <TableRow className="hover:bg-transparent">

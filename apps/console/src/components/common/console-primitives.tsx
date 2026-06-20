@@ -2,6 +2,11 @@ import * as React from "react";
 import type { HTMLAttributes } from "react";
 import type { LucideIcon } from "lucide-react";
 
+import {
+  LandingAppContent,
+  LandingAppHeader,
+  LandingAppShell,
+} from "@/components/landing/landing-primitives";
 import { cn } from "@/lib/utils";
 
 // ─── Page wrapper ─────────────────────────────────────────────────────────────
@@ -14,23 +19,9 @@ export function ConsolePage({
   ...props
 }: HTMLAttributes<HTMLElement>) {
   return (
-    <main
-      className={cn(
-        "relative flex min-h-full flex-col overflow-hidden bg-canvas",
-        className,
-      )}
-      {...props}
-    >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute left-[-12rem] top-[-9rem] h-[28rem] w-[28rem] rounded-full border border-border/25 opacity-70"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute right-[-9rem] top-[-11rem] h-[30rem] w-[30rem] rounded-full bg-accent/15 blur-3xl"
-      />
+    <LandingAppShell className={className} {...props}>
       {children}
-    </main>
+    </LandingAppShell>
   );
 }
 
@@ -46,22 +37,9 @@ export function ConsolePageHeader({
   ...props
 }: HTMLAttributes<HTMLElement> & { narrow?: boolean }) {
   return (
-    <header
-      className={cn(
-        "relative z-20 border-b border-border/40 bg-canvas/68 backdrop-blur-xl lg:sticky lg:top-0",
-        className,
-      )}
-      {...props}
-    >
-      <div
-        className={cn(
-          "mx-auto flex w-full flex-col gap-7 px-4 py-7 sm:px-6 lg:flex-row lg:items-end lg:justify-between lg:py-9",
-          narrow ? "max-w-3xl" : "max-w-[1500px]",
-        )}
-      >
-        {children}
-      </div>
-    </header>
+    <LandingAppHeader compact={narrow} className={className} {...props}>
+      {children}
+    </LandingAppHeader>
   );
 }
 
@@ -73,16 +51,9 @@ export function ConsolePageContent({
   ...props
 }: HTMLAttributes<HTMLDivElement> & { narrow?: boolean }) {
   return (
-    <div
-      className={cn(
-        "relative z-10 mx-auto w-full flex-1 px-4 py-6 sm:px-6 lg:py-8",
-        narrow ? "max-w-3xl" : "max-w-[1500px]",
-        className,
-      )}
-      {...props}
-    >
+    <LandingAppContent compact={narrow} className={className} {...props}>
       {children}
-    </div>
+    </LandingAppContent>
   );
 }
 
@@ -92,7 +63,7 @@ interface ConsoleEyebrowProps extends HTMLAttributes<HTMLParagraphElement> {
   icon?: React.ReactNode;
 }
 
-/** Pill-shaped eyebrow label placed above the page heading. */
+/** Small plain eyebrow label placed above the page heading. */
 export function ConsoleEyebrow({
   children,
   className,
@@ -102,12 +73,16 @@ export function ConsoleEyebrow({
   return (
     <p
       className={cn(
-        "mb-4 inline-flex items-center gap-2 rounded-full border border-border/70 bg-panel/72 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-accent shadow-sm",
+        "mb-5 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground",
         className,
       )}
       {...props}
     >
-      {icon}
+      {icon ? (
+        <span className="text-muted-foreground/70" aria-hidden>
+          {icon}
+        </span>
+      ) : null}
       {children}
     </p>
   );
@@ -127,7 +102,6 @@ interface MetricReadoutProps {
 export function MetricReadout({
   label,
   value,
-  tone,
   className,
 }: MetricReadoutProps) {
   const numStr =
@@ -135,23 +109,14 @@ export function MetricReadout({
   return (
     <div
       className={cn(
-        "surface flex min-w-0 flex-col gap-3 rounded-2xl px-4 py-4 sm:min-w-[150px]",
+        "min-w-0 border-t border-border-strong/45 px-1 py-4 sm:min-w-[150px]",
         className,
       )}
     >
       <dt className="text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
         {label}
       </dt>
-      <dd
-        className={cn(
-          "display order-first text-4xl leading-none tabular-nums",
-          tone === "warning"
-            ? "text-warning"
-            : tone === "signal"
-              ? "text-success"
-              : "text-foreground",
-        )}
-      >
+      <dd className="display order-first text-4xl leading-none text-foreground tabular-nums">
         {numStr}
       </dd>
     </div>
@@ -166,16 +131,16 @@ interface SignalChipProps {
   className?: string;
 }
 
-/** Feature/signal pill chip placed below the page heading. */
+/** Plain feature/signal label placed below the page heading. */
 export function SignalChip({ Icon, label, className }: SignalChipProps) {
   return (
     <span
       className={cn(
-        "inline-flex min-h-8 items-center gap-1.5 rounded-full border border-border/55 bg-panel/62 px-3 text-[11px] font-medium text-muted-foreground",
+        "inline-flex min-h-6 items-center gap-1.5 text-[11px] font-medium text-muted-foreground",
         className,
       )}
     >
-      <Icon className="size-3.5 text-accent" aria-hidden="true" strokeWidth={1.8} />
+      <Icon className="size-3.5 text-muted-foreground/55" aria-hidden="true" strokeWidth={1.8} />
       {label}
     </span>
   );
@@ -191,7 +156,7 @@ export function ConsoleSurface({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("surface rounded-2xl", className)} {...props}>
+    <div className={cn("landing-framed-surface", className)} {...props}>
       {children}
     </div>
   );

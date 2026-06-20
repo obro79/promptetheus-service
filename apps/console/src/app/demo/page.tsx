@@ -1,4 +1,5 @@
 import {
+  LandingAppShell,
   LandingCard,
   LandingSection,
 } from "@/components/landing/landing-primitives";
@@ -7,7 +8,7 @@ const demoAgents = ["Browser Agent", "Voice Agent", "Chat Agent"] as const;
 
 export default function DemoPage() {
   return (
-    <div className="landing-page min-h-dvh overflow-y-auto">
+    <LandingAppShell>
       <LandingSection
         className="min-h-dvh py-5 sm:py-6 lg:h-dvh lg:min-h-0 lg:py-8"
         containerClassName="landing-use-case-container flex min-h-[calc(100dvh-2.5rem)] items-stretch lg:min-h-[calc(100dvh-4rem)]"
@@ -28,6 +29,6 @@ export default function DemoPage() {
           ))}
         </div>
       </LandingSection>
-    </div>
+    </LandingAppShell>
   );
 }

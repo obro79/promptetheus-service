@@ -32,7 +32,7 @@ export default async function ProjectSettingsPage() {
           >
             {workspace.name}
           </ConsoleEyebrow>
-          <h1 className="display text-5xl leading-[0.92] text-foreground sm:text-6xl">
+          <h1 className="landing-display-lg">
             Project settings
           </h1>
           <p className="mt-5 max-w-2xl text-sm leading-6 text-muted-foreground">

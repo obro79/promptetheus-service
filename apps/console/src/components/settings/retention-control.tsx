@@ -46,7 +46,7 @@ export function RetentionControl({ project }: RetentionControlProps) {
   }, [days, project.id]);
 
   return (
-    <div className="surface rounded-2xl p-5">
+    <div className="landing-framed-surface p-5">
       <div className="flex items-start gap-3">
         <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-accent/20 bg-accent-muted text-accent">
           <Clock className="size-4" />

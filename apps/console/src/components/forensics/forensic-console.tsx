@@ -12,6 +12,11 @@ import {
 } from "lucide-react";
 
 import { ConfidenceMeter } from "@/components/common/confidence-meter";
+import {
+  Eyebrow,
+  LandingAppContent,
+  LandingAppShell,
+} from "@/components/landing/landing-primitives";
 import { MonoId } from "@/components/common/mono-id";
 import { StatusPill } from "@/components/common/status-pill";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -167,12 +172,16 @@ export function ForensicConsole({
   const regressionCovered = Boolean(incident?.fix_agent_result?.regression_test || latestRegression?.status === "complete");
 
   return (
-    <div className="flex min-h-[calc(100dvh-3rem)] flex-col bg-canvas xl:h-[calc(100dvh-3rem)] xl:overflow-hidden">
-      <header className="shrink-0 border-b border-border/40 bg-canvas/72 px-4 py-4 backdrop-blur-xl sm:px-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+    <LandingAppShell className="flex flex-col overflow-hidden">
+      <header className="relative z-10 shrink-0 px-4 py-5 sm:px-6 lg:px-8">
+        <div className="landing-container landing-use-case-container flex flex-col gap-5 px-0 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2.5"><MonoId id={incident?.id ?? session.id} /><StatusPill status={incident?.status ?? session.status} /><span className="rounded-md bg-warning/10 px-2 py-1 text-[11px] font-medium text-warning">{(incident?.label ?? analysis?.labels[0] ?? "session trace").replaceAll("_", " ")}</span></div>
-            <h1 className="display mt-2.5 line-clamp-2 text-2xl leading-[0.96] text-foreground xl:line-clamp-1">{incident?.title ?? session.user_goal ?? "Untitled agent run"}</h1>
+            <Eyebrow className="mb-4">
+              <MonoId id={incident?.id ?? session.id} />
+              <StatusPill status={incident?.status ?? session.status} />
+              <span>{(incident?.label ?? analysis?.labels[0] ?? "session trace").replaceAll("_", " ")}</span>
+            </Eyebrow>
+            <h1 className="landing-display-lg line-clamp-2 max-w-5xl xl:line-clamp-1">{incident?.title ?? session.user_goal ?? "Untitled agent run"}</h1>
             <dl className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
               <Metric label="Agent" value={session.agent ?? "unknown"} />
               <Metric label="Environment" value={session.environment ?? "unknown"} />
@@ -191,7 +200,8 @@ export function ForensicConsole({
         </div>
       </header>
 
-      <div className="forensic-panes m-3 min-h-[430px] flex-1 gap-0" style={{ "--replay-pane": `${paneWidths[0]}fr`, "--events-pane": `${paneWidths[1]}fr`, "--inspector-pane": `${paneWidths[2]}fr` } as React.CSSProperties}>
+      <LandingAppContent className="flex min-h-0 flex-1 flex-col px-4 pb-3 sm:px-6 lg:px-8">
+      <div className="forensic-panes min-h-[430px] flex-1 gap-0" style={{ "--replay-pane": `${paneWidths[0]}fr`, "--events-pane": `${paneWidths[1]}fr`, "--inspector-pane": `${paneWidths[2]}fr` } as React.CSSProperties}>
         <ReplayViewport session={session} events={ordered} artifacts={artifacts} modality={modality} selectedSeq={selection.selectedSeq} currentMs={selection.currentMs} durationMs={durationMs} playing={playing} criticalSeq={criticalSeq} onSelect={selectEvent} onSeek={(currentMs) => dispatch({ type: "scrub", currentMs })} onTogglePlayback={() => setPlaying((value) => !value)} />
         <PaneDivider label="Resize replay and events panes" index={0} widths={paneWidths} onChange={setPaneWidths} />
         <EventStream events={ordered} selectedSeq={selection.selectedSeq} criticalSeq={criticalSeq} evidence={evidence} onSelect={(seq) => { selectEvent(seq); setInspectorOpen(true); }} />
@@ -205,7 +215,8 @@ export function ForensicConsole({
 
       <ForensicTimeline events={ordered} durationMs={durationMs} currentMs={selection.currentMs} selectedSeq={selection.selectedSeq} criticalSeq={criticalSeq} evidence={evidence} modality={modality} onSelect={selectEvent} onScrub={(currentMs) => dispatch({ type: "scrub", currentMs })} />
       <CaseDock session={session} events={ordered} analysis={analysis} incident={incident} evidence={evidence} criticalSeq={criticalSeq} onSelect={selectEvent} />
-    </div>
+      </LandingAppContent>
+    </LandingAppShell>
   );
 }
 

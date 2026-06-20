@@ -4,6 +4,11 @@ import Link from "next/link";
 import { ShieldQuestion } from "lucide-react";
 
 import { EmptyState } from "@/components/common/empty-state";
+import {
+  LandingAppShell,
+  LandingCard,
+  LandingSection,
+} from "@/components/landing/landing-primitives";
 import { Button } from "@/components/ui/button";
 import { IncidentDetail } from "@/components/incidents/detail/incident-detail";
 import { getIncidentContext } from "@/lib/data";
@@ -28,8 +33,12 @@ export default function IncidentPage({ params }: IncidentPageProps) {
 
   if (!context) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-canvas px-6 py-16">
-        <div className="w-full max-w-md">
+      <LandingAppShell>
+        <LandingSection
+          className="flex min-h-dvh items-center"
+          containerClassName="flex justify-center"
+        >
+          <LandingCard className="w-full max-w-md">
           <EmptyState
             icon={ShieldQuestion}
             title="Incident not found"
@@ -40,8 +49,9 @@ export default function IncidentPage({ params }: IncidentPageProps) {
               </Button>
             }
           />
-        </div>
-      </main>
+          </LandingCard>
+        </LandingSection>
+      </LandingAppShell>
     );
   }
 

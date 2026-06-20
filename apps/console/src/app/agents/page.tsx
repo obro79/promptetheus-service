@@ -37,7 +37,7 @@ export default function AgentsPage() {
           <ConsoleEyebrow icon={<Bot className="size-3.5" strokeWidth={1.8} aria-hidden />}>
             Fleet health
           </ConsoleEyebrow>
-          <h1 className="display max-w-4xl text-5xl leading-[0.92] text-foreground sm:text-6xl lg:text-7xl">
+          <h1 className="landing-display-lg max-w-4xl">
             Production agents
           </h1>
           <p className="mt-5 max-w-2xl text-sm leading-6 text-muted-foreground">
@@ -59,7 +59,7 @@ export default function AgentsPage() {
       </ConsolePageHeader>
 
       <ConsolePageContent>
-        <div className="surface overflow-hidden rounded-2xl">
+        <div className="landing-framed-surface overflow-hidden">
           <div className="grid grid-cols-[minmax(0,1fr)_100px_100px_120px_36px] border-b border-border/50 bg-muted/35 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
             <span>Agent</span>
             <span>Runs</span>

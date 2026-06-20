@@ -3,6 +3,11 @@ import Link from "next/link";
 import { FileQuestion } from "lucide-react";
 
 import { EmptyState } from "@/components/common/empty-state";
+import {
+  LandingAppShell,
+  LandingCard,
+  LandingSection,
+} from "@/components/landing/landing-primitives";
 import { Button } from "@/components/ui/button";
 import { ReplayView } from "@/components/replay/replay-view";
 import {
@@ -21,8 +26,12 @@ export default function SessionPage({ params }: SessionPageProps) {
 
   if (!session) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-canvas px-6 py-16">
-        <div className="w-full max-w-md">
+      <LandingAppShell>
+        <LandingSection
+          className="flex min-h-dvh items-center"
+          containerClassName="flex justify-center"
+        >
+          <LandingCard className="w-full max-w-md">
           <EmptyState
             icon={FileQuestion}
             title="Session not found"
@@ -33,8 +42,9 @@ export default function SessionPage({ params }: SessionPageProps) {
               </Button>
             }
           />
-        </div>
-      </main>
+          </LandingCard>
+        </LandingSection>
+      </LandingAppShell>
     );
   }
 

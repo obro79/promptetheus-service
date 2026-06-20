@@ -45,7 +45,7 @@ export function RepoConnection({ project }: RepoConnectionProps) {
   }, []);
 
   return (
-    <div className="surface rounded-2xl p-5">
+    <div className="landing-framed-surface p-5">
       <div className="flex items-start gap-3">
         <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border border-border/50 bg-elevated text-foreground">
           <Github className="size-4" />
