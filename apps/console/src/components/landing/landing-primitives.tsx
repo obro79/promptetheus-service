@@ -186,11 +186,10 @@ export function IconFrame({ children, className, ...props }: HTMLAttributes<HTML
 export function DecorativeField() {
   return (
     <div aria-hidden="true" className="landing-decorative-field">
-      <div className="absolute left-[-16rem] top-[-9rem] h-[42rem] w-[42rem] rounded-full border border-border/25" />
-      <div className="absolute left-[-11rem] top-[-4rem] h-[31rem] w-[31rem] rounded-full border border-border/20" />
-      <div className="absolute right-[-13rem] top-[-4rem] h-[35rem] w-[35rem] rounded-full bg-accent/20 blur-3xl" />
-      <div className="absolute right-[-3rem] top-24 h-[27rem] w-[17rem] rotate-12 rounded-[50%] border border-accent/20 bg-gradient-to-b from-accent/30 via-accent/12 to-transparent blur-sm" />
-      <div className="absolute inset-x-0 top-[34rem] h-px bg-border/45" />
+      <div className="absolute inset-x-0 top-0 h-[32rem] bg-[linear-gradient(180deg,hsl(var(--glow-accent)/0.28),transparent_72%)]" />
+      <div className="absolute inset-x-0 top-0 h-px bg-white/80" />
+      <div className="absolute left-0 right-0 top-[28rem] h-px bg-border/45" />
+      <div className="absolute inset-x-[8%] top-20 h-52 rounded-[2rem] border border-white/70 bg-white/20 blur-3xl" />
     </div>
   );
 }
