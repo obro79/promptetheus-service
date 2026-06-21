@@ -13,7 +13,7 @@ class CodexRunner:
     def __init__(self, allowed_paths: list[str] | None = None) -> None:
         self.allowed_paths = allowed_paths
 
-    def run(self, incident_bundle: dict[str, Any]) -> FixAgentResult:
+    def run(self, incident_bundle: dict[str, Any], **_: Any) -> FixAgentResult:
         raise NotImplementedError(
             "Codex fix-agent runner is not wired in State-0; set "
             "PROMPTETHEUS_FIX_AGENT_RUNNER=deterministic"
