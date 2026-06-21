@@ -31,6 +31,7 @@ import {
 import { JsonViewer } from "@/components/common/json-viewer";
 import { LabelTag } from "@/components/common/label-tag";
 import { StatusPill } from "@/components/common/status-pill";
+import { SelfHealPanel } from "@/components/incidents/detail/self-heal-panel";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -320,6 +321,10 @@ export function LogsDashboard({
     </div>
   );
 
+  // Failed runs resolve to a clustered incident — surface the self-heal + eval
+  // flow inline so remediation happens on the logs surface, not a separate page.
+  const remediationIncidentId = selectedRun?.incident?.id ?? null;
+
   return (
     <div className="flex min-h-0 gap-3">
       {/* Left rail: agent selector + filters + metrics */}
@@ -378,6 +383,10 @@ export function LogsDashboard({
         />
 
         {traceDebuggerNode}
+
+        {remediationIncidentId ? (
+          <SelfHealPanel incidentId={remediationIncidentId} className="" />
+        ) : null}
       </div>
 
       {/* Expanded trace overlay */}

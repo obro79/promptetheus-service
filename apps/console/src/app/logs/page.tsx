@@ -1,6 +1,7 @@
 import { Activity, Gauge, ListTree, Timer } from "lucide-react";
 
 import { LogsDashboard } from "@/components/logs/logs-dashboard";
+import { LogsAutoRefresh } from "@/components/logs/logs-auto-refresh";
 import {
   ConsolePage,
   ConsolePageContent,
@@ -16,6 +17,7 @@ import {
   getProjects,
   getSessions,
 } from "@/lib/data";
+import { loadLiveLogsData, type LogsData } from "@/lib/live-data";
 import type { AnalysisResult, TraceEvent } from "@/lib/types";
 
 export const metadata = {
@@ -23,17 +25,34 @@ export const metadata = {
   description: "Trace logs for instrumented agent runs.",
 };
 
-export default function LogsPage() {
+// Always render fresh so newly ingested runs show up (with the client poller).
+export const dynamic = "force-dynamic";
+
+/** Live logs from FastAPI, or the bundled seed when the backend is unreachable. */
+async function loadLogsData(): Promise<LogsData & { isLive: boolean }> {
+  const live = await loadLiveLogsData();
+  if (live) return { ...live, isLive: true };
+
   const sessions = getSessions();
-  const projects = getProjects();
-  const incidents = getIncidents();
   const eventsBySession: Record<string, TraceEvent[]> = {};
   const analysesBySession: Record<string, AnalysisResult | undefined> = {};
-
   for (const session of sessions) {
     eventsBySession[session.id] = getEvents(session.id);
     analysesBySession[session.id] = getAnalysis(session.id);
   }
+  return {
+    sessions,
+    projects: getProjects(),
+    incidents: getIncidents(),
+    eventsBySession,
+    analysesBySession,
+    isLive: false,
+  };
+}
+
+export default async function LogsPage() {
+  const { sessions, projects, incidents, eventsBySession, analysesBySession, isLive } =
+    await loadLogsData();
 
   const failed = sessions.filter(
     (s) => s.status === "failed" || s.status === "error",
@@ -54,6 +73,11 @@ export default function LogsPage() {
             log exploration without leaving the console.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-2.5 text-[11px] font-medium text-muted-foreground">
+            {isLive ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2 py-1 text-[11px] font-semibold text-success">
+                <span className="size-1.5 animate-pulse rounded-full bg-success" /> Live · ingesting
+              </span>
+            ) : null}
             <SignalChip Icon={Activity} label="Live trace streaming" />
             <SignalChip Icon={Gauge} label="Failure signals attached" />
             <SignalChip Icon={Timer} label="Latency percentiles" />
@@ -67,6 +91,7 @@ export default function LogsPage() {
       </ConsolePageHeader>
 
       <ConsolePageContent>
+        {isLive ? <LogsAutoRefresh intervalMs={4000} /> : null}
         <LogsDashboard
           sessions={sessions}
           projects={projects}
