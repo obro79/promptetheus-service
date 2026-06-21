@@ -455,7 +455,7 @@ def create_app(
         app.state.auth, and app.state.hub expose the wired components.
     """
 
-    app = FastAPI(title="Promptetheus API", version="0.0.1")
+    app = FastAPI(title="Promptetheus API", version="1.0.0")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_cors_origins(),
