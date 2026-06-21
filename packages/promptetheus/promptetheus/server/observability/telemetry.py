@@ -10,9 +10,43 @@ the heal loop must never break because the sink is down.
 
 from __future__ import annotations
 
-from typing import Any
+import os
+from contextlib import contextmanager
+from typing import Any, Iterator
 
 from promptetheus.server.evals.report import EvalReport
+
+_INITIALIZED = False
+
+
+def init_sentry() -> bool:
+    """Initialize Sentry once from `SENTRY_DSN`. No-op (returns False) when the
+    DSN is unset or `sentry-sdk` isn't installed, so the service runs unchanged
+    without observability configured. Called from `create_app`."""
+
+    global _INITIALIZED
+    if _INITIALIZED:
+        return True
+    dsn = os.environ.get("SENTRY_DSN")
+    if not dsn:
+        return False
+    try:
+        import sentry_sdk
+    except Exception:
+        return False
+    try:
+        sentry_sdk.init(
+            dsn=dsn,
+            # Capture every heal run for the demo; AI agent (gen_ai) spans need
+            # tracing on. anthropic is auto-instrumented when present.
+            traces_sample_rate=1.0,
+            environment=os.environ.get("PROMPTETHEUS_ENV", "demo"),
+            send_default_pii=False,
+        )
+        _INITIALIZED = True
+        return True
+    except Exception:
+        return False
 
 
 def _sentry() -> Any | None:
@@ -23,12 +57,41 @@ def _sentry() -> Any | None:
     except Exception:
         return None
     try:
-        # Hub.client is None until sentry_sdk.init() ran with a DSN.
-        if sentry_sdk.Hub.current.client is None:
+        client = sentry_sdk.get_client()
+        if client is None or not client.is_active():
             return None
     except Exception:
-        return None
+        # Older SDKs: fall back to the Hub client check.
+        try:
+            if sentry_sdk.Hub.current.client is None:
+                return None
+        except Exception:
+            return None
     return sentry_sdk
+
+
+@contextmanager
+def heal_run(incident_id: str, source: str | None = None) -> Iterator[Any]:
+    """Open a Sentry transaction for one heal run so the eval spans and the
+    auto-instrumented Anthropic `gen_ai` spans attach to a single AI-agent run
+    in the dashboard. No-op context when Sentry isn't active."""
+
+    sentry_sdk = _sentry()
+    if sentry_sdk is None:
+        yield None
+        return
+    with sentry_sdk.start_transaction(
+        op="gen_ai.invoke_agent", name="heal_incident"
+    ) as transaction:
+        try:
+            transaction.set_tag("promptetheus.incident_id", str(incident_id))
+            transaction.set_data("gen_ai.operation.name", "invoke_agent")
+            transaction.set_data("gen_ai.agent.name", "promptetheus-healer")
+            if source:
+                transaction.set_data("promptetheus.source", source)
+        except Exception:
+            pass
+        yield transaction
 
 
 def record_eval(incident: dict[str, Any], report: EvalReport) -> None:
@@ -62,4 +125,4 @@ def record_eval(incident: dict[str, Any], report: EvalReport) -> None:
         return
 
 
-__all__ = ["record_eval"]
+__all__ = ["init_sentry", "heal_run", "record_eval"]
