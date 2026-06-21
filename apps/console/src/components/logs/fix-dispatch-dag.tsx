@@ -25,6 +25,9 @@ import { cn, pct } from "@/lib/utils";
 import type { LogRun } from "./model";
 import {
   FIX_DAG_NODE_IDS,
+  buildFixDagEvidence,
+  type FixDagEvidence,
+  type FixDagEvidenceTone,
   type FixDagNode,
   type FixDagNodeId,
   type FixDagNodeStatus,
@@ -37,6 +40,7 @@ type DispatchHeal = (incidentId: string) => Promise<HealReport | null>;
 interface FixDispatchDagProps {
   autoDemo?: boolean;
   dispatchHeal?: DispatchHeal;
+  layout?: "prominent" | "compact";
   prominent?: boolean;
   run: LogRun;
 }
@@ -69,10 +73,12 @@ const MIN_DISPATCH_DURATION_MS = 2100;
 export function FixDispatchDag({
   autoDemo = false,
   dispatchHeal = healIncident,
+  layout,
   prominent = false,
   run,
 }: FixDispatchDagProps) {
   const incident = run.incident ?? null;
+  const isProminent = layout === "prominent" || prominent;
   const [phase, setPhase] = React.useState<FixDagPhase>("idle");
   const [activeNodeId, setActiveNodeId] = React.useState<FixDagNodeId>("read_logs");
   const [selectedNodeId, setSelectedNodeId] = React.useState<FixDagNodeId>("read_logs");
@@ -144,6 +150,13 @@ export function FixDispatchDag({
     projection.nodes.find((node) => node.id === selectedNodeId) ??
     projection.nodes.find((node) => node.id === projection.currentNodeId) ??
     projection.nodes[0];
+  const evidence = buildFixDagEvidence({
+    activeNodeId: selectedNode?.id ?? projection.currentNodeId,
+    error,
+    phase,
+    report,
+    run,
+  });
 
   const dispatch = React.useCallback(async () => {
     if (!incident || phase === "running") return;
@@ -222,13 +235,13 @@ export function FixDispatchDag({
       <div
         className={cn(
           "rounded-xl border bg-panel/70 p-3",
-          prominent ? "border-accent/25 bg-accent/[0.04] p-4" : "border-border",
+          isProminent ? "border-accent/25 bg-accent/[0.04] p-4" : "border-border",
         )}
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              {prominent ? (
+              {isProminent ? (
                 <span className="inline-flex size-8 items-center justify-center rounded-lg border border-accent/25 bg-accent-muted text-accent">
                   <Sparkles className="size-4" />
                 </span>
@@ -261,7 +274,8 @@ export function FixDispatchDag({
         </div>
       </div>
 
-      <div className="landing-framed-surface overflow-hidden">
+      <div className={cn(isProminent && "grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]")}>
+        <div className="landing-framed-surface overflow-hidden">
         <div className="overflow-x-auto">
           <div
             className="relative"
@@ -326,9 +340,95 @@ export function FixDispatchDag({
             run={run}
           />
         </div>
+        </div>
+
+        {isProminent ? <ProofPanel evidence={evidence} /> : null}
       </div>
     </div>
   );
+}
+
+function ProofPanel({ evidence }: { evidence: FixDagEvidence }) {
+  return (
+    <aside className="landing-framed-surface overflow-hidden" aria-label="Fix DAG proof">
+      <div className="border-b border-border/70 bg-panel/65 p-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase text-muted-foreground">Proof</p>
+            <h3 className="mt-1 truncate text-sm font-semibold text-foreground">{evidence.title}</h3>
+          </div>
+          <EvidenceModeTag mode={evidence.mode} />
+        </div>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{evidence.subtitle}</p>
+      </div>
+
+      <div className="divide-y divide-border/70">
+        {evidence.items.map((item) => (
+          <div
+            key={`${item.label}-${item.value}`}
+            className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 px-3 py-2.5"
+          >
+            <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+              {item.label}
+            </span>
+            {item.href ? (
+              <a
+                href={item.href}
+                target="_blank"
+                rel="noreferrer"
+                className={cn(
+                  "min-w-0 truncate text-xs font-medium underline-offset-4 hover:underline",
+                  evidenceToneClass(item.tone),
+                )}
+              >
+                {item.value}
+                <ExternalLink className="ml-1 inline size-3" aria-hidden="true" />
+              </a>
+            ) : (
+              <span className={cn("min-w-0 break-words text-xs font-medium", evidenceToneClass(item.tone))}>
+                {item.value}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {evidence.details.length ? (
+        <div className="border-t border-border/70 bg-elevated/40 p-3">
+          <p className="text-[10px] font-semibold uppercase text-muted-foreground">Receipts</p>
+          <ul className="mt-2 space-y-2">
+            {evidence.details.slice(0, 4).map((detail) => (
+              <li key={detail} className="flex gap-2 text-xs leading-5 text-muted-foreground">
+                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-accent/70" aria-hidden="true" />
+                <span className="min-w-0 break-words">{detail}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </aside>
+  );
+}
+
+function EvidenceModeTag({ mode }: { mode: FixDagEvidence["mode"] }) {
+  const tone = {
+    blocked: "border-warning/25 bg-warning/10 text-warning",
+    demo: "border-warning/25 bg-warning/10 text-warning",
+    live: "border-success/25 bg-success/10 text-success",
+    local: "border-accent/20 bg-accent-muted text-accent",
+  }[mode];
+  return (
+    <span className={cn("inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase", tone)}>
+      {mode}
+    </span>
+  );
+}
+
+function evidenceToneClass(tone: FixDagEvidenceTone | undefined) {
+  if (tone === "success") return "text-success";
+  if (tone === "warning") return "text-warning";
+  if (tone === "error") return "text-destructive";
+  return "text-foreground";
 }
 
 function FixDagNodeCard({

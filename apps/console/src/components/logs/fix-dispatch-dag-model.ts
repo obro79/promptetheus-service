@@ -1,4 +1,5 @@
-import type { HealReport, Incident } from "@/lib/types";
+import type { HealAttempt, HealReport, Incident, TraceEvent } from "@/lib/types";
+import { eventSummary, eventTitle, type LogRun } from "./model";
 
 export type FixDagNodeId =
   | "read_logs"
@@ -53,6 +54,25 @@ export interface FixDagProjection {
   selectedDefaultNodeId: FixDagNodeId;
   prUrl: string | null;
   prPreview: boolean;
+}
+
+export type FixDagEvidenceMode = "local" | "live" | "demo" | "blocked";
+export type FixDagEvidenceTone = "info" | "success" | "warning" | "error";
+
+export interface FixDagEvidenceItem {
+  label: string;
+  value: string;
+  tone?: FixDagEvidenceTone;
+  href?: string;
+}
+
+export interface FixDagEvidence {
+  nodeId: FixDagNodeId;
+  title: string;
+  subtitle: string;
+  mode: FixDagEvidenceMode;
+  items: FixDagEvidenceItem[];
+  details: string[];
 }
 
 export const FIX_DAG_NODE_IDS: FixDagNodeId[] = [
@@ -251,6 +271,57 @@ export function projectFixDispatchDag({
   });
 }
 
+export function buildFixDagEvidence({
+  activeNodeId,
+  error,
+  phase,
+  report,
+  run,
+}: {
+  activeNodeId: FixDagNodeId;
+  error?: string | null;
+  phase: FixDagPhase;
+  report?: HealReport | null;
+  run: LogRun;
+}): FixDagEvidence {
+  const incident = run.incident ?? null;
+  const liveAttempt = latestAttempt(report);
+  const evalAttempt = latestEvalAttempt(report);
+  const mode = evidenceMode(phase, report);
+
+  if (!incident) {
+    return {
+      details: [
+        "This run can still be inspected, but Promptetheus needs an attached incident before it can dispatch a fix.",
+      ],
+      items: [
+        { label: "Session", value: run.session.id },
+        { label: "Events", value: String(run.events.length || run.session.event_count) },
+        { label: "Run status", value: run.session.status, tone: "warning" },
+      ],
+      mode: "blocked",
+      nodeId: activeNodeId,
+      subtitle: "No incident is available to package into a fix bundle.",
+      title: "No incident available",
+    };
+  }
+
+  switch (activeNodeId) {
+    case "read_logs":
+      return buildReadLogsEvidence(run, mode);
+    case "plan_fix":
+      return buildPlanEvidence(run, mode);
+    case "dispatch_fix":
+      return buildDispatchEvidence(run, mode, liveAttempt, report);
+    case "run_evals":
+      return buildEvalEvidence(run, mode, evalAttempt, report, error);
+    case "open_pr":
+      return buildPrEvidence(run, mode, report);
+    case "merge_github":
+      return buildMergeEvidence(run, mode, report);
+  }
+}
+
 function buildProjection({
   currentNodeId,
   detail,
@@ -328,4 +399,202 @@ function summaryForStatus(id: FixDagNodeId, status: FixDagNodeStatus): string {
   if (status === "blocked") return id === "merge_github" ? "Requires a real PR" : "Needs attention";
   if (status === "disabled") return "Unavailable";
   return NODE_SUMMARY[id];
+}
+
+function buildReadLogsEvidence(run: LogRun, mode: FixDagEvidenceMode): FixDagEvidence {
+  const criticalSeq = run.analysis?.critical_step_seq ?? run.incident?.critical_step_seq ?? null;
+  const criticalEvent = criticalSeq === null ? undefined : run.events.find((event) => event.seq === criticalSeq);
+  const evidenceRefs = uniqueEvidenceRefs(run);
+  const recent = [...run.events]
+    .sort((a, b) => b.seq - a.seq)
+    .slice(0, 3)
+    .map(describeEvent);
+
+  return {
+    details: [
+      criticalEvent ? `Critical event: ${describeEvent(criticalEvent)}` : "Critical event is inferred from the incident bundle.",
+      ...recent,
+    ],
+    items: compactItems([
+      { label: "Session", value: run.session.id },
+      { label: "Event count", value: String(run.events.length || run.session.event_count) },
+      criticalSeq === null ? null : { label: "Critical seq", value: `#${criticalSeq}`, tone: "warning" },
+      evidenceRefs.length ? { label: "Evidence refs", value: evidenceRefs.map((ref) => `#${ref}`).join(", ") } : null,
+      { label: "Status", value: run.session.status, tone: run.session.status === "failed" ? "warning" : "info" },
+    ]),
+    mode,
+    nodeId: "read_logs",
+    subtitle: "Receipts are pulled from the selected trace before a fix is planned.",
+    title: "Read selected run",
+  };
+}
+
+function buildPlanEvidence(run: LogRun, mode: FixDagEvidenceMode): FixDagEvidence {
+  const incident = run.incident;
+  return {
+    details: [
+      incident?.root_cause ?? run.analysis?.root_cause ?? run.errorPreview,
+      `Representative session: ${incident?.representative_session_id ?? run.session.id}`,
+    ].filter(Boolean),
+    items: compactItems([
+      { label: "Incident", value: incident?.title ?? "No incident title" },
+      { label: "Severity", value: incident?.severity ?? "unknown", tone: incident?.severity === "critical" ? "warning" : "info" },
+      { label: "Labels", value: (incident?.labels ?? run.analysis?.labels ?? []).join(", ") || "unlabeled" },
+      run.confidence === null ? null : { label: "Confidence", value: formatPercent(run.confidence), tone: "success" },
+      { label: "Fingerprint", value: incident?.fingerprint ?? "pending" },
+    ]),
+    mode,
+    nodeId: "plan_fix",
+    subtitle: "Promptetheus turns the failure cluster into an incident-scoped fix plan.",
+    title: "Plan fix from incident",
+  };
+}
+
+function buildDispatchEvidence(
+  run: LogRun,
+  mode: FixDagEvidenceMode,
+  attempt: HealAttempt | null,
+  report?: HealReport | null,
+): FixDagEvidence {
+  const fixResult = run.incident?.fix_agent_result;
+  return {
+    details: [
+      attempt?.diagnosis ?? fixResult?.summary ?? run.incident?.root_cause ?? "Using local incident evidence until the live heal report returns.",
+      fixResult?.plan?.slice(0, 2).join(" -> ") ?? "",
+    ].filter(Boolean),
+    items: compactItems([
+      { label: "Source", value: report?.source ?? "selected run evidence" },
+      { label: "Orchestrator", value: report?.orchestrator ?? "local demo sequence" },
+      { label: "Runner", value: attempt?.runner ?? fixResult?.runner ?? "deterministic preview" },
+      { label: "Attempt", value: attempt ? String(attempt.attempt) : String(report?.attempts ?? 1) },
+      report?.workflow_run_id ? { label: "Workflow", value: report.workflow_run_id } : null,
+    ]),
+    mode,
+    nodeId: "dispatch_fix",
+    subtitle: "The fix handoff is tied to the same incident payload used by the live API.",
+    title: "Dispatch fix agent",
+  };
+}
+
+function buildEvalEvidence(
+  run: LogRun,
+  mode: FixDagEvidenceMode,
+  attempt: HealAttempt | null,
+  report?: HealReport | null,
+  error?: string | null,
+): FixDagEvidence {
+  const evalReport = attempt?.eval ?? null;
+  const firstCase = evalReport?.cases[0] ?? null;
+  const blockedReason = error ?? report?.reason ?? firstCase?.reason ?? evalReport?.note ?? null;
+  const passed = evalReport?.passed ?? (mode === "demo" ? true : null);
+
+  return {
+    details: [
+      firstCase?.assertion ? `Assertion: ${firstCase.assertion}` : `Local assertion: ${run.errorPreview || run.analysis?.root_cause || "failed trace should be corrected"}`,
+      blockedReason ? `Reason: ${blockedReason}` : "",
+      attempt?.critique?.reason ? `Critique: ${attempt.critique.reason}` : "",
+    ].filter(Boolean),
+    items: compactItems([
+      { label: "Eval", value: passed === null ? "pending" : passed ? "passed" : "failed", tone: passed ? "success" : passed === false ? "error" : "info" },
+      { label: "Before fail", value: String(evalReport?.before_fail ?? attempt?.regression?.before_fail ?? 1) },
+      { label: "After fail", value: String(evalReport?.after_fail ?? attempt?.regression?.after_fail ?? (mode === "demo" ? 0 : "pending")), tone: evalReport?.after_fail === 0 || mode === "demo" ? "success" : "info" },
+      firstCase ? { label: "Confidence", value: formatPercent(firstCase.confidence), tone: "success" } : run.confidence === null ? null : { label: "Confidence", value: formatPercent(run.confidence) },
+      evalReport ? { label: "Meaningful", value: evalReport.meaningful ? "yes" : "no", tone: evalReport.meaningful ? "success" : "warning" } : null,
+    ]),
+    mode: report?.status === "escalated" || error ? "blocked" : mode,
+    nodeId: "run_evals",
+    subtitle: "The eval gate proves the fix changes the failing behavior before PR handoff.",
+    title: "Run eval gate",
+  };
+}
+
+function buildPrEvidence(run: LogRun, mode: FixDagEvidenceMode, report?: HealReport | null): FixDagEvidence {
+  const pr = report?.pr ?? null;
+  const fallback = pr?.fallback ?? mode !== "live";
+  const changedFiles = pr?.changed_files ?? run.incident?.fix_agent_result?.changed_files ?? [];
+
+  return {
+    details: [
+      changedFiles.length ? `Changed files: ${changedFiles.join(", ")}` : "Changed files are preview-only until the live heal report returns.",
+      fallback ? "PR preview only. Connect the API/GitHub integration to open a real pull request." : "Live GitHub PR was opened after evals passed.",
+    ],
+    items: compactItems([
+      { label: "Title", value: pr?.title ?? `Fix ${run.incident?.label.replaceAll("_", " ") ?? "incident"}` },
+      { label: "Branch", value: pr?.branch ?? `promptetheus/${run.incident?.id ?? run.session.id}-fix` },
+      { label: "Files", value: changedFiles.length ? String(changedFiles.length) : "preview pending" },
+      { label: "Mode", value: fallback ? "PR preview" : "real GitHub PR", tone: fallback ? "warning" : "success" },
+      pr?.pr_url ? { label: "GitHub", value: pr.pr_url, href: pr.pr_url, tone: "success" } : null,
+    ]),
+    mode: fallback ? "demo" : mode,
+    nodeId: "open_pr",
+    subtitle: "A PR is prepared only after the eval gate says the candidate is useful.",
+    title: fallback ? "Open PR preview" : "Open real PR",
+  };
+}
+
+function buildMergeEvidence(run: LogRun, mode: FixDagEvidenceMode, report?: HealReport | null): FixDagEvidence {
+  const prUrl = report?.pr?.pr_url ?? run.incident?.pr_url ?? null;
+  const fallback = report?.pr?.fallback ?? !prUrl;
+  const blocked = report?.status === "escalated" || fallback;
+
+  return {
+    details: [
+      blocked
+        ? "Promptetheus does not merge from the app. This state becomes actionable when a real GitHub PR link exists."
+        : "Review and merge remain in GitHub after the live PR and eval receipts are available.",
+      report?.reason ?? "",
+    ].filter(Boolean),
+    items: compactItems([
+      { label: "Merge action", value: "external GitHub review" },
+      { label: "State", value: blocked ? "preview or blocked" : "ready in GitHub", tone: blocked ? "warning" : "success" },
+      { label: "Mode", value: fallback ? "preview" : "real PR", tone: fallback ? "warning" : "success" },
+      prUrl ? { label: "PR link", value: prUrl, href: prUrl, tone: "success" } : null,
+    ]),
+    mode: blocked ? "blocked" : mode,
+    nodeId: "merge_github",
+    subtitle: "The final state is a GitHub-ready handoff, not an in-app merge button.",
+    title: blocked ? "Merge blocked until real PR" : "Merge in GitHub",
+  };
+}
+
+function evidenceMode(phase: FixDagPhase, report?: HealReport | null): FixDagEvidenceMode {
+  if (phase === "escalated" || phase === "error") return "blocked";
+  if (report) return "live";
+  if (phase === "demo" || phase === "demo_complete" || phase === "running") return "demo";
+  return "local";
+}
+
+function latestAttempt(report?: HealReport | null): HealAttempt | null {
+  const trail = report?.trail ?? [];
+  return trail.length ? trail[trail.length - 1] : null;
+}
+
+function latestEvalAttempt(report?: HealReport | null): HealAttempt | null {
+  const trail = report?.trail ?? [];
+  for (let index = trail.length - 1; index >= 0; index -= 1) {
+    if (trail[index].eval) return trail[index];
+  }
+  return null;
+}
+
+function uniqueEvidenceRefs(run: LogRun): number[] {
+  const refs = new Set<number>();
+  for (const detection of run.analysis?.detections ?? []) {
+    for (const ref of detection.evidence_refs) refs.add(ref);
+  }
+  for (const ref of run.incident?.fix_agent_result?.evidence_refs ?? []) refs.add(ref);
+  return [...refs].sort((a, b) => a - b);
+}
+
+function describeEvent(event: TraceEvent): string {
+  const summary = eventSummary(event);
+  return `#${event.seq} ${eventTitle(event)}${summary ? ` - ${summary}` : ""}`;
+}
+
+function compactItems(items: Array<FixDagEvidenceItem | null>): FixDagEvidenceItem[] {
+  return items.filter((item): item is FixDagEvidenceItem => Boolean(item));
+}
+
+function formatPercent(value: number): string {
+  return `${Math.round(value * 100)}%`;
 }

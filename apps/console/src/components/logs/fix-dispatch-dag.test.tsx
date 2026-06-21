@@ -1,5 +1,5 @@
 import * as React from "react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -231,25 +231,52 @@ describe("FixDispatchDag", () => {
     expect(screen.getByRole("button", { name: "Dispatch fix unavailable" })).toBeDisabled();
   });
 
+  it("shows no-incident evidence in the prominent proof panel", () => {
+    render(
+      <FixDispatchDag
+        layout="prominent"
+        run={run({ incident: undefined, session: { ...session, incident_id: null } })}
+      />,
+    );
+
+    const proof = within(screen.getByLabelText("Fix DAG proof"));
+    expect(proof.getByText("No incident available")).toBeInTheDocument();
+    expect(proof.getByText("ses_failed")).toBeInTheDocument();
+  });
+
   it("auto-runs the prominent demo DAG through merge PR", async () => {
     vi.useFakeTimers();
-    render(<FixDispatchDag autoDemo prominent run={run()} />);
+    render(<FixDispatchDag autoDemo layout="prominent" run={run()} />);
 
     expect(screen.getByText("Dispatch running")).toBeInTheDocument();
     expect(screen.getByText("3s demo loop")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Fix DAG proof")).getByText("Read selected run")).toBeInTheDocument();
 
     await act(async () => {
-      vi.advanceTimersByTime(15000);
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(within(screen.getByLabelText("Fix DAG proof")).getByText("Plan fix from incident")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    expect(within(screen.getByLabelText("Fix DAG proof")).getByText("Dispatch fix agent")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(9000);
     });
 
     expect(screen.getByText("Merge-ready PR path")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Fix DAG proof")).getByText("Merge blocked until real PR")).toBeInTheDocument();
     expect(screen.getAllByText("Merge PR").length).toBeGreaterThan(0);
   });
 
   it("advances a successful dispatch and shows the GitHub PR link", async () => {
     vi.useFakeTimers();
     const dispatchHeal = vi.fn().mockResolvedValue(report());
-    render(<FixDispatchDag run={run()} dispatchHeal={dispatchHeal} />);
+    render(<FixDispatchDag layout="prominent" run={run()} dispatchHeal={dispatchHeal} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Dispatch fix for selected run" }));
 
@@ -264,6 +291,19 @@ describe("FixDispatchDag", () => {
       "href",
       "https://github.com/acme/repo/pull/12",
     );
+
+    const proof = within(screen.getByLabelText("Fix DAG proof"));
+    expect(proof.getByText("Merge in GitHub")).toBeInTheDocument();
+    expect(proof.getByText("real PR")).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByText("Open PR")[0]);
+    const prProof = within(screen.getByLabelText("Fix DAG proof"));
+    expect(prProof.getByText("Changed files: agents/browser.py")).toBeInTheDocument();
+    expect(prProof.getByText("real GitHub PR")).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByText("Run evals")[0]);
+    const evalProof = within(screen.getByLabelText("Fix DAG proof"));
+    expect(evalProof.getByText("Assertion: Books requested time")).toBeInTheDocument();
   });
 
   it("falls back to demo mode when the API is unavailable", async () => {
@@ -296,5 +336,48 @@ describe("FixDispatchDag", () => {
 
     expect(screen.getByText("Dispatch failed")).toBeInTheDocument();
     expect(screen.getByText("API exploded")).toBeInTheDocument();
+  });
+
+  it("shows escalated dispatch evidence in the proof panel", async () => {
+    vi.useFakeTimers();
+    const dispatchHeal = vi.fn().mockResolvedValue(
+      report({
+        pr: null,
+        reason: "Eval did not flip",
+        status: "escalated",
+        trail: [
+          {
+            ...report().trail[0],
+            eval: {
+              ...report().trail[0].eval!,
+              passed: false,
+              after_fail: 1,
+              cases: [
+                {
+                  ...report().trail[0].eval!.cases[0],
+                  after_passed: false,
+                  reason: "Selected time still wrong.",
+                },
+              ],
+            },
+            passed: false,
+          },
+        ],
+      }),
+    );
+    render(<FixDispatchDag layout="prominent" run={run()} dispatchHeal={dispatchHeal} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Dispatch fix for selected run" }));
+
+    await act(async () => {
+      await Promise.resolve();
+      vi.advanceTimersByTime(2200);
+    });
+
+    const proof = within(screen.getByLabelText("Fix DAG proof"));
+    expect(screen.getByText("Eval gate blocked dispatch")).toBeInTheDocument();
+    expect(proof.getByText("Run eval gate")).toBeInTheDocument();
+    expect(proof.getByText("failed")).toBeInTheDocument();
+    expect(proof.getByText("Reason: Eval did not flip")).toBeInTheDocument();
   });
 });
