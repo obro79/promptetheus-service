@@ -48,6 +48,15 @@ The instance has no key pair by default. Two ways to get a shell:
   `devin-iac` user as scoped (`AmazonEC2FullAccess` + `AmazonSSMReadOnlyAccess`) cannot
   create the role — broaden to include IAM, or create the role out-of-band.
 
+## Locked-down VPC default NACL
+If the box can't reach the internet (Docker/SSM time out) and can't be reached on
+6379 even with the SG open, check the subnet's **Network ACL**. A default NACL that
+was hardened to allow only specific inbound ports breaks everything, because NACLs
+are **stateless**: the ephemeral-port return traffic for the box's own *outbound*
+calls gets dropped too. Set `manage_network_acl = true` to create a dedicated NACL
+for this subnet (allows 6379 + ephemeral 1024–65535 inbound, all outbound) and
+reassociate only this subnet — other subnets keep the default NACL.
+
 ## Security notes
 - `allowed_cidrs` must be as tight as possible. Prefer running the FastAPI service in
   this VPC and allowing its security group (swap the `cidr_blocks` ingress for a

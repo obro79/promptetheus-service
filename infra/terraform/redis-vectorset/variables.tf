@@ -68,3 +68,9 @@ variable "enable_ssm" {
   type        = bool
   default     = false
 }
+
+variable "manage_network_acl" {
+  description = "Create a dedicated Network ACL for this box's subnet allowing Redis (6379) + ephemeral return traffic. Use when the VPC's default NACL is locked down (NACLs are stateless, so a restrictive default NACL silently breaks outbound too). Reassociates ONLY this subnet; other subnets keep the default NACL."
+  type        = bool
+  default     = false
+}
