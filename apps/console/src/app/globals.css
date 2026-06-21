@@ -17,6 +17,7 @@
     --landing-card-radius-sm: 1.35rem;
     --landing-shell-radius: 2rem;
     --landing-eyebrow-tracking: 0.02em;
+    --console-panel-pad: 1rem;
 
     --hero-sky-top: 203 91% 55%;
     --hero-sky-mid: 194 92% 68%;
@@ -260,12 +261,58 @@
 
   .instrument-header {
     display: flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-bottom: 1px solid hsl(var(--border) / 0.48);
+    padding: 0.625rem var(--console-panel-pad, 1rem);
+  }
+
+  .console-panel {
+    --console-panel-pad: 1rem;
+    background: hsl(var(--panel) / 0.76);
+    border: 1px solid hsl(var(--border) / 0.74);
+    border-radius: var(--landing-card-radius-sm);
+    box-shadow:
+      0 24px 70px hsl(var(--shadow-color) / 0.1),
+      inset 0 1px 0 hsl(0 0% 100% / 0.72);
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    backdrop-filter: blur(22px) saturate(145%);
+  }
+
+  .console-panel-pad {
+    padding-left: var(--console-panel-pad);
+    padding-right: var(--console-panel-pad);
+  }
+
+  .console-panel-header {
+    display: flex;
     min-height: 44px;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
     border-bottom: 1px solid hsl(var(--border) / 0.56);
-    padding: 0 14px;
+    padding: 0.625rem var(--console-panel-pad, 1rem);
+  }
+
+  .console-panel-body {
+    padding: var(--console-panel-pad, 1rem);
+  }
+
+  .logs-console-grid {
+    display: grid;
+    min-height: calc(100dvh - 13rem);
+    gap: 1rem;
+    grid-template-columns: minmax(240px, 240px) minmax(0, 1fr);
+  }
+
+  @media (max-width: 1023px) {
+    .logs-console-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   .landing-page {

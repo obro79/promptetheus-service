@@ -1,6 +1,6 @@
 import * as React from "react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   AnalysisResult,
@@ -10,6 +10,15 @@ import type {
   TraceSession,
 } from "@/lib/types";
 import { LogsDashboard } from "./logs-dashboard";
+
+const mockReplace = vi.fn();
+const mockSearchParams = new URLSearchParams();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: mockReplace }),
+  usePathname: () => "/logs",
+  useSearchParams: () => mockSearchParams,
+}));
 
 const project: Project = {
   id: "prj_logs",
@@ -129,7 +138,7 @@ const eventsBySession: Record<string, TraceEvent[]> = {
   ],
 };
 
-function renderDashboard() {
+function renderDashboard(overrides?: Partial<React.ComponentProps<typeof LogsDashboard>>) {
   render(
     <LogsDashboard
       sessions={sessions}
@@ -137,30 +146,58 @@ function renderDashboard() {
       incidents={incidents}
       eventsBySession={eventsBySession}
       analysesBySession={analysesBySession}
+      {...overrides}
     />,
   );
 }
 
+function openRunTrace(runLabel: string) {
+  const runsList = screen.getByLabelText("Runs list");
+  fireEvent.click(within(runsList).getAllByText(runLabel)[0]);
+}
+
+beforeEach(() => {
+  mockReplace.mockClear();
+  for (const key of [...mockSearchParams.keys()]) {
+    mockSearchParams.delete(key);
+  }
+});
+
 afterEach(() => cleanup());
 
 describe("LogsDashboard", () => {
-  it("filters run rows and keeps the selected run inspector visible", () => {
+  it("shows agent nav and runs table without inline trace by default", () => {
     renderDashboard();
 
-    expect(screen.getAllByText("Book a demo at 2pm").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Answer order status")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Selected 2am").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Agent navigation")).toBeInTheDocument();
+    expect(screen.getByLabelText("Runs list")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Trace waterfall")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Run inspector")).not.toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: "Passed" }));
-    fireEvent.click(screen.getByRole("button", { name: "Failed only" }));
+  it("filters run rows with status pills and opens trace overlay on run click", () => {
+    renderDashboard();
 
-    expect(screen.getAllByText("Answer order status").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getAllByText("Answer order status")[0]);
+    const runsList = screen.getByLabelText("Runs list");
+
+    expect(within(runsList).getAllByText("Book a demo at 2pm").length).toBeGreaterThan(0);
+    expect(within(runsList).getAllByText("Answer order status").length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("Trace waterfall")).not.toBeInTheDocument();
+
+    fireEvent.click(within(runsList).getByRole("button", { name: "Passed (1)" }));
+
+    expect(within(runsList).queryByText("Book a demo at 2pm")).not.toBeInTheDocument();
+    expect(within(runsList).getAllByText("Answer order status").length).toBeGreaterThan(0);
+
+    openRunTrace("Answer order status");
+
+    expect(screen.getByLabelText("Expanded trace view")).toBeInTheDocument();
     expect(screen.getAllByText("Order shipped").length).toBeGreaterThan(0);
   });
 
-  it("expands and collapses trace nodes", () => {
+  it("expands and collapses trace nodes in the overlay", () => {
     renderDashboard();
+    openRunTrace("Book a demo at 2pm");
 
     const trace = screen.getByLabelText("Trace waterfall");
     expect(within(trace).getByText("browser.click")).toBeInTheDocument();
@@ -170,14 +207,34 @@ describe("LogsDashboard", () => {
     expect(within(trace).getByText("browser.click")).toBeInTheDocument();
   });
 
-  it("shows agent selector and expand control for full trace", () => {
+  it("shows exit full view control after opening a run", async () => {
     renderDashboard();
 
-    expect(screen.getByRole("button", { name: /All agents/i })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.getByRole("button", { name: /Expand trace to full view/i })).toBeInTheDocument();
+    const agentNav = screen.getByLabelText("Agent navigation");
+    await waitFor(() => {
+      expect(
+        within(agentNav).getAllByRole("button", { name: /All agents/i })[0],
+      ).toHaveAttribute("aria-pressed", "true");
+    });
+
+    expect(screen.queryByRole("button", { name: /Exit full view/i })).not.toBeInTheDocument();
+
+    openRunTrace("Book a demo at 2pm");
+
+    expect(screen.getByRole("button", { name: /Exit full view/i })).toBeInTheDocument();
+  });
+
+  it("auto-selects a failed run when selecting an agent without opening trace overlay", () => {
+    renderDashboard();
+
+    const agentNav = screen.getByLabelText("Agent navigation");
+    const logsProjectBtn = within(agentNav)
+      .getAllByRole("button")
+      .find((btn) => btn.textContent?.includes("Logs Project"))!;
+    fireEvent.click(logsProjectBtn);
+
+    expect(screen.getAllByText("Book a demo at 2pm").length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("Trace waterfall")).not.toBeInTheDocument();
   });
 
   it("filters runs to a selected agent and hides runs from other agents", () => {
@@ -219,19 +276,27 @@ describe("LogsDashboard", () => {
       />,
     );
 
-    // Turn off failed-only so all sessions are visible
-    fireEvent.click(screen.getByRole("button", { name: "Failed only" }));
+    const runsList = screen.getByLabelText("Runs list");
+    expect(within(runsList).getAllByText("Other agent task").length).toBeGreaterThan(0);
 
-    // "Other agent task" is visible (all agents selected)
-    expect(screen.getAllByText("Other agent task").length).toBeGreaterThan(0);
-
-    // Select "Logs Project" agent — "Other agent task" from prj_other should disappear
-    const agentNav = screen.getByLabelText("Agent navigation and filters");
+    const agentNav = screen.getByLabelText("Agent navigation");
     const logsProjectBtn = within(agentNav)
       .getAllByRole("button")
       .find((btn) => btn.textContent?.includes("Logs Project"))!;
     fireEvent.click(logsProjectBtn);
 
-    expect(screen.queryByText("Other agent task")).not.toBeInTheDocument();
+    expect(within(runsList).queryByText("Other agent task")).not.toBeInTheDocument();
+  });
+
+  it("hydrates selection from URL search params and opens trace overlay", () => {
+    mockSearchParams.set("agent", "prj_logs");
+    mockSearchParams.set("session", "ses_passed");
+    mockSearchParams.set("seq", "1");
+
+    renderDashboard();
+
+    expect(screen.getByLabelText("Expanded trace view")).toBeInTheDocument();
+    expect(screen.getAllByText("Answer order status").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Order shipped").length).toBeGreaterThan(0);
   });
 });

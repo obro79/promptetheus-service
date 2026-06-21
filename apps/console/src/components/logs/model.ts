@@ -74,17 +74,7 @@ export interface VisibleTraceNode {
   depth: number;
 }
 
-export const DEFAULT_COLUMNS: LogColumn[] = [
-  "status",
-  "run",
-  "input",
-  "output",
-  "error",
-  "start_time",
-  "latency",
-  "tokens",
-  "feedback",
-];
+export const DEFAULT_COLUMNS: LogColumn[] = ["status", "run", "error", "latency"];
 
 const FILTER_NOW = Date.parse("2026-06-18T17:00:00Z");
 
@@ -463,4 +453,33 @@ export function flattenTraceTree(
     }
   }
   return visible;
+}
+
+export function allExpandable(nodes: TraceNode[], ids = new Set<string>()): Set<string> {
+  for (const node of nodes) {
+    if (node.children.length) ids.add(node.id);
+    allExpandable(node.children, ids);
+  }
+  return ids;
+}
+
+export function firstFailedEvent(run: LogRun): TraceEvent | undefined {
+  const critical = run.analysis?.critical_step_seq;
+  return (
+    run.events.find((event) => event.seq === critical) ??
+    run.events.find(
+      (event) =>
+        event.type === "error" ||
+        (event.type === "goal_check" &&
+          (event.payload as { passed?: boolean }).passed === false),
+    ) ??
+    run.events[0]
+  );
+}
+
+export function pickDefaultRun(runs: LogRun[]): LogRun | undefined {
+  if (runs.length === 0) return undefined;
+  const failed = runs.filter((run) => ["failed", "error"].includes(run.session.status));
+  const pool = failed.length > 0 ? failed : runs;
+  return sortLogRuns(pool, "start_time", "desc")[0];
 }
