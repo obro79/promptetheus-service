@@ -216,6 +216,19 @@ export interface HealPr {
   pr_url?: string | null;
 }
 
+/**
+ * A prior verified fix the Redis fix-memory matched for this incident, passed to
+ * the fix agent as a warm-start. Present only when the loop reused past learning.
+ */
+export interface HealWarmStart {
+  from_incident_id?: string | null;
+  label?: string | null;
+  /** Similarity to the prior incident (cosine for Voyage embeddings, else lexical). */
+  score?: number | null;
+  plan?: string[] | null;
+  diff?: string | null;
+}
+
 /** Result of the self-healing loop (POST /api/incidents/{id}/heal). */
 export interface HealReport {
   status: "pr_opened" | "escalated";
@@ -227,6 +240,8 @@ export interface HealReport {
   reason: string | null;
   workflow_run_id: string | null;
   orchestrator: string;
+  /** The Redis fix-memory neighbour this heal warm-started from, or null if cold. */
+  warm_start: HealWarmStart | null;
 }
 
 /** The incident-context bundle (GET /api/incidents/{id}/context). */

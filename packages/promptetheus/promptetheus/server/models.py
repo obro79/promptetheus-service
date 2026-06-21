@@ -152,6 +152,11 @@ class HealReport:
     reason: str | None = None
     workflow_run_id: str | None = None
     orchestrator: str = "inprocess"
+    #: When the Redis fix-memory warm-started this heal from a prior verified fix,
+    #: the matched neighbour ({from_incident_id, label, score, ...}). None when the
+    #: loop started cold (no Redis, or no similar prior fix). Surfacing this is what
+    #: makes the data flywheel ("it reused what it learned") visible in the console.
+    warm_start: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -164,4 +169,5 @@ class HealReport:
             "reason": self.reason,
             "workflow_run_id": self.workflow_run_id,
             "orchestrator": self.orchestrator,
+            "warm_start": self.warm_start,
         }

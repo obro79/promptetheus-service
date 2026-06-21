@@ -107,11 +107,23 @@ def test_warm_start_from_memory_is_passed_to_first_attempt(monkeypatch) -> None:
         return DeterministicRunner(allowed_paths=bundle.get("allowed_paths")).run(bundle)
 
     monkeypatch.setattr(loop_mod.ClaudeRunner, "run", _fake_run)
-    monkeypatch.setattr(
-        loop_mod.memory, "find_similar_fix", lambda bundle: {"from_incident_id": "old", "score": 0.9}
-    )
+    warm = {"from_incident_id": "old", "label": "browser_goal_mismatch", "score": 0.9}
+    monkeypatch.setattr(loop_mod.memory, "find_similar_fix", lambda bundle: warm)
 
     report = heal_incident(store, _incident())
 
     assert report.status == "pr_opened"
-    assert seen["warm_start"] == {"from_incident_id": "old", "score": 0.9}
+    assert seen["warm_start"] == warm
+    # The reuse must surface on the report so the console can render the flywheel.
+    assert report.warm_start == warm
+    assert report.as_dict()["warm_start"] == warm
+
+
+def test_warm_start_is_none_when_memory_has_no_match(monkeypatch) -> None:
+    store = InMemoryStore()
+    monkeypatch.setattr(loop_mod.memory, "find_similar_fix", lambda bundle: None)
+
+    report = heal_incident(store, _incident())
+
+    assert report.warm_start is None
+    assert report.as_dict()["warm_start"] is None

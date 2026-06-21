@@ -5,23 +5,28 @@ import {
   Activity,
   AlertCircle,
   AlertTriangle,
-  Bell,
   Bot,
   Bug,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   CircleDot,
+  Clock,
   Columns3,
+  ExternalLink,
   Eye,
   FileJson,
   Filter,
   FlaskConical,
   Gauge,
+  GitMerge,
+  GitPullRequest,
   ListFilter,
   MessageSquare,
   PanelRight,
   PlayCircle,
+  Power,
+  RefreshCw,
   RotateCcw,
   ScrollText,
   Search,
@@ -30,11 +35,18 @@ import {
   Tags,
   Terminal,
   Timer,
+  Trash2,
   Waypoints,
   X,
   type LucideIcon,
 } from "lucide-react";
 
+import Link from "next/link";
+
+import {
+  ClaudeMark,
+  DevinMark,
+} from "@/components/common/brand-marks";
 import { JsonViewer } from "@/components/common/json-viewer";
 import { LabelTag } from "@/components/common/label-tag";
 import { StatusPill } from "@/components/common/status-pill";
@@ -95,7 +107,7 @@ type LogSection =
   | "runs"
   | "evaluations"
   | "logs"
-  | "alerts"
+  | "actions"
   | "settings";
 
 const NAV_ITEMS: Array<{
@@ -107,7 +119,7 @@ const NAV_ITEMS: Array<{
   { value: "runs", label: "Runs / Traces", Icon: Waypoints },
   { value: "evaluations", label: "Evaluations", Icon: FlaskConical },
   { value: "logs", label: "Logs", Icon: ScrollText },
-  { value: "alerts", label: "Alerts", Icon: Bell },
+  { value: "actions", label: "Actions", Icon: GitPullRequest },
   { value: "settings", label: "Settings", Icon: Settings2 },
 ];
 
@@ -345,7 +357,7 @@ export function LogsDashboard({
 
       <div className="min-w-0 flex-1">
         {section === "runs" ? (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-5">
             <LogFiltersBar
               query={query}
               onQueryChange={setQuery}
@@ -368,8 +380,17 @@ export function LogsDashboard({
               onClear={clearAllFilters}
             />
 
+<<<<<<< Updated upstream
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
               <div className="flex min-w-0 flex-col gap-3">
+=======
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="flex min-w-0 flex-col gap-5">
+                {selectedRun ? (
+                  <FixDispatchDag autoDemo prominent run={selectedRun} />
+                ) : null}
+
+>>>>>>> Stashed changes
                 <RunsTable
                   runs={filteredRuns}
                   selectedRunId={selectedRun?.session.id}
@@ -434,18 +455,10 @@ export function LogsDashboard({
           />
         ) : section === "evaluations" ? (
           <EvaluationsPanel agents={agents} runs={runs} />
-        ) : section === "alerts" ? (
-          <EmptyPanel
-            Icon={Bell}
-            title="No alerts configured"
-            description="Set thresholds on error rate, latency, and cost to route failures to webhooks or PagerDuty the moment they happen."
-          />
+        ) : section === "actions" ? (
+          <ActionsPanel incidents={incidents} onOpenRun={openRun} />
         ) : (
-          <EmptyPanel
-            Icon={Settings2}
-            title="Project settings"
-            description="API keys, retention, connected repo, and instrumentation setup for this project will live here."
-          />
+          <SettingsPanel agents={agents} />
         )}
       </div>
     </div>
@@ -1112,6 +1125,292 @@ function EmptyPanel({
       </span>
       <h2 className="mt-4 text-base font-semibold text-foreground">{title}</h2>
       <p className="mt-1.5 max-w-sm text-sm leading-6 text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+// ─── Actions (human-in-the-loop PR review) ───────────────────────────────────
+
+/** Derive a readable branch name from a GitHub PR url, or null. */
+function prBranchHint(prUrl: string | null): string | null {
+  if (!prUrl) return null;
+  const match = prUrl.match(/\/pull\/(\d+)/);
+  return match ? `PR #${match[1]}` : null;
+}
+
+/**
+ * The human-in-the-loop surface: every pull request the fix agent (Devin) opened
+ * for a verified fix, waiting for a person to review and merge. This is where the
+ * loop deliberately stops — Promptetheus never auto-merges.
+ */
+function ActionsPanel({
+  incidents,
+  onOpenRun,
+}: {
+  incidents: Incident[];
+  onOpenRun: (run: LogRun) => void;
+}) {
+  void onOpenRun; // actions link to the incident detail; run-open kept for parity
+  const prs = incidents.filter((incident) => incident.pr_url || incident.fix_agent_result);
+  const awaiting = prs.filter((incident) => incident.status !== "fixed");
+  const merged = prs.filter((incident) => incident.status === "fixed");
+
+  if (prs.length === 0) {
+    return (
+      <EmptyPanel
+        Icon={GitPullRequest}
+        title="No pull requests yet"
+        description="When the fix agent verifies a fix it opens a pull request and pauses here for a human to review and merge — nothing is auto-merged."
+      />
+    );
+  }
+
+  return (
+    <section className="flex flex-col gap-4">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Actions</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Pull requests opened by the fix agent — review and merge. The loop stops
+            here; nothing merges without you.
+          </p>
+        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning">
+          <Clock className="size-3.5" />
+          {awaiting.length} awaiting review
+        </span>
+      </header>
+
+      {awaiting.length > 0 ? (
+        <div className="flex flex-col gap-2.5">
+          {awaiting.map((incident) => (
+            <ActionPrCard key={incident.id} incident={incident} />
+          ))}
+        </div>
+      ) : null}
+
+      {merged.length > 0 ? (
+        <div className="flex flex-col gap-2.5">
+          <SectionLabel>Merged</SectionLabel>
+          {merged.map((incident) => (
+            <ActionPrCard key={incident.id} incident={incident} merged />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function ActionPrCard({
+  incident,
+  merged = false,
+}: {
+  incident: Incident;
+  merged?: boolean;
+}) {
+  const fix = incident.fix_agent_result;
+  const runner = fix?.runner ?? "claude";
+  const RunnerMark = runner === "claude" ? ClaudeMark : DevinMark;
+  const branch = prBranchHint(incident.pr_url);
+  const title = fix?.summary || incident.title || incident.label;
+
+  return (
+    <article className={cn("flex flex-col gap-3 p-3.5", SURFACE)}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-elevated">
+            <DevinMark className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="truncate text-sm font-medium text-foreground">{title}</p>
+              {branch ? (
+                <span className="mono shrink-0 text-[10px] text-muted-foreground">{branch}</span>
+              ) : null}
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <LabelTag label={incident.label} />
+              <span className="inline-flex items-center gap-1 rounded border border-border/60 bg-elevated px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                <RunnerMark className="size-3" /> {runner}
+              </span>
+              {typeof fix?.confidence === "number" ? (
+                <span className="text-[10px] text-muted-foreground">
+                  {pct(fix.confidence)} confidence
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+        <span
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold",
+            merged ? "bg-success/15 text-success" : "bg-warning/15 text-warning",
+          )}
+        >
+          {merged ? <GitMerge className="size-3" /> : <Clock className="size-3" />}
+          {merged ? "merged" : "awaiting merge"}
+        </span>
+      </div>
+
+      {fix?.changed_files && fix.changed_files.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {fix.changed_files.map((file) => (
+            <span key={file} className="mono rounded bg-elevated px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              {file}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="flex items-center justify-between gap-2">
+        <Link
+          href={`/incidents/${incident.id}`}
+          className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
+        >
+          View incident
+        </Link>
+        <div className="flex items-center gap-2">
+          {incident.pr_url ? (
+            <a
+              href={incident.pr_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border/70 px-2.5 py-1.5 text-[11px] font-semibold text-foreground transition-colors hover:bg-elevated"
+            >
+              <GitPullRequest className="size-3.5" /> View PR <ExternalLink className="size-3" />
+            </a>
+          ) : null}
+          {!merged ? (
+            <button
+              type="button"
+              disabled={!incident.pr_url}
+              className="inline-flex items-center gap-1.5 rounded-md bg-accent px-2.5 py-1.5 text-[11px] font-semibold text-accent-foreground transition-colors hover:bg-accent-bright disabled:opacity-50"
+              title={incident.pr_url ? "Open the PR on GitHub to merge" : "No PR yet"}
+            >
+              <GitMerge className="size-3.5" /> Approve &amp; merge
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+
+/**
+ * Project settings: generic configuration plus the operational controls the demo
+ * needs — reload data, and per-agent removal (decommission an instrumented agent).
+ */
+function SettingsPanel({ agents }: { agents: AgentRow[] }) {
+  const [removed, setRemoved] = React.useState<Set<string>>(new Set());
+  const visibleAgents = agents.filter((agent) => !removed.has(agent.id));
+
+  return (
+    <section className="flex flex-col gap-4">
+      <header>
+        <h2 className="text-sm font-semibold text-foreground">Settings</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Project configuration, instrumented agents, and maintenance.
+        </p>
+      </header>
+
+      <div className={cn("flex flex-col divide-y divide-border/60", SURFACE)}>
+        <SettingRow label="API endpoint" hint="Where agents send traces">
+          <code className="mono rounded bg-elevated px-2 py-1 text-[11px] text-foreground">
+            POST /api/ingest
+          </code>
+        </SettingRow>
+        <SettingRow label="Connected repo" hint="Where the fix agent opens PRs">
+          <code className="mono rounded bg-elevated px-2 py-1 text-[11px] text-foreground">
+            acme/acmemeet-agent
+          </code>
+        </SettingRow>
+        <SettingRow label="Trace retention" hint="How long runs are kept">
+          <span className="text-[11px] text-muted-foreground">30 days</span>
+        </SettingRow>
+      </div>
+
+      <div className={cn("overflow-hidden", SURFACE)}>
+        <header className={PANEL_HEADER}>
+          <span className="text-xs font-semibold text-foreground">
+            Instrumented agents ({visibleAgents.length})
+          </span>
+        </header>
+        {visibleAgents.length === 0 ? (
+          <p className="px-3.5 py-6 text-center text-xs text-muted-foreground">
+            All agents removed. Re-instrument an agent to see it here.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border/60">
+            {visibleAgents.map((agent) => (
+              <li key={agent.id} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <Bot className="size-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-foreground">{agent.name}</p>
+                    <p className="mono text-[10px] text-muted-foreground">
+                      {agent.version} · {agent.runCount} runs
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRemoved((prev) => new Set(prev).add(agent.id))}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border/70 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
+                >
+                  <Trash2 className="size-3.5" /> Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className={cn("flex flex-wrap items-center justify-between gap-3 p-3.5", SURFACE)}>
+        <div>
+          <p className="text-xs font-semibold text-foreground">Maintenance</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Reload trace data or restart the connection to the ingestion service.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border/70 px-2.5 py-1.5 text-[11px] font-semibold text-foreground transition-colors hover:bg-elevated"
+          >
+            <RefreshCw className="size-3.5" /> Reload data
+          </button>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border/70 px-2.5 py-1.5 text-[11px] font-semibold text-foreground transition-colors hover:bg-elevated"
+          >
+            <Power className="size-3.5" /> Reconnect
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SettingRow({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-3.5 py-3">
+      <div>
+        <p className="text-xs font-medium text-foreground">{label}</p>
+        <p className="text-[10px] text-muted-foreground">{hint}</p>
+      </div>
+      {children}
     </div>
   );
 }
