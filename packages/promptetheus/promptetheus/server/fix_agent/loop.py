@@ -27,6 +27,7 @@ from promptetheus.server.github import (
     github_pr_enabled,
 )
 from promptetheus.server.models import HealReport
+from promptetheus.server.observability import telemetry
 
 
 def _max_attempts(explicit: int | None) -> int:
@@ -141,8 +142,20 @@ def run_attempts(
     after a human approves the gated tool). Returns a result dict carrying the
     verified fix (or None), the bundle, the trail, the source, and the attempt
     count — everything `open_verified_fix` needs to finish the job.
+
+    The whole run is wrapped in a Sentry transaction so the per-attempt eval
+    spans and the auto-instrumented Anthropic gen_ai spans land on one AI-agent
+    run in the dashboard (no-op when Sentry isn't configured).
     """
 
+    incident_id = str(incident.get("id") or "incident")
+    with telemetry.heal_run(incident_id, source=incident.get("source")):
+        return _run_attempts_core(store, incident, max_attempts=max_attempts)
+
+
+def _run_attempts_core(
+    store: Any, incident: dict[str, Any], *, max_attempts: int | None = None
+) -> dict[str, Any]:
     cap = _max_attempts(max_attempts)
     incident_id = str(incident.get("id") or "incident")
     bundle = build_incident_bundle(store, incident)
