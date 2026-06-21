@@ -1,4 +1,11 @@
-import type { EvalScoreboard, HealReport, Project, Workspace } from "./types";
+import type {
+  AgentPrDispatchResult,
+  ClosedTestPullRequestResult,
+  EvalScoreboard,
+  HealReport,
+  Project,
+  Workspace,
+} from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_PROMPTETHEUS_API_URL;
 const ENV_CONSOLE_TOKEN = process.env.NEXT_PUBLIC_PROMPTETHEUS_CONSOLE_TOKEN;
@@ -153,6 +160,52 @@ export async function healIncident(
     method: "POST",
     body: JSON.stringify(maxAttempts ? { max_attempts: maxAttempts } : {}),
   });
+}
+
+export async function dispatchLogsAgentPrs(input: {
+  agentName?: string | null;
+  incidentId: string;
+  incidentTitle?: string | null;
+  rootCause?: string | null;
+  sessionId: string;
+}): Promise<AgentPrDispatchResult> {
+  const response = await fetch("/api/logs/dispatch-agent", {
+    body: JSON.stringify(input),
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+  const body = (await response.json()) as AgentPrDispatchResult | { error?: string };
+  if (!response.ok) {
+    throw new Error("error" in body && body.error ? body.error : `Agent dispatch ${response.status}`);
+  }
+  return body as AgentPrDispatchResult;
+}
+
+export async function createClosedLogsTestPr(input: {
+  agentName?: string | null;
+  incidentId: string;
+  incidentTitle?: string | null;
+  rootCause?: string | null;
+  sessionId: string;
+}): Promise<ClosedTestPullRequestResult> {
+  const response = await fetch("/api/logs/test-pr", {
+    body: JSON.stringify(input),
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+  const body = (await response.json()) as ClosedTestPullRequestResult | { error?: string };
+  if (!response.ok) {
+    throw new Error("error" in body && body.error ? body.error : `Test PR ${response.status}`);
+  }
+  return body as ClosedTestPullRequestResult;
 }
 
 /** Live eval scoreboard (GET /api/evals/scoreboard). Returns null when the API

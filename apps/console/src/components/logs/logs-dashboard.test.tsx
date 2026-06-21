@@ -222,15 +222,18 @@ describe("LogsDashboard", () => {
     expect(screen.getByLabelText("Expand trace tree")).toBeInTheDocument();
   });
 
-  it("shows the promoted fix dispatch DAG above the runs list with proof receipts", () => {
+  it("shows the promoted fix dispatch DAG above the runs list with agent PR dispatch", () => {
     renderDashboard();
 
     const dag = screen.getByLabelText("Fix dispatch DAG");
     const proof = within(screen.getByLabelText("Fix DAG proof"));
     const runsList = screen.getByLabelText("Runs list");
 
-    expect(screen.getByText("Dispatch running")).toBeInTheDocument();
-    expect(screen.getByText("3s demo loop")).toBeInTheDocument();
+    expect(screen.getByText("Ready to dispatch")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create and close test PR" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dispatch fix for selected run" })).toHaveTextContent(
+      "Dispatch agent PRs",
+    );
     expect(proof.getByText("Read selected run")).toBeInTheDocument();
     expect(dag.compareDocumentPosition(runsList) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });

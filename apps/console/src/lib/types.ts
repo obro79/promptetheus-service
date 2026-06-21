@@ -216,6 +216,34 @@ export interface HealPr {
   pr_url?: string | null;
 }
 
+export type AgentDispatchStatus = "running" | "pr_opened" | "partial" | "error";
+export type AgentDispatchType = "browser" | "chat" | "voice";
+
+export interface AgentPullRequestResult {
+  agentType: AgentDispatchType;
+  title: string;
+  url: string | null;
+  branch: string | null;
+  number: number | null;
+  devinReviewRequested: boolean;
+  error?: string;
+}
+
+export interface AgentPrDispatchResult {
+  status: AgentDispatchStatus;
+  targetRepo: string;
+  pullRequests: AgentPullRequestResult[];
+}
+
+export interface ClosedTestPullRequestResult {
+  title: string;
+  url: string;
+  branch: string;
+  number: number;
+  state: "closed";
+  targetRepo: string;
+}
+
 /** Result of the self-healing loop (POST /api/incidents/{id}/heal). */
 export interface HealReport {
   status: "pr_opened" | "escalated";
