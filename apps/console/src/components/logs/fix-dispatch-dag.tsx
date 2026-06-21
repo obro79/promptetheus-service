@@ -130,11 +130,11 @@ const INFRA_BRANCHES: Array<{
  * "what runs, in what order, and how long it takes".
  */
 const STEP_META: Record<FixDagNodeId, { step: number; duration: string }> = {
-  read_logs: { step: 1, duration: "0.4s" },
-  plan_fix: { step: 2, duration: "1.2s" },
-  dispatch_fix: { step: 3, duration: "3.8s" },
-  run_evals: { step: 4, duration: "2.1s" },
-  open_pr: { step: 5, duration: "0.9s" },
+  read_logs: { step: 1, duration: "6s" },
+  plan_fix: { step: 2, duration: "6s" },
+  dispatch_fix: { step: 3, duration: "6s" },
+  run_evals: { step: 4, duration: "6s" },
+  open_pr: { step: 5, duration: "6s" },
   merge_github: { step: 6, duration: "human" },
 };
 
@@ -288,9 +288,9 @@ const NODE_SUBSTEPS: Record<FixDagNodeId, FixDagSubStep[]> = {
 const DAG_ICON_FRAME =
   "inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-accent/25 bg-accent-muted text-accent shadow-[0_12px_34px_hsl(var(--glow-accent)/0.18)]";
 
-const ANIMATION_NODE_DELAY_MS = 420;
-const DEMO_NODE_DELAY_MS = 3000;
-const MIN_DISPATCH_DURATION_MS = 2100;
+const PIPELINE_STEP_DELAY_MS = 6000;
+const PIPELINE_TOTAL_DURATION_MS = PIPELINE_STEP_DELAY_MS * (FIX_DAG_NODE_IDS.length - 1);
+const DEMO_NODE_DELAY_MS = PIPELINE_STEP_DELAY_MS;
 const PR_POLL_INTERVAL_MS = 5000;
 const PR_POLL_TIMEOUT_MS = 120000;
 
@@ -482,17 +482,17 @@ export function FixDispatchDag({
     setError(null);
     prPollStartedAt.current = null;
 
-    FIX_DAG_NODE_IDS.slice(1, 5).forEach((id, index) => {
+    FIX_DAG_NODE_IDS.slice(1, -1).forEach((id, index) => {
       timers.current.push(
         setTimeout(() => {
           setActiveNodeId(id);
           setSelectedNodeId(id);
-        }, ANIMATION_NODE_DELAY_MS * (index + 1)),
+        }, PIPELINE_STEP_DELAY_MS * (index + 1)),
       );
     });
 
     const settle = (callback: () => void) => {
-      const remaining = Math.max(0, MIN_DISPATCH_DURATION_MS - (Date.now() - startedAt));
+      const remaining = Math.max(0, PIPELINE_TOTAL_DURATION_MS - (Date.now() - startedAt));
       timers.current.push(setTimeout(callback, remaining));
     };
 
@@ -587,7 +587,7 @@ export function FixDispatchDag({
               ) : null}
               <p className="text-sm font-semibold text-foreground">{projection.headline}</p>
               <ModeTag mode={projection.mode} />
-              {autoDemo ? <LabelTag label="3s demo loop" /> : null}
+              {autoDemo ? <LabelTag label="30s demo loop" /> : null}
               {projection.prPreview ? <LabelTag label="PR preview" /> : null}
               {attempts > 0 ? <LabelTag label={`${attempts} attempt${attempts === 1 ? "" : "s"}`} /> : null}
               {confidence !== null ? <LabelTag label={`eval ${pct(confidence)}`} /> : null}
