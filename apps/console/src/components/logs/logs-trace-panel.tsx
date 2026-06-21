@@ -105,8 +105,8 @@ export function TracePanel({
 
       <div
         className={cn(
-          "grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(280px,0.9fr)_minmax(320px,1.1fr)]",
-          isFullView && "h-full",
+          "flex min-h-0 flex-1 flex-col gap-3",
+          isFullView && "lg:flex-row lg:gap-4",
         )}
       >
         <TraceWaterfall
@@ -120,6 +120,7 @@ export function TracePanel({
           isFullView={isFullView}
           onFullViewToggle={onFullViewToggle}
           traceScrollRef={traceScrollRef}
+          className={cn(isFullView && "lg:min-h-0 lg:flex-1")}
         />
         <RunInspector
           run={run}
@@ -131,6 +132,7 @@ export function TracePanel({
             if (match) onEventSelect(match);
           }}
           isFullView={isFullView}
+          className={cn(isFullView && "lg:min-h-0 lg:flex-1")}
         />
       </div>
     </section>
@@ -142,16 +144,16 @@ function FailureSummaryStrip({ run }: { run: LogRun }) {
     run.analysis?.root_cause ?? run.errorPreview ?? "Run failed without a recorded root cause.";
 
   return (
-    <div className="landing-framed-surface flex flex-wrap items-start gap-3 border-warning/30 bg-warning/[0.04] px-4 py-3">
-      <AlertCircle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+    <div className="landing-framed-surface console-panel-pad flex items-center gap-3 border-warning/25 bg-warning/[0.04] py-3">
+      <AlertCircle className="size-4 shrink-0 text-warning" aria-hidden />
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-warning">Failure summary</p>
-        <p className="mt-1 text-sm leading-5 text-foreground/90">{rootCause}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-warning">Failure summary</p>
+        <p className="mt-1 text-sm leading-relaxed text-foreground/90">{rootCause}</p>
       </div>
       {run.incident ? (
         <Link
           href={`/incidents/${run.incident.id}`}
-          className="shrink-0 text-xs font-medium text-accent transition-colors hover:text-accent-bright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="shrink-0 self-center text-xs font-medium text-accent transition-colors hover:text-accent-bright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           View incident →
         </Link>
@@ -171,6 +173,7 @@ function TraceWaterfall({
   isFullView,
   onFullViewToggle,
   traceScrollRef,
+  className,
 }: {
   run: LogRun;
   traceTree: TraceNode[];
@@ -182,23 +185,25 @@ function TraceWaterfall({
   isFullView?: boolean;
   onFullViewToggle?: () => void;
   traceScrollRef?: React.RefObject<HTMLElement | null>;
+  className?: string;
 }) {
   return (
     <div
       className={cn(
         "instrument-panel flex min-h-0 flex-col overflow-hidden",
-        isFullView ? "min-h-0 flex-1" : "min-h-[280px]",
+        isFullView ? "min-h-0 flex-1" : "min-h-[220px] max-h-[38vh]",
+        className,
       )}
       aria-label="Trace waterfall"
     >
       <div className="instrument-header">
-        <div>
+        <div className="min-w-0">
           <p className="micro">Trace waterfall</p>
           <p className="mono mt-0.5 text-[10px] text-muted-foreground">
             {run.events.length} events · {traceTree.length} roots
           </p>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={() => onExpandedChange(allExpandable(traceTree))}
@@ -224,7 +229,10 @@ function TraceWaterfall({
           ) : null}
         </div>
       </div>
-      <ol ref={traceScrollRef as React.RefObject<HTMLOListElement>} className="min-h-0 flex-1 overflow-auto py-1">
+      <ol
+        ref={traceScrollRef as React.RefObject<HTMLOListElement>}
+        className="min-h-0 flex-1 overflow-auto py-1.5"
+      >
         {visibleTrace.map(({ node, depth }) => {
           const event = node.event;
           const selected = selectedEvent?.seq === event.seq;
@@ -239,7 +247,7 @@ function TraceWaterfall({
             <li key={node.id} data-trace-seq={event.seq}>
               <div
                 className={cn(
-                  "grid h-9 w-full grid-cols-[minmax(0,1fr)_auto] items-center border-l-2 pr-3 text-left text-xs transition-colors",
+                  "grid min-h-10 w-full grid-cols-[minmax(0,1fr)_auto] items-center border-l-2 pr-3 text-left text-xs transition-colors",
                   selected
                     ? "border-l-accent bg-accent/10 text-foreground"
                     : "border-l-transparent text-muted-foreground hover:bg-elevated/70",
@@ -317,6 +325,7 @@ function RunInspector({
   onTabChange,
   onEvidenceSelect,
   isFullView,
+  className,
 }: {
   run: LogRun;
   event: TraceEvent | undefined;
@@ -324,6 +333,7 @@ function RunInspector({
   onTabChange: (tab: LogDetailTab) => void;
   onEvidenceSelect: (seq: number) => void;
   isFullView?: boolean;
+  className?: string;
 }) {
   const eventPayload = event?.payload ?? {};
   const eventMetadata = event?.metadata ?? null;
@@ -332,12 +342,13 @@ function RunInspector({
     <div
       className={cn(
         "instrument-panel flex min-h-0 flex-col overflow-hidden",
-        isFullView ? "min-h-0 flex-1" : "min-h-[280px]",
+        isFullView ? "min-h-0 flex-1" : "min-h-[280px] flex-1",
+        className,
       )}
       aria-label="Run inspector"
     >
       <div className="instrument-header">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="micro">Run inspector</p>
           <h2 className="truncate text-sm font-semibold text-foreground">
             {event ? eventTitle(event) : (run.session.user_goal ?? run.session.id)}
@@ -347,7 +358,7 @@ function RunInspector({
             {event ? ` · seq ${event.seq}` : ""}
           </p>
         </div>
-        <span className="mono hidden rounded-full border border-border bg-elevated px-2.5 py-1 text-[10px] text-muted-foreground sm:inline">
+        <span className="mono ml-3 shrink-0 self-center rounded-full border border-border/60 bg-elevated px-3 py-1.5 text-[10px] text-muted-foreground">
           {costEstimate(run.totalTokens)}
         </span>
       </div>
@@ -357,15 +368,15 @@ function RunInspector({
         onValueChange={(value) => onTabChange(value as LogDetailTab)}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <TabsList className="mx-3 mt-1 flex">
+        <TabsList className="console-panel-pad mt-2 flex w-auto self-start">
           <TabsTrigger value="run">Run</TabsTrigger>
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
           <TabsTrigger value="metadata">Metadata</TabsTrigger>
         </TabsList>
 
-        <div className="min-h-0 flex-1 overflow-auto px-4 pb-4">
-          <TabsContent value="run" className="mt-3 space-y-4">
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <div className="console-panel-pad min-h-0 flex-1 overflow-auto pb-4 pt-1">
+          <TabsContent value="run" className="mt-2 space-y-5">
+            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
               <Readout label="Status" value={run.session.status} />
               <Readout label="Latency" value={fmtDuration(run.latencyMs)} />
               <Readout label="Tokens" value={numberFormat(run.totalTokens)} />
@@ -387,8 +398,8 @@ function RunInspector({
             </InspectorSection>
           </TabsContent>
 
-          <TabsContent value="feedback" className="mt-3 space-y-4">
-            <div className="grid grid-cols-2 gap-2">
+          <TabsContent value="feedback" className="mt-2 space-y-5">
+            <div className="grid grid-cols-2 gap-2.5">
               <Readout
                 label="Confidence"
                 value={run.confidence !== null ? `${Math.round(run.confidence * 100)}%` : "pending"}
@@ -429,7 +440,7 @@ function RunInspector({
             </InspectorSection>
           </TabsContent>
 
-          <TabsContent value="metadata" className="mt-3 space-y-4">
+          <TabsContent value="metadata" className="mt-2 space-y-5">
             <InspectorSection title="Run metadata" defaultOpen>
               <JsonViewer
                 data={{
@@ -467,9 +478,9 @@ function RunInspector({
 
 function Readout({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-elevated px-3 py-2">
+    <div className="rounded-xl border border-border/60 bg-elevated px-3.5 py-2.5">
       <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</dt>
-      <dd className="mono mt-1 truncate text-xs text-foreground">{value}</dd>
+      <dd className="mono mt-1.5 truncate text-xs font-medium text-foreground">{value}</dd>
     </div>
   );
 }
@@ -484,12 +495,12 @@ function InspectorSection({
   defaultOpen?: boolean;
 }) {
   return (
-    <details open={defaultOpen} className="group rounded-xl border border-border bg-panel/50">
-      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between px-3 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    <details open={defaultOpen} className="group rounded-xl border border-border/60 bg-panel/40">
+      <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between px-3.5 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         {title}
         <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
       </summary>
-      <div className="border-t border-border/70 p-3">{children}</div>
+      <div className="border-t border-border/50 p-3.5">{children}</div>
     </details>
   );
 }
@@ -504,7 +515,7 @@ function CodeBlock({
   return (
     <pre
       className={cn(
-        "max-h-52 overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-canvas p-3 text-xs leading-5",
+        "max-h-52 overflow-auto whitespace-pre-wrap rounded-xl border border-border/60 bg-canvas p-3.5 text-xs leading-6",
         tone === "error" ? "text-warning" : "text-foreground/90",
       )}
     >

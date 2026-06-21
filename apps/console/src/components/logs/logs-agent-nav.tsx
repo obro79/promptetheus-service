@@ -71,14 +71,14 @@ export function LogsAgentNav({
         aria-label="Agent navigation"
       >
         <div className="landing-framed-surface flex min-h-0 flex-1 flex-col overflow-hidden">
-          <nav aria-label="Agent list">
-            <div className="border-b border-border/70 px-3 py-2.5">
+          <nav aria-label="Agent list" className="flex min-h-0 flex-col">
+            <div className="console-panel-pad border-b border-border/40 py-3">
               <h2 className="flex items-center gap-2 text-xs font-semibold text-foreground">
                 <Bot className="size-3.5" />
                 Agents
               </h2>
             </div>
-            <ul className="max-h-[220px] overflow-auto p-1.5">
+            <ul className="max-h-[220px] flex-1 overflow-auto console-panel-pad py-2">
               <li>
                 <AgentListButton
                   label="All agents"
@@ -101,12 +101,12 @@ export function LogsAgentNav({
             </ul>
           </nav>
 
-          <div className="border-t border-border/70">
-            <div className="flex items-center justify-between px-3 py-2">
+          <div className="border-t border-border/40">
+            <div className="console-panel-pad flex items-center justify-between py-2.5">
               <h2 className="text-xs font-semibold text-foreground">Metrics</h2>
               <span className="text-[10px] text-muted-foreground">filtered</span>
             </div>
-            <dl className="grid grid-cols-2 gap-px bg-border/50">
+            <dl className="console-panel-pad grid grid-cols-2 gap-2 pb-3">
               <MetricTile label="Runs" value={String(metrics.totalRuns)} Icon={Activity} />
               <MetricTile label="Failures" value={String(metrics.failedRuns)} Icon={AlertCircle} />
               <MetricTile label="Error rate" value={pct(metrics.errorRate)} Icon={Gauge} />
@@ -117,8 +117,8 @@ export function LogsAgentNav({
           </div>
 
           {(environments.length > 0 || tags.length > 0) && (
-            <div className="border-t border-border/70 px-3 py-2.5">
-              <div className="mb-2 flex items-center justify-between">
+            <div className="border-t border-border/40 console-panel-pad py-3">
+              <div className="mb-2.5 flex items-center justify-between">
                 <span className="text-[11px] font-medium text-muted-foreground">Filters</span>
                 {hasFilterChips ? (
                   <button
@@ -214,7 +214,7 @@ function AgentListButton({
       aria-pressed={selected}
       onClick={onClick}
       className={cn(
-        "flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "flex w-full items-center justify-between rounded-xl px-2.5 py-2.5 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         selected
           ? "bg-accent/10 font-medium text-accent"
           : "text-muted-foreground hover:bg-elevated hover:text-foreground",
@@ -246,12 +246,12 @@ function MetricTile({
   Icon: LucideIcon;
 }) {
   return (
-    <div className="bg-panel px-3 py-2">
+    <div className="rounded-xl border border-border/50 bg-elevated/50 px-3 py-2.5">
       <dt className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
         <Icon className="size-3" />
         {label}
       </dt>
-      <dd className="mono mt-0.5 truncate text-sm text-foreground">{value}</dd>
+      <dd className="mono mt-1 truncate text-sm font-medium text-foreground">{value}</dd>
     </div>
   );
 }
@@ -271,7 +271,7 @@ function ToggleChip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "mono inline-flex min-h-7 items-center rounded-full border px-2.5 text-[10px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "mono inline-flex min-h-6 items-center rounded-full border px-2 py-0.5 text-[9px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         active
           ? "border-accent/30 bg-accent/10 text-accent"
           : "border-border bg-elevated text-muted-foreground hover:text-foreground",

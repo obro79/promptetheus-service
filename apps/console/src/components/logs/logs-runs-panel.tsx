@@ -118,60 +118,62 @@ export function LogsRunsPanel({
 
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden" aria-label="Runs list">
-      <div className="landing-framed-surface flex shrink-0 flex-col overflow-hidden lg:flex-row lg:items-stretch">
-        <label className="relative min-w-0 flex-1 border-b border-border/50 transition-colors focus-within:bg-elevated/55 lg:border-b-0 lg:border-r">
-          <span className="sr-only">Search logs</span>
-          <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            ref={searchRef}
-            value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Search runs, inputs, outputs, errors…"
-            aria-label="Search logs"
-            className="h-12 w-full bg-transparent pl-11 pr-12 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/60"
-          />
-          {query ? (
-            <button
-              type="button"
-              onClick={() => onQueryChange("")}
-              aria-label="Clear search"
-              className="absolute right-1 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <X className="size-3.5" />
-            </button>
-          ) : (
-            <span className="mono absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
-              /
-            </span>
-          )}
-        </label>
-
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-border/50 p-2 lg:border-b-0 lg:border-r">
-          {STATUS_FILTERS.map((filter) => {
-            const active = status === filter.value;
-            const count = statusCounts[filter.value];
-            return (
+      <div className="landing-framed-surface flex shrink-0 flex-col overflow-hidden">
+        <div className="flex flex-col gap-0 border-b border-border/40 lg:flex-row lg:items-stretch">
+          <label className="relative min-w-0 flex-1 transition-colors focus-within:bg-elevated/40 lg:border-r lg:border-border/40">
+            <span className="sr-only">Search logs</span>
+            <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              placeholder="Search runs, inputs, outputs, errors…"
+              aria-label="Search logs"
+              className="h-11 w-full bg-transparent pl-11 pr-12 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/60"
+            />
+            {query ? (
               <button
-                key={filter.value}
                 type="button"
-                aria-pressed={active}
-                aria-label={`${filter.label} (${count})`}
-                onClick={() => onStatusChange(filter.value)}
-                className={cn(
-                  "inline-flex min-h-8 items-center gap-1 rounded-full px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                  active
-                    ? "bg-accent/10 text-accent shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
+                onClick={() => onQueryChange("")}
+                aria-label="Clear search"
+                className="absolute right-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                {filter.label}
-                <span className="mono text-[10px] opacity-80">({count})</span>
+                <X className="size-3.5" />
               </button>
-            );
-          })}
+            ) : (
+              <span className="mono absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">
+                /
+              </span>
+            )}
+          </label>
+
+          <div className="console-panel-pad flex flex-wrap items-center gap-x-1 gap-y-1 border-t border-border/40 lg:min-w-0 lg:flex-1 lg:border-t-0">
+            {STATUS_FILTERS.map((filter) => {
+              const active = status === filter.value;
+              const count = statusCounts[filter.value];
+              return (
+                <button
+                  key={filter.value}
+                  type="button"
+                  aria-pressed={active}
+                  aria-label={`${filter.label} (${count})`}
+                  onClick={() => onStatusChange(filter.value)}
+                  className={cn(
+                    "inline-flex min-h-7 items-center gap-1 rounded-full px-2.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                    active
+                      ? "bg-accent/10 text-accent"
+                      : "text-muted-foreground hover:bg-elevated/60 hover:text-foreground",
+                  )}
+                >
+                  {filter.label}
+                  <span className="mono text-[10px] opacity-75">{count}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 p-2">
+        <div className="console-panel-pad flex flex-wrap items-center gap-2 py-2.5">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
@@ -220,12 +222,12 @@ export function LogsRunsPanel({
 
       <div className="landing-framed-surface mt-3 min-h-0 flex-1 overflow-auto">
         {runs.length === 0 ? (
-          <div className="flex min-h-[200px] items-center justify-center p-6 text-sm text-muted-foreground">
+          <div className="flex min-h-[200px] items-center justify-center console-panel-pad py-6 text-sm text-muted-foreground">
             No runs match the current filters.
           </div>
         ) : (
           <Table>
-            <TableHeader className="sticky top-0 z-10 bg-muted/35">
+            <TableHeader className="sticky top-0 z-10 bg-muted/30">
               <TableRow className="hover:bg-transparent">
                 {showColumn("status") ? (
                   <TableHead className="w-[88px]">Status</TableHead>
@@ -322,12 +324,12 @@ export function LogsRunsPanel({
                     )}
                   >
                     {showColumn("status") ? (
-                      <TableCell className="py-2">
+                      <TableCell className="py-3">
                         <StatusPill status={run.session.status} />
                       </TableCell>
                     ) : null}
                     {showColumn("run") ? (
-                      <TableCell className="py-2">
+                      <TableCell className="py-3">
                         <div className="min-w-0">
                           <p
                             className={cn(
@@ -353,12 +355,12 @@ export function LogsRunsPanel({
                       <PreviewCell value={run.errorPreview} tone="error" />
                     ) : null}
                     {showColumn("project") ? (
-                      <TableCell className="hidden truncate py-2 text-muted-foreground xl:table-cell">
+                      <TableCell className="hidden truncate py-3 text-muted-foreground xl:table-cell">
                         {run.project?.name ?? run.session.project_id}
                       </TableCell>
                     ) : null}
                     {showColumn("environment") ? (
-                      <TableCell className="hidden py-2 xl:table-cell">
+                      <TableCell className="hidden py-3 xl:table-cell">
                         <span className="mono inline-flex items-center rounded-full bg-elevated px-2 py-0.5 text-[10px] text-muted-foreground">
                           {run.session.environment ?? "unknown"}
                         </span>
@@ -366,26 +368,26 @@ export function LogsRunsPanel({
                     ) : null}
                     {showColumn("start_time") ? (
                       <TableCell
-                        className="mono hidden whitespace-nowrap py-2 text-xs text-muted-foreground lg:table-cell"
+                        className="mono hidden whitespace-nowrap py-3 text-xs text-muted-foreground lg:table-cell"
                         title={run.session.started_at}
                       >
                         {fmtRelative(run.session.started_at)}
                       </TableCell>
                     ) : null}
                     {showColumn("latency") ? (
-                      <TableCell className="py-2">
+                      <TableCell className="py-3">
                         <LatencyBadge ms={run.latencyMs} />
                       </TableCell>
                     ) : null}
                     {showColumn("feedback") ? (
-                      <TableCell className="hidden py-2 xl:table-cell">
+                      <TableCell className="hidden py-3 xl:table-cell">
                         <span className="mono text-xs text-muted-foreground">
                           {run.confidence !== null ? `${Math.round(run.confidence * 100)}%` : "—"}
                         </span>
                       </TableCell>
                     ) : null}
                     {showColumn("tokens") ? (
-                      <TableCell className="mono hidden py-2 text-xs text-muted-foreground xl:table-cell">
+                      <TableCell className="mono hidden py-3 text-xs text-muted-foreground xl:table-cell">
                         {run.totalTokens}
                       </TableCell>
                     ) : null}
@@ -483,7 +485,7 @@ function PreviewCell({
   className?: string;
 }) {
   return (
-    <TableCell className={cn("py-2", className)}>
+    <TableCell className={cn("py-3", className)}>
       {value ? (
         <span
           className={cn(

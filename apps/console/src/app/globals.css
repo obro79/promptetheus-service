@@ -261,12 +261,12 @@
 
   .instrument-header {
     display: flex;
-    min-height: 44px;
+    min-height: 48px;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    border-bottom: 1px solid hsl(var(--border) / 0.56);
-    padding: 0 var(--console-panel-pad, 1rem);
+    gap: 0.75rem;
+    border-bottom: 1px solid hsl(var(--border) / 0.48);
+    padding: 0.625rem var(--console-panel-pad, 1rem);
   }
 
   .console-panel {
@@ -304,9 +304,9 @@
 
   .logs-console-grid {
     display: grid;
-    min-height: 0;
+    min-height: calc(100dvh - 13rem);
     gap: 1rem;
-    grid-template-columns: minmax(240px, 240px) minmax(320px, 1fr) minmax(420px, 1.2fr);
+    grid-template-columns: minmax(240px, 240px) minmax(300px, 0.92fr) minmax(480px, 1.35fr);
   }
 
   @media (max-width: 1023px) {

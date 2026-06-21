@@ -46,7 +46,7 @@ export function LogsDashboard(props: LogsDashboardProps) {
 
 function LogsDashboardSkeleton() {
   return (
-    <div className="grid min-h-[calc(100dvh-13rem)] animate-pulse grid-cols-1 gap-4 lg:grid-cols-[240px_minmax(320px,1fr)_minmax(420px,1.2fr)]">
+    <div className="logs-console-grid animate-pulse">
       <div className="hidden rounded-2xl bg-muted/40 lg:block" />
       <div className="rounded-2xl bg-muted/40" />
       <div className="rounded-2xl bg-muted/40" />
@@ -205,7 +205,7 @@ function LogsDashboardInner({
 
   return (
     <>
-      <div className="grid min-h-[calc(100dvh-13rem)] grid-cols-1 gap-4 lg:grid-cols-[240px_minmax(320px,1fr)_minmax(420px,1.2fr)]">
+      <div className="logs-console-grid">
         <LogsAgentNav
           agentGroups={agentGroups}
           selectedAgentId={selection.selectedAgentId}
