@@ -77,6 +77,7 @@ import type {
 } from "@/lib/types";
 import { cn, fmtDuration, fmtRelative, pct, shortId } from "@/lib/utils";
 import { buildAgents, type AgentRow } from "./agents-model";
+import { FixDispatchDag } from "./fix-dispatch-dag";
 import {
   DEFAULT_COLUMNS,
   buildLogRuns,
@@ -380,17 +381,12 @@ export function LogsDashboard({
               onClear={clearAllFilters}
             />
 
-<<<<<<< Updated upstream
-            <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
-              <div className="flex min-w-0 flex-col gap-3">
-=======
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_260px]">
               <div className="flex min-w-0 flex-col gap-5">
                 {selectedRun ? (
                   <FixDispatchDag autoDemo prominent run={selectedRun} />
                 ) : null}
 
->>>>>>> Stashed changes
                 <RunsTable
                   runs={filteredRuns}
                   selectedRunId={selectedRun?.session.id}

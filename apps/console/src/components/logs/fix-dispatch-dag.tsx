@@ -14,6 +14,7 @@ import {
   Network,
   ShieldCheck,
   Sparkles,
+  Timer,
   type LucideIcon,
 } from "lucide-react";
 
@@ -68,13 +69,13 @@ const NODE_POSITIONS: Record<FixDagNodeId, { x: number; y: number }> = {
   merge_github: { x: 936, y: 92 },
 };
 
-const CANVAS = { width: 1040, height: 250 };
-const NODE_WIDTH = 124;
+const CANVAS = { width: 1040, height: 268 };
+const NODE_WIDTH = 132;
 
-/** Y where the node row ends (center 92 + half the 84px node). */
-const NODE_BOTTOM_Y = 134;
+/** Y where the node row ends (center 92 + roughly half the node height). */
+const NODE_BOTTOM_Y = 144;
 /** Y where the infrastructure branch chips sit, below the node row. */
-const BRANCH_Y = 188;
+const BRANCH_Y = 200;
 
 /**
  * The infrastructure each step runs on, branched underneath its node so the DAG
@@ -91,6 +92,20 @@ const INFRA_BRANCHES: Array<{
   { underNode: "dispatch_fix", Mark: RedisMark, label: "Redis", detail: "warm-start memory" },
   { underNode: "run_evals", Mark: BrowserbaseMark, label: "Browserbase", detail: "cloud replay" },
 ];
+
+/**
+ * The roadmap each step occupies: its position in the pipeline (1–6) and a
+ * representative wall-clock cost, so the DAG reads as an ordered timeline —
+ * "what runs, in what order, and how long it takes".
+ */
+const STEP_META: Record<FixDagNodeId, { step: number; duration: string }> = {
+  read_logs: { step: 1, duration: "0.4s" },
+  plan_fix: { step: 2, duration: "1.2s" },
+  dispatch_fix: { step: 3, duration: "3.8s" },
+  run_evals: { step: 4, duration: "2.1s" },
+  open_pr: { step: 5, duration: "0.9s" },
+  merge_github: { step: 6, duration: "human" },
+};
 
 const ANIMATION_NODE_DELAY_MS = 420;
 const DEMO_NODE_DELAY_MS = 3000;
@@ -300,7 +315,7 @@ export function FixDispatchDag({
         </div>
       </div>
 
-      <div className={cn(isProminent && "grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]")}>
+      <div className={cn(isProminent && "flex flex-col gap-3")}>
         <div className="landing-framed-surface overflow-hidden">
         <div className="overflow-x-auto">
           <div
@@ -534,13 +549,14 @@ function FixDagNodeCard({
 }) {
   const Icon = NODE_ICON[node.id];
   const position = NODE_POSITIONS[node.id];
+  const meta = STEP_META[node.id];
   return (
     <button
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
       className={cn(
-        "absolute min-h-[84px] w-[124px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border bg-panel p-2.5 text-left shadow-sm outline-none transition-all hover:border-accent/30 focus-visible:ring-2 focus-visible:ring-ring",
+        "absolute min-h-[88px] w-[132px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border bg-panel p-2.5 text-left shadow-sm outline-none transition-all hover:border-accent/30 focus-visible:ring-2 focus-visible:ring-ring",
         nodeTone(node.status).border,
         selected && "ring-2 ring-accent/25",
         current && node.status === "active" && "shadow-glow",
@@ -550,7 +566,13 @@ function FixDagNodeCard({
       {current && node.status === "active" ? (
         <span className="absolute inset-x-0 top-0 h-0.5 animate-pulse bg-accent" />
       ) : null}
-      <span className="flex min-w-0 items-center gap-2">
+      <span
+        className="absolute right-1.5 top-1.5 inline-flex size-4 items-center justify-center rounded-full border border-border/70 bg-elevated text-[9px] font-semibold text-muted-foreground"
+        aria-hidden="true"
+      >
+        {meta.step}
+      </span>
+      <span className="flex min-w-0 items-center gap-2 pr-4">
         <span
           className={cn(
             "inline-flex size-7 shrink-0 items-center justify-center rounded-lg border",
@@ -566,7 +588,11 @@ function FixDagNodeCard({
           </span>
         </span>
       </span>
-      <span className="mt-2 block truncate text-[10px] leading-4 text-muted-foreground">
+      <span className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
+        <Timer className="size-3 shrink-0" aria-hidden="true" />
+        <span className="mono">{meta.duration}</span>
+      </span>
+      <span className="mt-1 block truncate text-[10px] leading-4 text-muted-foreground">
         {node.summary}
       </span>
     </button>
