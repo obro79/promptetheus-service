@@ -102,15 +102,21 @@ const NAV_ITEMS: Array<{
   value: LogSection;
   label: string;
   Icon: LucideIcon;
-  hint: string;
 }> = [
-  { value: "agents", label: "Agents", Icon: Bot, hint: "Fleet overview" },
-  { value: "runs", label: "Runs / Traces", Icon: Waypoints, hint: "Trace explorer" },
-  { value: "evaluations", label: "Evaluations", Icon: FlaskConical, hint: "Quality scores" },
-  { value: "logs", label: "Logs", Icon: ScrollText, hint: "Raw run stream" },
-  { value: "alerts", label: "Alerts", Icon: Bell, hint: "Triggers & webhooks" },
-  { value: "settings", label: "Settings", Icon: Settings2, hint: "Project config" },
+  { value: "agents", label: "Agents", Icon: Bot },
+  { value: "runs", label: "Runs / Traces", Icon: Waypoints },
+  { value: "evaluations", label: "Evaluations", Icon: FlaskConical },
+  { value: "logs", label: "Logs", Icon: ScrollText },
+  { value: "alerts", label: "Alerts", Icon: Bell },
+  { value: "settings", label: "Settings", Icon: Settings2 },
 ];
+
+/** Flat shadcn / Codex-style surface language shared across every panel:
+ *  crisp 1px border, small radius, solid panel fill — no glass blur or large
+ *  radii. */
+const SURFACE = "rounded-lg border border-border/70 bg-panel";
+const PANEL_HEADER =
+  "flex min-h-11 items-center justify-between gap-2 border-b border-border/60 px-3.5 py-2";
 
 const STATUS_FILTERS: Array<{ value: LogFilters["status"]; label: string }> = [
   { value: "all", label: "All" },
@@ -390,7 +396,7 @@ export function LogsDashboard({
                     onDetailTabChange={setDetailTab}
                   />
                 ) : (
-                  <div className="flex min-h-[320px] items-center justify-center rounded-2xl bg-panel/60 p-6 text-sm text-muted-foreground ring-1 ring-border/40">
+                  <div className={cn("flex min-h-[320px] items-center justify-center p-6 text-sm text-muted-foreground", SURFACE)}>
                     No runs match the current filters.
                   </div>
                 )}
@@ -427,11 +433,7 @@ export function LogsDashboard({
             onOpenRun={openRun}
           />
         ) : section === "evaluations" ? (
-          <EmptyPanel
-            Icon={FlaskConical}
-            title="No evaluations yet"
-            description="Offline and online eval scores will land here — compare agent versions, benchmark datasets, and catch regressions before users do."
-          />
+          <EvaluationsPanel agents={agents} runs={runs} />
         ) : section === "alerts" ? (
           <EmptyPanel
             Icon={Bell}
@@ -460,7 +462,7 @@ function LogsNav({
   return (
     <nav
       aria-label="Logs sections"
-      className="flex shrink-0 gap-1 overflow-x-auto pb-1 lg:sticky lg:top-24 lg:w-[212px] lg:flex-col lg:overflow-visible lg:pb-0"
+      className="flex shrink-0 gap-1 overflow-x-auto pb-1 lg:sticky lg:top-24 lg:w-[196px] lg:flex-col lg:gap-0.5 lg:overflow-visible lg:border-r lg:border-border/60 lg:pb-0 lg:pr-3"
     >
       {NAV_ITEMS.map((item) => {
         const isActive = item.value === active;
@@ -472,25 +474,20 @@ function LogsNav({
             onClick={() => onChange(item.value)}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "group flex min-h-11 shrink-0 items-center gap-3 rounded-xl px-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+              "group flex min-h-9 shrink-0 items-center gap-2.5 rounded-md px-2.5 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
               isActive
-                ? "bg-accent/[0.08] text-accent"
-                : "text-muted-foreground hover:bg-elevated/60 hover:text-foreground",
+                ? "bg-muted text-foreground"
+                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
             )}
           >
             <Icon
               className={cn(
                 "size-4 shrink-0 transition-colors",
-                isActive ? "text-accent" : "text-muted-foreground/65 group-hover:text-foreground",
+                isActive ? "text-foreground" : "text-muted-foreground/70 group-hover:text-foreground",
               )}
               strokeWidth={1.8}
             />
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-medium leading-tight">{item.label}</span>
-              <span className="hidden truncate text-[11px] text-muted-foreground/70 lg:block">
-                {item.hint}
-              </span>
-            </span>
+            <span className="truncate">{item.label}</span>
           </button>
         );
       })}
@@ -525,15 +522,15 @@ function AgentsPanel({
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl bg-panel/70 ring-1 ring-border/35">
-      <header className="flex items-center justify-between gap-3 px-5 py-4">
+    <section className={cn("overflow-hidden", SURFACE)}>
+      <header className="flex items-center justify-between gap-3 px-4 py-3.5">
         <div>
           <h2 className="text-sm font-semibold text-foreground">Agents</h2>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             {agents.length} agents · {totalRuns} runs
           </p>
         </div>
-        <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
           <span className="size-1.5 rounded-full bg-success" />
           live
         </span>
@@ -541,7 +538,7 @@ function AgentsPanel({
 
       <div
         className={cn(
-          "hidden border-t border-border/40 px-5 py-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground",
+          "hidden border-t border-border/60 bg-muted/30 px-4 py-2 text-[11px] font-medium text-muted-foreground",
           AGENT_GRID,
         )}
       >
@@ -555,7 +552,7 @@ function AgentsPanel({
         <span />
       </div>
 
-      <ul className="divide-y divide-border/35 border-t border-border/40">
+      <ul className="divide-y divide-border/60 border-t border-border/60">
         {agents.map((agent) => (
           <AgentListItem
             key={agent.id}
@@ -597,7 +594,7 @@ function AgentListItem({
       >
         {/* Name */}
         <span className="flex min-w-0 items-center gap-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted text-muted-foreground">
             <Bot className="size-4" strokeWidth={1.8} />
           </span>
           <span className="min-w-0">
@@ -675,7 +672,7 @@ function AgentDrawer({
 
   return (
     <div className="px-3 pb-4 pl-5 md:pl-16">
-      <div className="rounded-xl border-l-2 border-accent/40 bg-canvas/60 p-4">
+      <div className="rounded-md border border-border/60 bg-muted/30 p-4">
         <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
           {/* Left: overview + recent runs */}
           <div className="flex flex-col gap-4">
@@ -697,13 +694,13 @@ function AgentDrawer({
 
             <div>
               <SectionLabel>Recent runs</SectionLabel>
-              <ul className="mt-2 overflow-hidden rounded-lg ring-1 ring-border/40">
+              <ul className="mt-2 overflow-hidden rounded-md border border-border/60 bg-panel">
                 {recent.map((run) => (
                   <li key={run.session.id}>
                     <button
                       type="button"
                       onClick={() => onOpenRun(run)}
-                      className="flex w-full items-center gap-3 border-b border-border/30 bg-panel/60 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-elevated/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
+                      className="flex w-full items-center gap-3 border-b border-border/50 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
                     >
                       <StatusPill status={run.session.status} />
                       <span className="block min-w-0 flex-1 truncate text-[13px] text-foreground">
@@ -726,7 +723,7 @@ function AgentDrawer({
           <div className="flex flex-col gap-4">
             <div>
               <SectionLabel>Latest trace</SectionLabel>
-              <ol className="mt-2 space-y-0.5 rounded-lg bg-panel/60 p-2 ring-1 ring-border/40">
+              <ol className="mt-2 space-y-0.5 rounded-md border border-border/60 bg-panel p-2">
                 {previewEvents.length === 0 ? (
                   <li className="px-2 py-3 text-[12px] text-muted-foreground">
                     No trace events recorded.
@@ -770,7 +767,7 @@ function AgentDrawer({
             {failed?.errorPreview ? (
               <div>
                 <SectionLabel>Error preview</SectionLabel>
-                <div className="mt-2 flex items-start gap-2 rounded-lg bg-warning/[0.07] p-3 ring-1 ring-warning/20">
+                <div className="mt-2 flex items-start gap-2 rounded-md border border-warning/25 bg-warning/[0.06] p-3">
                   <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" strokeWidth={1.8} />
                   <p className="mono min-w-0 text-[11px] leading-5 text-warning/90 line-clamp-3">
                     {failed.errorPreview}
@@ -835,16 +832,159 @@ function AgentStat({
   tone?: "warning";
 }) {
   return (
-    <div className="rounded-lg bg-panel/70 px-3 py-2 ring-1 ring-border/35">
-      <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</dt>
+    <div className="rounded-md border border-border/60 bg-panel px-3 py-2.5">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd
         className={cn(
-          "mono mt-1 truncate text-sm font-semibold tabular-nums text-foreground",
+          "mt-1 text-lg font-semibold tabular-nums text-foreground",
           tone === "warning" && "text-warning",
         )}
       >
         {value}
       </dd>
+    </div>
+  );
+}
+
+// ─── Evaluations (charts) ─────────────────────────────────────────────────────
+
+function EvaluationsPanel({
+  agents,
+  runs,
+}: {
+  agents: AgentRow[];
+  runs: LogRun[];
+}) {
+  const passed = runs.filter((run) => run.session.status === "passed").length;
+  const failed = runs.filter((run) => ["failed", "error"].includes(run.session.status)).length;
+  const running = runs.filter((run) => run.session.status === "running").length;
+  const total = runs.length;
+
+  if (total === 0 || agents.length === 0) {
+    return (
+      <EmptyPanel
+        Icon={FlaskConical}
+        title="No evaluations yet"
+        description="Once runs start flowing in, success rate, latency, and outcome charts will appear here to benchmark agent versions and catch regressions."
+      />
+    );
+  }
+
+  const outcome = [
+    { label: "Passed", value: passed, className: "bg-success" },
+    { label: "Failed / error", value: failed, className: "bg-warning" },
+    { label: "Running", value: running, className: "bg-accent" },
+  ];
+  const maxLatency = Math.max(...agents.map((agent) => agent.avgLatencyMs), 1);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <ChartCard title="Run outcomes" subtitle={`${total} runs evaluated`}>
+        <div
+          className="flex h-3 w-full overflow-hidden rounded-md border border-border/60"
+          role="img"
+          aria-label={`${passed} passed, ${failed} failed or error, ${running} running`}
+        >
+          {outcome.map((segment) =>
+            segment.value ? (
+              <div
+                key={segment.label}
+                className={segment.className}
+                style={{ width: `${(segment.value / total) * 100}%` }}
+                title={`${segment.label}: ${segment.value}`}
+              />
+            ) : null,
+          )}
+        </div>
+        <dl className="mt-3.5 flex flex-wrap gap-x-7 gap-y-2">
+          {outcome.map((segment) => (
+            <div key={segment.label} className="flex items-center gap-2">
+              <span className={cn("size-2 rounded-full", segment.className)} aria-hidden />
+              <dt className="text-xs text-muted-foreground">{segment.label}</dt>
+              <dd className="text-sm font-semibold tabular-nums text-foreground">
+                {segment.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </ChartCard>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <ChartCard title="Success rate by agent" subtitle="Share of non-failing runs">
+          <div className="space-y-3.5">
+            {agents.map((agent) => (
+              <BarRow
+                key={agent.id}
+                label={agent.name}
+                display={pct(agent.successRate)}
+                ratio={agent.successRate}
+                tone={agent.successRate < 0.9 ? "warning" : "success"}
+              />
+            ))}
+          </div>
+        </ChartCard>
+
+        <ChartCard title="Avg latency by agent" subtitle="Lower is better">
+          <div className="space-y-3.5">
+            {agents.map((agent) => (
+              <BarRow
+                key={agent.id}
+                label={agent.name}
+                display={fmtDuration(agent.avgLatencyMs)}
+                ratio={agent.avgLatencyMs / maxLatency}
+                tone="accent"
+              />
+            ))}
+          </div>
+        </ChartCard>
+      </div>
+    </div>
+  );
+}
+
+function ChartCard({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={SURFACE}>
+      <header className="border-b border-border/60 px-4 py-3">
+        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+        {subtitle ? <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p> : null}
+      </header>
+      <div className="p-4">{children}</div>
+    </section>
+  );
+}
+
+function BarRow({
+  label,
+  display,
+  ratio,
+  tone,
+}: {
+  label: string;
+  display: string;
+  ratio: number;
+  tone: "success" | "warning" | "accent";
+}) {
+  const width = Math.max(2, Math.min(100, ratio * 100));
+  const fill =
+    tone === "success" ? "bg-success" : tone === "warning" ? "bg-warning" : "bg-accent";
+  return (
+    <div>
+      <div className="mb-1.5 flex items-baseline justify-between gap-3">
+        <span className="truncate text-xs font-medium text-foreground">{label}</span>
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{display}</span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-sm bg-muted">
+        <div className={cn("h-full rounded-sm", fill)} style={{ width: `${width}%` }} />
+      </div>
     </div>
   );
 }
@@ -868,7 +1008,7 @@ function LogsPanel({
 }) {
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-2 overflow-hidden rounded-2xl bg-panel/70 p-2 ring-1 ring-border/35 sm:flex-row sm:items-center">
+      <div className={cn("flex flex-col gap-2 overflow-hidden p-2 sm:flex-row sm:items-center", SURFACE)}>
         <label className="relative min-w-0 flex-1">
           <span className="sr-only">Search logs</span>
           <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -876,7 +1016,7 @@ function LogsPanel({
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="Search runs, inputs, outputs, errors…"
-            className="h-10 w-full rounded-xl bg-transparent pl-10 pr-3 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:bg-elevated/40"
+            className="h-10 w-full rounded-md bg-transparent pl-10 pr-3 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:bg-elevated/40"
           />
         </label>
         <div className="flex flex-wrap items-center gap-1 px-1">
@@ -902,13 +1042,13 @@ function LogsPanel({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl bg-panel/70 ring-1 ring-border/35">
+      <div className={cn("overflow-hidden", SURFACE)}>
         {runs.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-muted-foreground">
             No runs match the current filters.
           </p>
         ) : (
-          <ul className="divide-y divide-border/35">
+          <ul className="divide-y divide-border/60">
             {runs.map((run) => (
               <li key={run.session.id}>
                 <button
@@ -961,8 +1101,8 @@ function EmptyPanel({
   description: string;
 }) {
   return (
-    <div className="flex min-h-[440px] flex-col items-center justify-center rounded-2xl bg-panel/55 px-6 text-center ring-1 ring-border/35">
-      <span className="flex size-12 items-center justify-center rounded-2xl bg-elevated/70 text-muted-foreground">
+    <div className={cn("flex min-h-[440px] flex-col items-center justify-center px-6 text-center", SURFACE)}>
+      <span className="flex size-12 items-center justify-center rounded-md border border-border/60 bg-muted text-muted-foreground">
         <Icon className="size-5" strokeWidth={1.8} />
       </span>
       <h2 className="mt-4 text-base font-semibold text-foreground">{title}</h2>
@@ -1002,8 +1142,8 @@ function LogFiltersBar({
 }) {
   return (
     <div className="flex flex-col gap-3">
-      <div className="landing-framed-surface flex flex-col overflow-hidden lg:flex-row lg:items-stretch">
-        <label className="relative min-w-0 flex-1 border-b border-border/50 transition-colors focus-within:bg-elevated/55 lg:border-b-0 lg:border-r">
+      <div className={cn("flex flex-col overflow-hidden lg:flex-row lg:items-stretch", SURFACE)}>
+        <label className="relative min-w-0 flex-1 border-b border-border/60 transition-colors focus-within:bg-elevated/55 lg:border-b-0 lg:border-r">
           <span className="sr-only">Search logs</span>
           <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -1162,16 +1302,16 @@ function RunsTable({
 }) {
   if (runs.length === 0) {
     return (
-      <div className="landing-framed-surface flex min-h-[260px] items-center justify-center p-6 text-sm text-muted-foreground">
+      <div className={cn("flex min-h-[260px] items-center justify-center p-6 text-sm text-muted-foreground", SURFACE)}>
         No runs match the current filters.
       </div>
     );
   }
 
   return (
-    <div className="landing-framed-surface max-h-[42dvh] min-h-[340px] overflow-auto">
+    <div className={cn("max-h-[42dvh] min-h-[340px] overflow-auto", SURFACE)}>
       <Table>
-        <TableHeader className="sticky top-0 z-10 bg-muted/35">
+        <TableHeader className="sticky top-0 z-10 bg-muted/60">
           <TableRow className="hover:bg-transparent">
             {showColumn("status") ? (
               <TableHead className="w-[96px]">Status</TableHead>
@@ -1438,10 +1578,10 @@ function TraceDebugger({
   return (
     <div className="grid min-h-[520px] grid-cols-1 gap-3 lg:grid-cols-[minmax(360px,0.95fr)_minmax(420px,1.05fr)]">
       <section
-        className="instrument-panel flex min-h-[520px] flex-col overflow-hidden"
+        className={cn("flex min-h-[520px] flex-col overflow-hidden", SURFACE)}
         aria-label="Trace waterfall"
       >
-        <div className="instrument-header">
+        <div className={PANEL_HEADER}>
           <div>
             <p className="micro">Trace waterfall</p>
             <p className="mono mt-1 text-[10px] text-muted-foreground">
@@ -1577,8 +1717,8 @@ function RunInspector({
   const eventMetadata = event?.metadata ?? null;
 
   return (
-    <section className="instrument-panel flex min-h-[520px] flex-col overflow-hidden" aria-label="Run inspector">
-      <div className="instrument-header">
+    <section className={cn("flex min-h-[520px] flex-col overflow-hidden", SURFACE)} aria-label="Run inspector">
+      <div className={PANEL_HEADER}>
         <div className="min-w-0">
           <p className="micro">Run inspector</p>
           <h2 className="truncate text-sm font-semibold text-foreground">
@@ -1782,12 +1922,12 @@ function FilterRail({
 }) {
   return (
     <aside className="flex flex-col gap-3">
-      <div className="landing-framed-surface overflow-hidden">
-        <div className="flex items-center justify-between border-b border-border/70 px-3 py-2.5">
+      <div className={cn("overflow-hidden", SURFACE)}>
+        <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5">
           <h2 className="text-xs font-semibold text-foreground">Filtered metrics</h2>
           <span className="text-[10px] text-muted-foreground">live</span>
         </div>
-        <dl className="grid grid-cols-2 gap-px bg-border/50">
+        <dl className="grid grid-cols-2 gap-px bg-border/60">
           <MetricTile label="Runs" value={String(metrics.totalRuns)} Icon={Activity} />
           <MetricTile label="Failures" value={String(metrics.failedRuns)} Icon={AlertCircle} />
           <MetricTile label="Error rate" value={pct(metrics.errorRate)} Icon={Gauge} />
@@ -1797,8 +1937,8 @@ function FilterRail({
         </dl>
       </div>
 
-      <div className="landing-framed-surface overflow-hidden">
-        <div className="flex items-center justify-between border-b border-border/70 px-3 py-2.5">
+      <div className={cn("overflow-hidden", SURFACE)}>
+        <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5">
           <h2 className="flex items-center gap-2 text-xs font-semibold text-foreground">
             <ListFilter className="size-3.5" />
             Filter shortcuts

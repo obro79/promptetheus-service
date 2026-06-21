@@ -47,13 +47,14 @@ export default function LogsPage() {
           <ConsoleEyebrow icon={<ListTree className="size-3.5" strokeWidth={1.8} aria-hidden />}>
             Observability
           </ConsoleEyebrow>
-          <h1 className="landing-display-lg max-w-4xl">Agent observability</h1>
-          <p className="mt-5 max-w-2xl text-sm leading-6 text-muted-foreground">
+          <h1 className="landing-display-lg max-w-4xl text-[2.1rem] leading-[1.05] sm:text-[2.4rem]">
+            Agent observability
+          </h1>
+          <p className="mt-2.5 max-w-2xl text-sm leading-6 text-muted-foreground">
             Monitor every agent, drill into runs and waterfall traces, and surface
-            failure signals — so engineers can debug agent failures and understand
-            performance in seconds.
+            failure signals to debug agent failures in seconds.
           </p>
-          <div className="mt-6 flex flex-wrap items-center gap-2.5 text-[11px] font-medium text-muted-foreground">
+          <div className="mt-4 flex flex-wrap items-center gap-2.5 text-[11px] font-medium text-muted-foreground">
             <SignalChip Icon={Activity} label="Live trace streaming" />
             <SignalChip Icon={Gauge} label="Failure signals attached" />
             <SignalChip Icon={Timer} label="Latency percentiles" />
