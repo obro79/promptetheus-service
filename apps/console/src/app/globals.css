@@ -2752,7 +2752,7 @@
       min-height: 22rem;
     }
 
-    .landing-agent-mini-voice-core {
+    .landing-voice-core.landing-agent-mini-voice-core {
       width: 12.5rem;
       height: 12.5rem;
     }

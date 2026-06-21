@@ -401,7 +401,7 @@ function VoiceMiniScene() {
     >
       <div className="landing-voice-core landing-agent-mini-voice-core">
         <div
-          className="landing-demo-voice-orb landing-demo-voice-orb-speaking landing-demo-voice-orb-live"
+          className="landing-demo-voice-orb"
           aria-label="Animated voice orb"
         >
           <span className="landing-demo-voice-orb-glow" />
