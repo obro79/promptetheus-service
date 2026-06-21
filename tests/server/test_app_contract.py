@@ -10,6 +10,7 @@ frozen by server/INTERNAL_CONTRACT.md section 5 and the "API Contract" /
 from __future__ import annotations
 
 import sys
+import uuid
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,9 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "packages" / "promptetheus"
 sys.path.insert(0, str(PACKAGE_ROOT))
 
 from promptetheus.server import create_app  # noqa: E402
+from promptetheus.server.auth import AuthRegistry, WorkspaceMembership  # noqa: E402
+from promptetheus.server.db.keys import lookup_project_by_api_key  # noqa: E402
+from promptetheus.server.store import InMemoryStore  # noqa: E402
 
 
 # Deterministic dev credentials wired by AuthRegistry (see auth.py).
@@ -85,6 +89,41 @@ def _create_trace(client: testclient.TestClient, trace_id: str = "trace_1") -> s
     return response.json()["trace"]["id"]
 
 
+def _supabase_client_for_fresh_user() -> tuple[testclient.TestClient, dict[str, str]]:
+    jwt = pytest.importorskip("jwt")
+    store = InMemoryStore()
+    secret = "test-supabase-jwt-secret-with-32-bytes"
+    user_id = str(uuid.uuid4())
+    token = jwt.encode(
+        {"sub": user_id, "aud": "authenticated"},
+        secret,
+        algorithm="HS256",
+    )
+
+    def membership_lookup(
+        user_id: str, workspace_id: str | None
+    ) -> WorkspaceMembership | None:
+        row = store.find_workspace_membership(user_id=user_id, workspace_id=workspace_id)
+        if row is None:
+            return None
+        return WorkspaceMembership(
+            workspace_id=str(row["workspace_id"]),
+            user_id=str(row["user_id"]),
+            role=row["role"],
+        )
+
+    auth = AuthRegistry(
+        project_lookup=lambda api_key: lookup_project_by_api_key(store, api_key),
+        membership_lookup=membership_lookup,
+        auth_mode="supabase",
+        supabase_jwt_secret=secret,
+    )
+    return (
+        testclient.TestClient(create_app(store=store, auth=auth)),
+        {"Authorization": f"Bearer {token}"},
+    )
+
+
 def _failing_session_events(session_id: str = "trace_1") -> list[dict]:
     """An AcmeMeet-style failing booking that fires a detector + forms an incident.
 
@@ -119,6 +158,70 @@ def test_health_unchanged(client: testclient.TestClient) -> None:
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_self_host_dashboard_renders_persisted_trace(
+    client: testclient.TestClient,
+) -> None:
+    session_id = _create_trace(client, trace_id="trace_self_host")
+    appended = client.post(
+        f"/api/traces/{session_id}/events",
+        json={
+            "events": [
+                _event(
+                    seq=1,
+                    idempotency_key="self-host-user",
+                    event_type="user_message",
+                    session_id=session_id,
+                    payload={"content": "smoke self-host dashboard"},
+                ),
+                _event(
+                    seq=2,
+                    idempotency_key="self-host-agent",
+                    event_type="agent_message",
+                    session_id=session_id,
+                    payload={"content": "events landed"},
+                ),
+            ]
+        },
+        headers=KEY_AUTH,
+    )
+    assert appended.status_code == 200
+
+    page = client.get("/self-host")
+    assert page.status_code == 200
+    assert "text/html" in page.headers["content-type"]
+    assert "Promptetheus Self-Host" in page.text
+    assert "trace_self_host" in page.text
+    assert "events landed" in page.text
+
+    data = client.get("/self-host.json")
+    assert data.status_code == 200
+    body = data.json()
+    assert body["session_count"] == 1
+    assert body["event_count"] == 2
+    assert body["selected_session"]["id"] == "trace_self_host"
+    assert [event["seq"] for event in body["selected_events"]] == [1, 2]
+
+
+def test_self_host_dashboard_can_be_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PROMPTETHEUS_SELF_HOST_DASHBOARD", "0")
+    local_client = testclient.TestClient(create_app())
+
+    response = local_client.get("/self-host")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "self-host dashboard is disabled"}
+
+
+def test_self_host_dashboard_disabled_for_non_memory_store_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("PROMPTETHEUS_SELF_HOST_DASHBOARD", raising=False)
+    local_client = testclient.TestClient(create_app(store=object()))  # type: ignore[arg-type]
+
+    response = local_client.get("/self-host")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "self-host dashboard is disabled"}
 
 
 def test_locked_endpoint_routes_exist() -> None:
@@ -269,6 +372,90 @@ def test_project_settings_list_rotate_and_reuse_new_key(
     )
     assert created.status_code == 201
     assert created.json()["trace"]["project_id"] == "proj_dev"
+
+
+def test_supabase_user_bootstrap_can_create_agent_and_ingest_events() -> None:
+    client, console_auth = _supabase_client_for_fresh_user()
+
+    bootstrap = client.post(
+        "/api/onboarding/bootstrap",
+        json={
+            "workspace_name": "Acme QA",
+            "project_name": "Agent Runs",
+            "agent_name": "browser-agent",
+        },
+        headers=console_auth,
+    )
+    assert bootstrap.status_code == 201
+    body = bootstrap.json()
+    raw_key = body["api_key"]
+    assert raw_key.startswith("pt_live_")
+    assert body["created_workspace"] is True
+    assert body["created_project"] is True
+    assert body["api_key_created"] is True
+    assert body["agent"]["name"] == "browser-agent"
+
+    listed_projects = client.get("/api/projects", headers=console_auth)
+    assert listed_projects.status_code == 200
+    assert [project["id"] for project in listed_projects.json()["projects"]] == [
+        body["project"]["id"]
+    ]
+
+    created_trace = client.post(
+        "/api/traces",
+        json={
+            "id": "trace_bootstrap",
+            "agent": "browser-agent",
+            "user_goal": "Book the Tuesday room",
+            "environment": "preview",
+        },
+        headers={"Authorization": f"Bearer {raw_key}"},
+    )
+    assert created_trace.status_code == 201
+    assert created_trace.json()["trace"]["project_id"] == body["project"]["id"]
+
+    appended = client.post(
+        "/api/traces/trace_bootstrap/events",
+        json={
+            "events": [
+                _event(
+                    seq=1,
+                    idempotency_key="bootstrap-user",
+                    event_type="user_message",
+                    session_id="trace_bootstrap",
+                    payload={"content": "Book the Tuesday room"},
+                ),
+                _event(
+                    seq=2,
+                    idempotency_key="bootstrap-agent",
+                    event_type="agent_message",
+                    session_id="trace_bootstrap",
+                    payload={"content": "Opening calendar"},
+                ),
+            ]
+        },
+        headers={"Authorization": f"Bearer {raw_key}"},
+    )
+    assert appended.status_code == 200
+    assert appended.json() == {"accepted": 2, "rejected": []}
+
+    events = client.get("/api/traces/trace_bootstrap/events", headers=console_auth)
+    assert events.status_code == 200
+    assert [event["seq"] for event in events.json()["events"]] == [1, 2]
+
+
+def test_console_can_create_and_list_agents(client: testclient.TestClient) -> None:
+    created = client.post(
+        "/api/agents",
+        json={"name": "voice-agent", "project_id": "proj_dev"},
+        headers=CONSOLE_AUTH,
+    )
+    assert created.status_code == 201
+    assert created.json()["agent"]["name"] == "voice-agent"
+
+    listed = client.get("/api/agents?project_id=proj_dev", headers=CONSOLE_AUTH)
+    assert listed.status_code == 200
+    assert [agent["name"] for agent in listed.json()["agents"]] == ["voice-agent"]
 
 
 def test_project_settings_mutations_require_owner_role(

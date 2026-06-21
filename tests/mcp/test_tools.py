@@ -157,6 +157,30 @@ def test_failure_evidence_redacts_secrets(
     assert "[REDACTED]" in serialized
 
 
+def test_trace_events_tool_redacts_payloads(
+    wired: tuple[PromptetheusClient, InMemoryStore, str],
+) -> None:
+    client, store, _incident_id = wired
+
+    raw = json.dumps(store.get_events("trace_1"))
+    assert SECRET_TOKEN in raw
+    assert SECRET_PASSWORD in raw
+
+    timeline = tools.get_trace_events(client, "trace_1")
+    events = timeline["events"]
+    assert timeline["trace_id"] == "trace_1"
+    assert [event["seq"] for event in events] == [1, 2, 3, 4, 5, 6, 7]
+    assert [event["type"] for event in events][:2] == [
+        "user_message",
+        "browser_action",
+    ]
+
+    serialized = json.dumps(timeline)
+    assert SECRET_TOKEN not in serialized
+    assert SECRET_PASSWORD not in serialized
+    assert "[REDACTED]" in serialized
+
+
 def test_replay_timeline_tool(
     wired: tuple[PromptetheusClient, InMemoryStore, str],
 ) -> None:

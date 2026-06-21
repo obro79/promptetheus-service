@@ -125,6 +125,10 @@ class PromptetheusClient:
         body = self._request("GET", f"/api/incidents/{incident_id}/context")
         return dict(body.get("context") or {})
 
+    def get_trace_events(self, trace_id: str) -> list[dict[str, Any]]:
+        body = self._request("GET", f"/api/traces/{trace_id}/events")
+        return list(body.get("events") or [])
+
     def search_incidents(self, query: str) -> list[dict[str, Any]]:
         body = self._request("GET", "/api/incidents", params={"q": query})
         return list(body.get("incidents") or [])
