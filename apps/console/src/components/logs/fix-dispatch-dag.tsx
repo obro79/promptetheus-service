@@ -294,6 +294,19 @@ const MIN_DISPATCH_DURATION_MS = 2100;
 const PR_POLL_INTERVAL_MS = 5000;
 const PR_POLL_TIMEOUT_MS = 120000;
 
+type DevinWorkRow = {
+  detail: string;
+  id: string;
+  label: string;
+  url?: string | null;
+};
+
+const DEFAULT_DEVIN_WORK_ORDERS: DevinWorkRow[] = [
+  { detail: "replaying UI traces and fixing route behavior", id: "browser", label: "Browser agent" },
+  { detail: "validating chat regressions and prompt handling", id: "chat", label: "Chat agent" },
+  { detail: "checking voice workflow fallout before PR handoff", id: "voice", label: "Voice agent" },
+];
+
 export function FixDispatchDag({
   autoDemo = false,
   checkDispatchStatus,
@@ -621,6 +634,10 @@ export function FixDispatchDag({
         </div>
       </div>
 
+      {phase === "waiting_for_pr" ? (
+        <DevinAgentsWorkingPanel agentDispatch={agentDispatch} />
+      ) : null}
+
       <div className={cn(isProminent && "flex flex-col gap-3")}>
         <div className="landing-framed-surface overflow-hidden">
         <div className="overflow-x-auto">
@@ -711,9 +728,10 @@ export function FixDispatchDag({
         <FixDagFullscreen
           agentDispatch={agentDispatch}
           buttonLabel={buttonLabel}
+          buttonBusy={buttonBusy}
           evidence={evidence}
           onClose={() => setFullscreen(false)}
-          onDispatch={autoDemo ? replayDemo : dispatch}
+          onDispatch={buttonAction}
           phase={phase}
           projection={projection}
           run={run}
@@ -944,6 +962,179 @@ function buildStageChildren(
   return items;
 }
 
+function DevinWorkStyles() {
+  return (
+    <style>
+      {`
+        @keyframes devin-work-lane {
+          0% { transform: translateX(-120%); opacity: 0; }
+          16% { opacity: 1; }
+          76% { opacity: 1; }
+          100% { transform: translateX(220%); opacity: 0; }
+        }
+        @keyframes devin-node-glow {
+          0%, 100% { transform: scale(0.92); opacity: 0.45; }
+          50% { transform: scale(1.08); opacity: 0.85; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .devin-work-lane,
+          .devin-node-glow {
+            animation: none !important;
+            transform: none !important;
+          }
+        }
+      `}
+    </style>
+  );
+}
+
+function devinWorkRows(agentDispatch: AgentPrDispatchResult | null) {
+  const requests = agentDispatch?.pullRequests ?? [];
+  if (!requests.length) return DEFAULT_DEVIN_WORK_ORDERS;
+
+  return requests.map((pullRequest) => {
+    const prUrl = agentPullRequestPrUrl(pullRequest);
+    return {
+      detail: prUrl
+        ? `PR #${pullRequest.openedPrNumber ?? pullRequest.number ?? "ready"} detected`
+        : pullRequest.kind === "devin_session"
+          ? "session live; creating branch, patch, evals, and PR"
+          : pullRequest.kind === "devin_issue"
+            ? "GitHub issue assigned; Devin is opening the PR"
+            : "PR handoff in progress",
+      id: pullRequest.externalId ?? `${pullRequest.agentType}-${pullRequest.number}`,
+      label: `${agentTypeLabel(pullRequest.agentType)} Devin agent`,
+      url: prUrl ?? pullRequest.url,
+    };
+  });
+}
+
+function agentTypeLabel(agentType: AgentPullRequestResult["agentType"]) {
+  return agentType.charAt(0).toUpperCase() + agentType.slice(1);
+}
+
+function DevinAgentsWorkingPanel({
+  agentDispatch,
+  variant = "compact",
+}: {
+  agentDispatch: AgentPrDispatchResult | null;
+  variant?: "compact" | "fullscreen";
+}) {
+  const rows = devinWorkRows(agentDispatch);
+  return (
+    <section
+      aria-live="polite"
+      className={cn(
+        "landing-framed-surface overflow-hidden border-accent/25 bg-accent/[0.045]",
+        variant === "fullscreen" && "mx-auto mb-4 max-w-4xl",
+      )}
+    >
+      <DevinWorkStyles />
+      <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="relative inline-flex size-11 shrink-0 items-center justify-center rounded-2xl border border-accent/30 bg-accent-muted text-accent shadow-[0_18px_42px_hsl(var(--glow-accent)/0.18)]">
+            <span
+              aria-hidden="true"
+              className="devin-node-glow absolute inset-1 rounded-2xl border border-accent/35"
+              style={{ animation: "devin-node-glow 1.8s ease-in-out infinite" }}
+            />
+            <DevinMark className="relative size-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">
+              Devin agents are fixing the project
+            </p>
+            <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+              Branch work, eval checks, and PR creation are running in Devin; Promptetheus is
+              watching GitHub for the real PR links.
+            </p>
+          </div>
+        </div>
+        <span className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full border border-accent/25 bg-panel/70 px-3 text-xs font-medium text-accent">
+          <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" strokeWidth={1.8} />
+          PR detection active
+        </span>
+      </div>
+      <div
+        className={cn(
+          "grid gap-px border-t border-border/70 bg-border/60",
+          variant === "fullscreen" ? "sm:grid-cols-3" : "lg:grid-cols-3",
+        )}
+      >
+        {rows.map((row, index) => (
+          <div key={row.id} className="bg-panel/80 p-3">
+            <div className="flex items-center justify-between gap-2">
+              {row.url ? (
+                <a
+                  href={row.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="min-w-0 truncate text-xs font-semibold text-foreground underline-offset-2 hover:underline"
+                >
+                  {row.label}
+                </a>
+              ) : (
+                <span className="min-w-0 truncate text-xs font-semibold text-foreground">
+                  {row.label}
+                </span>
+              )}
+              <span className="flex shrink-0 items-center gap-1 text-[10px] uppercase text-accent">
+                <CircleDot className="size-2.5 animate-pulse motion-reduce:animate-none" strokeWidth={1.8} />
+                fixing
+              </span>
+            </div>
+            <p className="mt-1 min-h-8 text-xs leading-4 text-muted-foreground">{row.detail}</p>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+              <span
+                aria-hidden="true"
+                className="devin-work-lane block h-full w-1/2 rounded-full bg-accent/70"
+                style={{
+                  animation: "devin-work-lane 1.65s ease-in-out infinite",
+                  animationDelay: `${index * 180}ms`,
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function DevinStageLoadingRows({ agentDispatch }: { agentDispatch: AgentPrDispatchResult | null }) {
+  const rows = devinWorkRows(agentDispatch);
+  return (
+    <div className="rounded-xl border border-accent/25 bg-accent/[0.04] p-3">
+      <div className="flex items-center gap-2">
+        <Loader2 className="size-3.5 animate-spin text-accent motion-reduce:animate-none" strokeWidth={1.8} />
+        <p className="text-xs font-semibold text-foreground">
+          Devin is working through the prebuilt PR handoff steps
+        </p>
+      </div>
+      <div className="mt-2 grid gap-2 sm:grid-cols-3">
+        {rows.map((row, index) => (
+          <div key={row.id} className="rounded-lg border border-border/70 bg-panel/70 p-2">
+            <p className="truncate text-[11px] font-semibold text-foreground">{row.label}</p>
+            <p className="mt-0.5 min-h-8 text-[11px] leading-4 text-muted-foreground">
+              {row.detail}
+            </p>
+            <div className="mt-2 flex items-center gap-1">
+              {[0, 1, 2].map((dot) => (
+                <span
+                  key={dot}
+                  aria-hidden="true"
+                  className="size-1.5 rounded-full bg-accent animate-pulse motion-reduce:animate-none"
+                  style={{ animationDelay: `${index * 120 + dot * 160}ms` }}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /**
  * The near-fullscreen "under the hood" view. Drops the filter/shortcut chrome
  * and expands every pipeline stage into a deeply nested branch tree — sub-steps,
@@ -953,6 +1144,7 @@ function buildStageChildren(
 function FixDagFullscreen({
   agentDispatch,
   buttonLabel,
+  buttonBusy,
   evidence,
   onClose,
   onDispatch,
@@ -964,6 +1156,7 @@ function FixDagFullscreen({
 }: {
   agentDispatch: AgentPrDispatchResult | null;
   buttonLabel: string;
+  buttonBusy: boolean;
   evidence: FixDagEvidence;
   onClose: () => void;
   onDispatch: () => void;
@@ -1019,12 +1212,19 @@ function FixDagFullscreen({
             type="button"
             size="sm"
             onClick={onDispatch}
-            disabled={!run.incident || phase === "running"}
+            disabled={!run.incident || buttonBusy}
+            aria-label={
+              run.incident
+                ? phase === "waiting_for_pr"
+                  ? "Check for Devin PR"
+                  : "Dispatch fix for selected run"
+                : "Dispatch fix unavailable"
+            }
           >
-            {phase === "running" ? (
-              <Loader2 className="size-3.5 animate-spin" />
+            {buttonBusy ? (
+              <Loader2 className="size-3.5 animate-spin" strokeWidth={1.8} />
             ) : (
-              <Sparkles className="size-3.5" />
+              <Sparkles className="size-3.5" strokeWidth={1.8} />
             )}
             {buttonLabel}
           </Button>
@@ -1055,6 +1255,10 @@ function FixDagFullscreen({
 
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1 overflow-y-auto px-4 py-5">
+          {phase === "waiting_for_pr" ? (
+            <DevinAgentsWorkingPanel agentDispatch={agentDispatch} variant="fullscreen" />
+          ) : null}
+
           <ol className="mx-auto flex max-w-4xl flex-col gap-3">
             {projection.nodes.map((node, index) => {
               const infra = INFRA_BRANCHES.find((branch) => branch.underNode === node.id) ?? null;
@@ -1071,6 +1275,8 @@ function FixDagFullscreen({
                   node={node}
                   children={children}
                   collapsed={collapsed.has(node.id)}
+                  loading={phase === "waiting_for_pr" && node.id === "open_pr"}
+                  agentDispatch={agentDispatch}
                   onToggle={() => toggleStage(node.id)}
                   selected={node.id === selectedNodeId}
                   onSelect={() => selectStage(node.id)}
@@ -1118,17 +1324,21 @@ function FixDagFullscreen({
  * underneath. Collapsible so deep runs stay scannable.
  */
 function FixDagStageLayer({
+  agentDispatch,
   node,
   children,
   collapsed,
+  loading,
   onToggle,
   selected,
   onSelect,
   last,
 }: {
+  agentDispatch: AgentPrDispatchResult | null;
   node: FixDagNode;
   children: DagTreeItem[];
   collapsed: boolean;
+  loading: boolean;
   onToggle: () => void;
   selected: boolean;
   onSelect: () => void;
@@ -1205,7 +1415,8 @@ function FixDagStageLayer({
         </div>
 
         {!collapsed ? (
-          <div className="border-t border-border/60 px-3 py-3 pl-11">
+          <div className="space-y-3 border-t border-border/60 px-3 py-3 pl-11">
+            {loading ? <DevinStageLoadingRows agentDispatch={agentDispatch} /> : null}
             <DagTree items={children} />
           </div>
         ) : null}

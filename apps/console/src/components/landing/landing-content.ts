@@ -21,7 +21,7 @@ export const landingHero = {
   body:
     "Promptetheus records messy agent runs, detects likely failures, replays the exact bad step, and packages a verified fix path for the coding agent.",
   primaryCta: { label: "See the demo", href: "/demo" },
-  secondaryCta: { label: "Open console", href: "/incidents" },
+  secondaryCta: { label: "Open console", href: "/logs" },
 } as const;
 
 export const landingSections = {
@@ -106,7 +106,7 @@ export const landingPricingTiers = [
       "Fix-agent bundle handoff",
       "Regression queue visibility",
     ],
-    cta: { label: "Open console", href: "/incidents" },
+    cta: { label: "Open console", href: "/logs" },
     highlighted: true,
     badge: "Recommended",
   },

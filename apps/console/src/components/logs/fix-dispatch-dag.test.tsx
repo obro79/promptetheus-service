@@ -427,6 +427,8 @@ describe("FixDispatchDag", () => {
 
     expect(dispatchHeal).toHaveBeenCalledWith(incident.id, expect.objectContaining({ incident }));
     expect(screen.getByText("Waiting for Devin PR")).toBeInTheDocument();
+    expect(screen.getByText("Devin agents are fixing the project")).toBeInTheDocument();
+    expect(screen.getByText("PR detection active")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Check for Devin PR" })).toBeInTheDocument();
     expect(screen.queryByText("PR ready for GitHub")).not.toBeInTheDocument();
 
@@ -455,6 +457,14 @@ describe("FixDispatchDag", () => {
     );
     expect(proof.getAllByText("Devin creating PR")).toHaveLength(3);
     expect(screen.queryByRole("link", { name: "Open PR in GitHub" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand DAG to fullscreen" }));
+    const fullscreen = within(screen.getByRole("dialog"));
+    expect(fullscreen.getByText("Devin agents are fixing the project")).toBeInTheDocument();
+    expect(
+      fullscreen.getByText("Devin is working through the prebuilt PR handoff steps"),
+    ).toBeInTheDocument();
+    expect(fullscreen.getByRole("button", { name: "Check for Devin PR" })).toBeInTheDocument();
   });
 
   it("polls Devin PR status and promotes only when a real GitHub PR is found", async () => {
