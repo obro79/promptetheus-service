@@ -892,7 +892,7 @@
   }
 
   .landing-loop-stream-terminal-bar span {
-    color: hsl(215 14% 52%);
+    color: hsl(215 8% 42%);
     font-family: var(--font-mono);
     font-size: 0.52rem;
     line-height: 1;
@@ -936,46 +936,51 @@
   }
 
   .landing-loop-stream-ts {
-    color: hsl(215 14% 46%);
+    color: hsl(215 8% 38%);
     font-weight: 700;
   }
 
   .landing-loop-stream-kind {
-    color: hsl(var(--event-color));
-    font-weight: 800;
+    color: hsl(210 8% 48%);
+    font-weight: 700;
     letter-spacing: 0.03em;
     text-transform: uppercase;
   }
 
   .landing-loop-stream-text {
     overflow: hidden;
-    color: hsl(210 18% 84%);
+    color: hsl(210 6% 58%);
     text-overflow: ellipsis;
   }
 
   .landing-loop-stream-line.landing-stream-event-warning .landing-loop-stream-text {
-    color: hsl(38 92% 68%);
+    color: hsl(32 28% 54%);
   }
 
   .landing-loop-stream-line.landing-stream-event-tool .landing-loop-stream-kind,
   .landing-loop-stream-line.landing-stream-event-tool .landing-loop-stream-text {
-    color: hsl(199 82% 72%);
+    color: hsl(205 18% 52%);
   }
 
   .landing-loop-stream-line.landing-stream-event-prompt .landing-loop-stream-kind {
-    color: hsl(280 72% 74%);
+    color: hsl(270 16% 54%);
   }
 
-  .landing-loop-stream-line.landing-stream-event-model .landing-loop-stream-kind {
-    color: hsl(31 88% 72%);
+  .landing-loop-stream-line.landing-stream-event-model .landing-loop-stream-kind,
+  .landing-loop-stream-line.landing-stream-event-model .landing-loop-stream-text {
+    color: hsl(210 6% 58%);
   }
 
   .landing-loop-stream-line.landing-stream-event-artifact .landing-loop-stream-kind {
-    color: hsl(154 52% 62%);
+    color: hsl(165 14% 48%);
   }
 
   .landing-loop-stream-line.landing-stream-event-state .landing-loop-stream-kind {
-    color: hsl(214 72% 72%);
+    color: hsl(205 14% 50%);
+  }
+
+  .landing-loop-stream-line.landing-stream-event-summary .landing-loop-stream-kind {
+    color: hsl(250 12% 52%);
   }
 
   .landing-loop-code-import {
