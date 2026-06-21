@@ -23,6 +23,7 @@ import {
   sortLogRuns,
   type LogColumn,
   type LogFilters,
+  type LogRun,
   type LogSortKey,
   type LogTimeRange,
 } from "./model";
@@ -48,7 +49,6 @@ function LogsDashboardSkeleton() {
   return (
     <div className="logs-console-grid animate-pulse">
       <div className="hidden rounded-2xl bg-muted/40 lg:block" />
-      <div className="rounded-2xl bg-muted/40" />
       <div className="rounded-2xl bg-muted/40" />
     </div>
   );
@@ -109,7 +109,20 @@ function LogsDashboardInner({
     [baseFilters, runs, sortDirection, sortKey],
   );
 
-  const selection = useLogsSelection({
+  const {
+    selectedAgentId,
+    selectedRun,
+    selectedEvent,
+    expanded,
+    setExpanded,
+    detailTab,
+    setDetailTab,
+    traceExpanded,
+    setTraceExpanded,
+    selectAgent,
+    selectRun,
+    selectEvent,
+  } = useLogsSelection({
     runs,
     filteredRuns: selectionRuns,
     traceScrollRef,
@@ -119,9 +132,9 @@ function LogsDashboardInner({
   const displayFilters = React.useMemo<LogFilters>(
     () => ({
       ...baseFilters,
-      projects: selection.selectedAgentId ? [selection.selectedAgentId] : [],
+      projects: selectedAgentId ? [selectedAgentId] : [],
     }),
-    [baseFilters, selection.selectedAgentId],
+    [baseFilters, selectedAgentId],
   );
 
   const displayRuns = React.useMemo(
@@ -137,8 +150,8 @@ function LogsDashboardInner({
   const metrics = React.useMemo(() => deriveLogMetrics(displayRuns), [displayRuns]);
 
   const scopedRuns = React.useMemo(
-    () => agentScopedRuns(runs, selection.selectedAgentId),
-    [runs, selection.selectedAgentId],
+    () => agentScopedRuns(runs, selectedAgentId),
+    [runs, selectedAgentId],
   );
   const environments = React.useMemo(
     () => uniqueSorted(scopedRuns.map((run) => run.session.environment)),
@@ -150,12 +163,12 @@ function LogsDashboardInner({
   );
 
   const traceTree = React.useMemo(
-    () => buildTraceTree(selection.selectedRun?.events ?? []),
-    [selection.selectedRun],
+    () => buildTraceTree(selectedRun?.events ?? []),
+    [selectedRun],
   );
   const visibleTrace = React.useMemo(
-    () => flattenTraceTree(traceTree, selection.expanded),
-    [selection.expanded, traceTree],
+    () => flattenTraceTree(traceTree, expanded),
+    [expanded, traceTree],
   );
 
   const hasFilters =
@@ -181,34 +194,54 @@ function LogsDashboardInner({
   };
 
   const handleAgentSelect = (agentId: string | null) => {
-    selection.selectAgent(agentId);
+    selectAgent(agentId);
     setSelectedEnvironments([]);
     setSelectedTags([]);
   };
 
-  const tracePanel = (
+  const handleSelectRun = React.useCallback(
+    (run: LogRun) => {
+      selectRun(run);
+      setTraceExpanded(true);
+    },
+    [selectRun, setTraceExpanded],
+  );
+
+  const closeTraceOverlay = React.useCallback(() => {
+    setTraceExpanded(false);
+  }, [setTraceExpanded]);
+
+  React.useEffect(() => {
+    if (!traceExpanded) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeTraceOverlay();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [closeTraceOverlay, traceExpanded]);
+
+  const tracePanel = selectedRun ? (
     <TracePanel
-      run={selection.selectedRun}
+      run={selectedRun}
       traceTree={traceTree}
       visibleTrace={visibleTrace}
-      expanded={selection.expanded}
-      onExpandedChange={selection.setExpanded}
-      selectedEvent={selection.selectedEvent}
-      onEventSelect={selection.selectEvent}
-      detailTab={selection.detailTab}
-      onDetailTabChange={selection.setDetailTab}
-      isFullView={selection.traceExpanded}
-      onFullViewToggle={() => selection.setTraceExpanded((value) => !value)}
+      expanded={expanded}
+      onExpandedChange={setExpanded}
+      selectedEvent={selectedEvent}
+      onEventSelect={selectEvent}
+      detailTab={detailTab}
+      onDetailTabChange={setDetailTab}
+      onClose={closeTraceOverlay}
       traceScrollRef={traceScrollRef}
     />
-  );
+  ) : null;
 
   return (
     <>
       <div className="logs-console-grid">
         <LogsAgentNav
           agentGroups={agentGroups}
-          selectedAgentId={selection.selectedAgentId}
+          selectedAgentId={selectedAgentId}
           onAgentSelect={handleAgentSelect}
           metrics={metrics}
           environments={environments}
@@ -228,7 +261,7 @@ function LogsDashboardInner({
         <LogsRunsPanel
           runs={displayRuns}
           statusCounts={counts}
-          selectedRunId={selection.selectedRun?.session.id}
+          selectedRunId={selectedRun?.session.id}
           query={query}
           onQueryChange={setQuery}
           status={status}
@@ -240,16 +273,14 @@ function LogsDashboardInner({
           sortKey={sortKey}
           sortDirection={sortDirection}
           onSort={onSort}
-          onSelectRun={selection.selectRun}
+          onSelectRun={handleSelectRun}
           runRowRefs={runRowRefs}
           hasFilters={hasFilters}
           onClearFilters={clearAllFilters}
         />
-
-        <div className="flex min-h-0 flex-col overflow-hidden">{tracePanel}</div>
       </div>
 
-      {selection.traceExpanded && selection.selectedRun ? (
+      {traceExpanded && tracePanel ? (
         <div
           className="fixed inset-0 z-50 flex flex-col bg-canvas/95 backdrop-blur-sm"
           role="dialog"

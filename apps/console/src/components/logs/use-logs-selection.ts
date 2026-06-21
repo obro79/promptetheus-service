@@ -73,6 +73,7 @@ export function useLogsSelection({
         const seq =
           seqParam != null && Number.isFinite(Number(seqParam)) ? Number(seqParam) : null;
         drillIntoRun(run, seq);
+        setTraceExpanded(true);
       }
     } else if (agent) {
       setSelectedAgentId(agent);

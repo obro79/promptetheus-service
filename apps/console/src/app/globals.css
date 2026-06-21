@@ -306,7 +306,7 @@
     display: grid;
     min-height: calc(100dvh - 13rem);
     gap: 1rem;
-    grid-template-columns: minmax(240px, 240px) minmax(300px, 0.92fr) minmax(480px, 1.35fr);
+    grid-template-columns: minmax(240px, 240px) minmax(0, 1fr);
   }
 
   @media (max-width: 1023px) {

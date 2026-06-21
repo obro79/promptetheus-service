@@ -9,7 +9,6 @@ import {
   ChevronDown,
   ChevronRight,
   CircleDot,
-  Expand,
   FileJson,
   Gauge,
   MessageSquare,
@@ -61,8 +60,7 @@ export interface TracePanelProps {
   onEventSelect: (event: TraceEvent) => void;
   detailTab: LogDetailTab;
   onDetailTabChange: (tab: LogDetailTab) => void;
-  isFullView?: boolean;
-  onFullViewToggle?: () => void;
+  onClose?: () => void;
   traceScrollRef?: React.RefObject<HTMLElement | null>;
 }
 
@@ -76,39 +74,18 @@ export function TracePanel({
   onEventSelect,
   detailTab,
   onDetailTabChange,
-  isFullView = false,
-  onFullViewToggle,
+  onClose,
   traceScrollRef,
 }: TracePanelProps) {
   if (!run) {
-    return (
-      <section
-        className="landing-framed-surface flex min-h-[320px] items-center justify-center p-6 text-sm text-muted-foreground"
-        aria-label="Trace detail"
-      >
-        No run selected.
-      </section>
-    );
+    return null;
   }
 
   return (
-    <section
-      className={cn(
-        "flex min-h-0 flex-col gap-3",
-        isFullView ? "h-full min-h-0 flex-1" : "min-h-0 flex-1",
-      )}
-      aria-label="Trace detail"
-    >
-      {isFailedRun(run) ? (
-        <FailureSummaryStrip run={run} />
-      ) : null}
+    <section className="flex h-full min-h-0 flex-1 flex-col gap-3" aria-label="Trace detail">
+      {isFailedRun(run) ? <FailureSummaryStrip run={run} /> : null}
 
-      <div
-        className={cn(
-          "flex min-h-0 flex-1 flex-col gap-3",
-          isFullView && "lg:flex-row lg:gap-4",
-        )}
-      >
+      <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row lg:gap-4">
         <TraceWaterfall
           run={run}
           traceTree={traceTree}
@@ -117,10 +94,9 @@ export function TracePanel({
           onExpandedChange={onExpandedChange}
           selectedEvent={selectedEvent}
           onEventSelect={onEventSelect}
-          isFullView={isFullView}
-          onFullViewToggle={onFullViewToggle}
+          onClose={onClose}
           traceScrollRef={traceScrollRef}
-          className={cn(isFullView && "lg:min-h-0 lg:flex-1")}
+          className="lg:min-h-0 lg:flex-1"
         />
         <RunInspector
           run={run}
@@ -131,8 +107,7 @@ export function TracePanel({
             const match = run.events.find((candidate) => candidate.seq === seq);
             if (match) onEventSelect(match);
           }}
-          isFullView={isFullView}
-          className={cn(isFullView && "lg:min-h-0 lg:flex-1")}
+          className="lg:min-h-0 lg:flex-1"
         />
       </div>
     </section>
@@ -170,8 +145,7 @@ function TraceWaterfall({
   onExpandedChange,
   selectedEvent,
   onEventSelect,
-  isFullView,
-  onFullViewToggle,
+  onClose,
   traceScrollRef,
   className,
 }: {
@@ -182,18 +156,13 @@ function TraceWaterfall({
   onExpandedChange: (value: Set<string>) => void;
   selectedEvent: TraceEvent | undefined;
   onEventSelect: (event: TraceEvent) => void;
-  isFullView?: boolean;
-  onFullViewToggle?: () => void;
+  onClose?: () => void;
   traceScrollRef?: React.RefObject<HTMLElement | null>;
   className?: string;
 }) {
   return (
     <div
-      className={cn(
-        "instrument-panel flex min-h-0 flex-col overflow-hidden",
-        isFullView ? "min-h-0 flex-1" : "min-h-[220px] max-h-[38vh]",
-        className,
-      )}
+      className={cn("instrument-panel flex min-h-0 flex-1 flex-col overflow-hidden", className)}
       aria-label="Trace waterfall"
     >
       <div className="instrument-header">
@@ -212,19 +181,10 @@ function TraceWaterfall({
           >
             <UnfoldVertical className="size-3.5" />
           </button>
-          {onFullViewToggle ? (
-            <Button variant="outline" size="sm" type="button" onClick={onFullViewToggle}>
-              {isFullView ? (
-                <>
-                  <Minimize2 className="size-3.5" />
-                  Exit full view
-                </>
-              ) : (
-                <>
-                  <Expand className="size-3.5" />
-                  Full view
-                </>
-              )}
+          {onClose ? (
+            <Button variant="outline" size="sm" type="button" onClick={onClose}>
+              <Minimize2 className="size-3.5" />
+              Exit full view
             </Button>
           ) : null}
         </div>
@@ -324,7 +284,6 @@ function RunInspector({
   tab,
   onTabChange,
   onEvidenceSelect,
-  isFullView,
   className,
 }: {
   run: LogRun;
@@ -332,7 +291,6 @@ function RunInspector({
   tab: LogDetailTab;
   onTabChange: (tab: LogDetailTab) => void;
   onEvidenceSelect: (seq: number) => void;
-  isFullView?: boolean;
   className?: string;
 }) {
   const eventPayload = event?.payload ?? {};
@@ -340,11 +298,7 @@ function RunInspector({
 
   return (
     <div
-      className={cn(
-        "instrument-panel flex min-h-0 flex-col overflow-hidden",
-        isFullView ? "min-h-0 flex-1" : "min-h-[280px] flex-1",
-        className,
-      )}
+      className={cn("instrument-panel flex min-h-0 flex-1 flex-col overflow-hidden", className)}
       aria-label="Run inspector"
     >
       <div className="instrument-header">
