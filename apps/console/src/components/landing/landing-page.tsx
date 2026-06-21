@@ -30,6 +30,7 @@ import {
   LandingSection,
   SectionHeader,
 } from "@/components/landing/landing-primitives";
+import { PromptetheusMark } from "@/components/common/promptetheus-mark";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -207,8 +208,8 @@ function LandingHeroNav() {
         href="/"
         className="flex min-h-11 min-w-0 items-center gap-2 rounded-full pr-2 text-white transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
       >
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/20 text-sm font-bold shadow-[0_8px_30px_hsl(213_82%_18%/0.22)] backdrop-blur">
-          P
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/20 text-white shadow-[0_8px_30px_hsl(213_82%_18%/0.22)] backdrop-blur">
+          <PromptetheusMark className="size-[1.15rem]" />
         </span>
         <span className="truncate text-base font-semibold drop-shadow-[0_1px_8px_hsl(213_82%_18%/0.28)] sm:text-lg">
           Promptetheus
