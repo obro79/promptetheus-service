@@ -194,10 +194,9 @@ describe("LogsDashboard", () => {
 
     const agentNav = screen.getByLabelText("Agent navigation");
     await waitFor(() => {
-      const logsProjectBtn = within(agentNav)
-        .getAllByRole("button")
-        .find((btn) => btn.textContent?.includes("Logs Project"))!;
-      expect(logsProjectBtn).toHaveAttribute("aria-pressed", "true");
+      expect(
+        within(agentNav).getAllByRole("button", { name: /All agents/i })[0],
+      ).toHaveAttribute("aria-pressed", "true");
     });
     expect(screen.getByRole("button", { name: /Full view/i })).toBeInTheDocument();
   });
