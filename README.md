@@ -132,6 +132,7 @@ pnpm --dir apps/console exec tsc --noEmit
 | Path | Purpose |
 | --- | --- |
 | `packages/promptetheus/promptetheus/server/` | FastAPI ingestion, analysis, fix-agent handoff, GitHub integration, MCP tools, storage, and regression fallback logic. |
+| `sdk/promptetheus/` | Vendored snapshot of the standalone Promptetheus Python SDK repository. |
 | `apps/console/` | Next.js console for sessions, logs, replay, incidents, evals, docs, settings, and the guided demo. |
 | `db/` | Supabase schema, migrations, and RLS policies. |
 | `infra/` | Railway, Vercel, and Supabase deployment configuration. |
