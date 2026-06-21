@@ -158,7 +158,7 @@ export function LandingPage({ stats }: { stats: LandingStats }) {
 
 function LandingHero() {
   return (
-    <section className="relative isolate min-h-[42rem] overflow-hidden bg-[hsl(var(--hero-sky-top))] pb-20 text-white sm:min-h-[46rem] sm:pb-24">
+    <section className="relative isolate min-h-[48rem] overflow-hidden bg-[hsl(var(--hero-sky-top))] pb-28 text-white sm:min-h-[54rem] sm:pb-32 lg:min-h-[56rem]">
       <div className="cluely-hero-backdrop pointer-events-none absolute inset-0" />
       <div className="landing-hero-readable-scrim pointer-events-none absolute inset-0" />
       <LandingHeroNav />
