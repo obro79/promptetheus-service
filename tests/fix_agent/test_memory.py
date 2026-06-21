@@ -171,3 +171,48 @@ def test_remember_fix_indexes_into_vector_set(monkeypatch) -> None:
 def test_find_similar_fixes_respects_limit_and_noop_without_redis() -> None:
     assert memory.find_similar_fixes(_query_bundle()) == []
     assert memory.find_similar_fixes(_query_bundle(), limit=0) == []
+
+
+def _store_labeled(client: _FakeRedis, ws: str, fix_id: str, label: str) -> None:
+    client.kv[f"ptfix:{ws}:{fix_id}"] = json.dumps(
+        {"incident_id": fix_id, "label": label, "signature": label, "embedding": [1.0, 0.0]}
+    )
+    client.sets.setdefault(f"ptfix:ids:{ws}", set()).add(fix_id)
+
+
+def test_cluster_incident_is_noop_without_redis() -> None:
+    assert memory.cluster_incident(_query_bundle()) is None
+
+
+def test_cluster_incident_knn_majority_vote(monkeypatch) -> None:
+    # VSIM returns the incident itself (excluded) + three neighbours: two label
+    # "goal_mismatch" and one "ignored_warning". KNN vote -> goal_mismatch.
+    client = _FakeRedis(
+        vsim=["incident_new", "1.0", "old_a", "0.95", "old_b", "0.90", "old_c", "0.85"]
+    )
+    _store_labeled(client, "ws_dev", "old_a", "goal_mismatch")
+    _store_labeled(client, "ws_dev", "old_b", "goal_mismatch")
+    _store_labeled(client, "ws_dev", "old_c", "ignored_warning")
+    _install(monkeypatch, client)
+    monkeypatch.setenv("VOYAGE_API_KEY", "x")
+    monkeypatch.setattr(memory, "_embed", lambda text: [1.0, 0.0])
+
+    cluster = memory.cluster_incident(_query_bundle())
+
+    assert cluster is not None
+    assert cluster["label"] == "goal_mismatch"
+    assert cluster["size"] == 3
+    assert cluster["confidence"] == pytest.approx(2 / 3, abs=1e-3)
+    assert cluster["matches_incident_label"] is True
+    assert set(cluster["members"]) == {"old_a", "old_b", "old_c"}
+    assert any(cmd[0] == "VSIM" for cmd in client.commands)
+
+
+def test_cluster_incident_rejects_nonpositive_k(monkeypatch) -> None:
+    client = _FakeRedis(vsim=["old_a", "0.95"])
+    _store_labeled(client, "ws_dev", "old_a", "goal_mismatch")
+    _install(monkeypatch, client)
+    monkeypatch.setenv("VOYAGE_API_KEY", "x")
+    monkeypatch.setattr(memory, "_embed", lambda text: [1.0, 0.0])
+
+    assert memory.cluster_incident(_query_bundle(), k=0) is None

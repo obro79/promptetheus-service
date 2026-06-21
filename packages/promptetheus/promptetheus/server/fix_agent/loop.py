@@ -180,6 +180,24 @@ def _run_attempts_core(
     source = bundle.get("source") or "unknown"
     runner = _resolve_loop_runner(bundle.get("allowed_paths"))
 
+    # KNN-vote clustering over the Redis Vector Set: assign this incident to the
+    # cluster (failure label) that dominates its nearest neighbours, so the loop
+    # knows whether it's facing a known recurring class of failure. Safe no-op
+    # without Redis. Stashed on the bundle for fix-agent context and published to
+    # the heal timeline for the console.
+    cluster = memory.cluster_incident(bundle)
+    if cluster:
+        bundle["cluster"] = cluster
+        memory.timeline_publish(
+            incident_id,
+            {
+                "kind": "cluster",
+                "label": cluster.get("label"),
+                "size": cluster.get("size"),
+                "confidence": cluster.get("confidence"),
+            },
+        )
+
     warm_used = memory.find_similar_fix(bundle)
     warm = warm_used
     if warm_used:
@@ -215,6 +233,7 @@ def _run_attempts_core(
                 "attempts": attempt,
                 "incident_id": incident_id,
                 "warm_start": warm_used,
+                "cluster": cluster,
             }
 
     return {
@@ -226,6 +245,7 @@ def _run_attempts_core(
         "attempts": cap,
         "incident_id": incident_id,
         "warm_start": warm_used,
+        "cluster": cluster,
     }
 
 
