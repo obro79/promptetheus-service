@@ -55,6 +55,7 @@ from promptetheus.server.fix_agent.runner import (
 )
 from promptetheus.server.fix_agent.runners import get_runner
 from promptetheus.server.fix_agent.orchestrator import run_loop
+from promptetheus.server.fix_agent.triggers import maybe_trigger_auto_heal
 from promptetheus.server.observability import telemetry
 from promptetheus.server.github import (
     GitHubConfig,
@@ -354,6 +355,7 @@ def create_app(
         )
 
         accepted = 0
+        accepted_events: list[dict[str, Any]] = []
         rejected: list[dict[str, Any]] = []
 
         for index, event in enumerate(events):
@@ -392,6 +394,12 @@ def create_app(
             if result.status == "accepted":
                 # Only publish first-seen events; duplicate replays are no-ops.
                 app.state.hub.publish(ctx.workspace_id, stored)
+                accepted_events.append(stored)
+
+        # Optional event trigger: when PROMPTETHEUS_AUTO_HEAL is on, a freshly
+        # ingested failure event auto-dispatches the analysis -> heal pipeline off
+        # the request path. No-op by default; never affects the ingestion result.
+        maybe_trigger_auto_heal(app.state.store, id, accepted_events)
 
         return JSONResponse(
             {"accepted": accepted, "rejected": rejected}, status_code=200

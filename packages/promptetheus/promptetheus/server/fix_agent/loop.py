@@ -30,6 +30,23 @@ from promptetheus.server.models import HealReport
 from promptetheus.server.observability import telemetry
 
 
+def _resolve_loop_runner(allowed_paths: Any) -> Any:
+    """Pick the heal-loop diagnosis runner from env (Claude by default).
+
+    Set ``PROMPTETHEUS_FIX_AGENT_RUNNER=devin`` to drive the bounded loop with the
+    Devin runner, which seeds the session with the top similar past fixes as
+    advanced context. Both runners share the ``run(bundle, *, prior_critique,
+    warm_start)`` signature and fall back to the deterministic runner on failure.
+    """
+
+    name = os.environ.get("PROMPTETHEUS_FIX_AGENT_RUNNER", "").strip().lower()
+    if name == "devin":
+        from promptetheus.server.fix_agent.runners.devin import DevinRunner
+
+        return DevinRunner(allowed_paths=allowed_paths)
+    return ClaudeRunner(allowed_paths=allowed_paths)
+
+
 def _max_attempts(explicit: int | None) -> int:
     if isinstance(explicit, int) and explicit > 0:
         return explicit
@@ -43,12 +60,12 @@ def _max_attempts(explicit: int | None) -> int:
 
 def diagnose_step(
     bundle: dict[str, Any],
-    runner: ClaudeRunner,
+    runner: Any,
     *,
     prior_critique: Any = None,
     warm_start: Any = None,
 ) -> Any:
-    """Generate a candidate fix (Claude, with deterministic fallback)."""
+    """Generate a candidate fix (Claude/Devin, with deterministic fallback)."""
 
     return runner.run(bundle, prior_critique=prior_critique, warm_start=warm_start)
 
@@ -160,7 +177,7 @@ def _run_attempts_core(
     incident_id = str(incident.get("id") or "incident")
     bundle = build_incident_bundle(store, incident)
     source = bundle.get("source") or "unknown"
-    runner = ClaudeRunner(allowed_paths=bundle.get("allowed_paths"))
+    runner = _resolve_loop_runner(bundle.get("allowed_paths"))
 
     warm = memory.find_similar_fix(bundle)
     if warm:

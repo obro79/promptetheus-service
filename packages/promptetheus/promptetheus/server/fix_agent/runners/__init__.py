@@ -24,6 +24,10 @@ def get_runner(
         name
         or os.environ.get("PROMPTETHEUS_FIX_AGENT_RUNNER", "deterministic")
     ).strip().lower()
+    if runner_name == "devin":
+        from .devin import DevinRunner
+
+        return DevinRunner(allowed_paths=allowed_paths)
     if runner_name == "codex":
         from .codex import CodexRunner
 

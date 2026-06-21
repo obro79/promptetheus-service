@@ -8,6 +8,8 @@ never break remediation.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from promptetheus.server.fix_agent import memory
@@ -66,3 +68,106 @@ def test_lexical_similarity_scoring() -> None:
     # Pure helper: token-overlap similarity, used as the no-embedder fallback.
     assert memory._lexical("wrong slot booking", "wrong slot booking") == pytest.approx(1.0)
     assert memory._lexical("alpha beta", "gamma delta") == 0.0
+
+
+class _FakeRedis:
+    """Minimal in-memory stand-in for the redis client surface memory.py uses."""
+
+    def __init__(self, vsim: list | None = None) -> None:
+        self.kv: dict[str, str] = {}
+        self.sets: dict[str, set[str]] = {}
+        self.commands: list[tuple] = []
+        self._vsim = vsim or []
+
+    def get(self, key: str):
+        return self.kv.get(key)
+
+    def set(self, key: str, value: str) -> None:
+        self.kv[key] = value
+
+    def sadd(self, key: str, *vals: str) -> None:
+        self.sets.setdefault(key, set()).update(vals)
+
+    def smembers(self, key: str):
+        return self.sets.get(key, set())
+
+    def execute_command(self, *args):
+        self.commands.append(args)
+        if args and args[0] == "VSIM":
+            return self._vsim
+        return None
+
+
+def _install(monkeypatch, client) -> None:
+    monkeypatch.setattr(memory, "_client", client, raising=False)
+    monkeypatch.setattr(memory, "_client_resolved", True, raising=False)
+
+
+def _query_bundle() -> dict:
+    return {
+        "incident": {"id": "incident_new", "workspace_id": "ws_dev", "label": "goal_mismatch"},
+        "root_cause": "selected the wrong slot",
+    }
+
+
+def _store_row(client: _FakeRedis, ws: str, fix_id: str, signature: str, embedding=None) -> None:
+    client.kv[f"ptfix:{ws}:{fix_id}"] = json.dumps(
+        {
+            "incident_id": fix_id,
+            "label": "goal_mismatch",
+            "signature": signature,
+            "diff": f"--- /dev/null\n+++ b/agents/{fix_id}.py\n@@ -0,0 +1,1 @@\n+pass\n",
+            "plan": ["step"],
+            "embedding": embedding,
+        }
+    )
+    client.sets.setdefault(f"ptfix:ids:{ws}", set()).add(fix_id)
+
+
+def test_fallback_scan_ranks_by_lexical_overlap(monkeypatch) -> None:
+    client = _FakeRedis()
+    _store_row(client, "ws_dev", "old_match", "goal_mismatch selected the wrong slot")
+    _store_row(client, "ws_dev", "old_unrelated", "alpha beta gamma delta")
+    _install(monkeypatch, client)
+
+    matches = memory.find_similar_fixes(_query_bundle(), limit=3)
+
+    assert [m["from_incident_id"] for m in matches] == ["old_match"]
+    assert memory.find_similar_fix(_query_bundle())["from_incident_id"] == "old_match"
+
+
+def test_vector_path_uses_vsim_and_excludes_self(monkeypatch) -> None:
+    # VSIM returns the query incident itself + two neighbors; self is dropped and
+    # the rest are ranked by their similarity scores.
+    client = _FakeRedis(vsim=["incident_new", "1.0", "old_a", "0.95", "old_b", "0.81"])
+    _store_row(client, "ws_dev", "old_a", "a", embedding=[1.0, 0.0])
+    _store_row(client, "ws_dev", "old_b", "b", embedding=[0.0, 1.0])
+    _install(monkeypatch, client)
+    monkeypatch.setenv("VOYAGE_API_KEY", "x")
+    monkeypatch.setattr(memory, "_embed", lambda text: [1.0, 0.0])
+
+    matches = memory.find_similar_fixes(_query_bundle(), limit=5)
+
+    assert [m["from_incident_id"] for m in matches] == ["old_a", "old_b"]
+    assert any(cmd[0] == "VSIM" for cmd in client.commands)
+
+
+def test_remember_fix_indexes_into_vector_set(monkeypatch) -> None:
+    client = _FakeRedis()
+    _install(monkeypatch, client)
+    monkeypatch.setenv("VOYAGE_API_KEY", "x")
+    monkeypatch.setattr(memory, "_embed", lambda text: [0.1, 0.2, 0.3])
+
+    class _Fix:
+        diff = "--- /dev/null\n+++ b/agents/x.py\n@@ -0,0 +1,1 @@\n+pass\n"
+        plan = ["step"]
+
+    memory.remember_fix(_query_bundle()["incident"], _query_bundle(), _Fix())
+
+    assert any(cmd[0] == "VADD" for cmd in client.commands)
+    assert client.kv.get("ptfix:ws_dev:incident_new") is not None
+
+
+def test_find_similar_fixes_respects_limit_and_noop_without_redis() -> None:
+    assert memory.find_similar_fixes(_query_bundle()) == []
+    assert memory.find_similar_fixes(_query_bundle(), limit=0) == []
