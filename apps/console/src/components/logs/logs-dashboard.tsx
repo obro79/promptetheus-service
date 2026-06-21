@@ -65,6 +65,7 @@ import type {
 } from "@/lib/types";
 import { cn, fmtDuration, fmtRelative, pct, shortId } from "@/lib/utils";
 import { buildAgents, type AgentRow } from "./agents-model";
+import { FixDispatchDag } from "./fix-dispatch-dag";
 import {
   DEFAULT_COLUMNS,
   buildLogRuns,
@@ -81,6 +82,8 @@ import {
   type LogTimeRange,
   type TraceNode,
 } from "./model";
+
+type InspectorTab = "run" | "feedback" | "fix" | "metadata";
 
 interface LogsDashboardProps {
   sessions: TraceSession[];
@@ -237,7 +240,7 @@ export function LogsDashboard({
     () => uniqueSorted(runs.map((run) => run.session.environment)),
     [runs],
   );
-  const [section, setSection] = React.useState<LogSection>("agents");
+  const [section, setSection] = React.useState<LogSection>("runs");
   const [query, setQuery] = React.useState("");
   const [status, setStatus] = React.useState<LogFilters["status"]>("all");
   const [failedOnly, setFailedOnly] = React.useState(true);
@@ -255,7 +258,7 @@ export function LogsDashboard({
   );
   const [selectedSeq, setSelectedSeq] = React.useState<number | null>(null);
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
-  const [detailTab, setDetailTab] = React.useState<"run" | "feedback" | "metadata">("run");
+  const [detailTab, setDetailTab] = React.useState<InspectorTab>("run");
 
   const filters = React.useMemo<LogFilters>(
     () => ({
@@ -370,6 +373,10 @@ export function LogsDashboard({
 
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
               <div className="flex min-w-0 flex-col gap-3">
+                {selectedRun ? (
+                  <FixDispatchDag autoDemo prominent run={selectedRun} />
+                ) : null}
+
                 <RunsTable
                   runs={filteredRuns}
                   selectedRunId={selectedRun?.session.id}
@@ -1577,8 +1584,8 @@ function TraceDebugger({
   onExpandedChange: (value: Set<string>) => void;
   selectedEvent: TraceEvent | undefined;
   onEventSelect: (event: TraceEvent) => void;
-  detailTab: "run" | "feedback" | "metadata";
-  onDetailTabChange: (tab: "run" | "feedback" | "metadata") => void;
+  detailTab: InspectorTab;
+  onDetailTabChange: (tab: InspectorTab) => void;
 }) {
   return (
     <div className="grid min-h-[520px] grid-cols-1 gap-3 lg:grid-cols-[minmax(360px,0.95fr)_minmax(420px,1.05fr)]">
@@ -1714,8 +1721,8 @@ function RunInspector({
 }: {
   run: LogRun;
   event: TraceEvent | undefined;
-  tab: "run" | "feedback" | "metadata";
-  onTabChange: (tab: "run" | "feedback" | "metadata") => void;
+  tab: InspectorTab;
+  onTabChange: (tab: InspectorTab) => void;
   onEvidenceSelect: (seq: number) => void;
 }) {
   const eventPayload = event?.payload ?? {};
@@ -1734,19 +1741,35 @@ function RunInspector({
             {event ? ` · seq ${event.seq}` : ""}
           </p>
         </div>
-        <span className="mono hidden rounded-md border border-border bg-elevated px-2 py-1 text-[10px] text-muted-foreground sm:inline">
-          {costEstimate(run.totalTokens)}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            type="button"
+            variant={tab === "fix" ? "default" : "outline"}
+            size="sm"
+            onClick={() => onTabChange("fix")}
+            aria-label="Open Fix DAG"
+          >
+            <Sparkles className="size-3.5" />
+            Fix DAG
+          </Button>
+          <span className="mono hidden rounded-md border border-border bg-elevated px-2 py-1 text-[10px] text-muted-foreground sm:inline">
+            {costEstimate(run.totalTokens)}
+          </span>
+        </div>
       </div>
 
       <Tabs
         value={tab}
-        onValueChange={(value) => onTabChange(value as "run" | "feedback" | "metadata")}
+        onValueChange={(value) => onTabChange(value as InspectorTab)}
         className="flex min-h-0 flex-1 flex-col"
       >
         <TabsList className="mx-3 mt-1 flex">
           <TabsTrigger value="run">Run</TabsTrigger>
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
+          <TabsTrigger value="fix">
+            <Sparkles className="size-3.5" />
+            Fix DAG
+          </TabsTrigger>
           <TabsTrigger value="metadata">Metadata</TabsTrigger>
         </TabsList>
 
@@ -1814,6 +1837,10 @@ function RunInspector({
                 )}
               </div>
             </InspectorSection>
+          </TabsContent>
+
+          <TabsContent value="fix" className="mt-3">
+            <FixDispatchDag run={run} />
           </TabsContent>
 
           <TabsContent value="metadata" className="mt-3 space-y-4">
@@ -2066,9 +2093,7 @@ export function LogSessionTraceView({ run }: { run: LogRun }) {
   const [selectedSeq, setSelectedSeq] = React.useState<number | null>(
     () => firstFailedEvent(run)?.seq ?? null,
   );
-  const [detailTab, setDetailTab] = React.useState<"run" | "feedback" | "metadata">(
-    "run",
-  );
+  const [detailTab, setDetailTab] = React.useState<InspectorTab>("run");
 
   React.useEffect(() => {
     setExpanded(allExpandable(buildTraceTree(run.events)));

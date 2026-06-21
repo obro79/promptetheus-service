@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -157,13 +157,17 @@ function openRunTrace(runLabel: string) {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   mockReplace.mockClear();
   for (const key of [...mockSearchParams.keys()]) {
     mockSearchParams.delete(key);
   }
 });
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe("LogsDashboard", () => {
   it("shows agent nav and runs table without inline trace by default", () => {
@@ -211,17 +215,29 @@ describe("LogsDashboard", () => {
     renderDashboard();
 
     const agentNav = screen.getByLabelText("Agent navigation");
-    await waitFor(() => {
-      expect(
-        within(agentNav).getAllByRole("button", { name: /All agents/i })[0],
-      ).toHaveAttribute("aria-pressed", "true");
-    });
+    expect(within(agentNav).getAllByRole("button", { name: /All agents/i })[0]).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
 
     expect(screen.queryByRole("button", { name: /Exit full view/i })).not.toBeInTheDocument();
 
     openRunTrace("Book a demo at 2pm");
 
     expect(screen.getByRole("button", { name: /Exit full view/i })).toBeInTheDocument();
+  });
+
+  it("shows the promoted fix dispatch DAG above the runs list with proof receipts", () => {
+    renderDashboard();
+
+    const dag = screen.getByLabelText("Fix dispatch DAG");
+    const proof = within(screen.getByLabelText("Fix DAG proof"));
+    const runsList = screen.getByLabelText("Runs list");
+
+    expect(screen.getByText("Dispatch running")).toBeInTheDocument();
+    expect(screen.getByText("3s demo loop")).toBeInTheDocument();
+    expect(proof.getByText("Read selected run")).toBeInTheDocument();
+    expect(dag.compareDocumentPosition(runsList) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("auto-selects a failed run when selecting an agent without opening trace overlay", () => {
