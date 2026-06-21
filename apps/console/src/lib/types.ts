@@ -216,6 +216,7 @@ export interface HealPr {
   pr_url?: string | null;
 }
 
+<<<<<<< HEAD
 /**
  * A prior verified fix the Redis fix-memory matched for this incident, passed to
  * the fix agent as a warm-start. Present only when the loop reused past learning.
@@ -227,6 +228,34 @@ export interface HealWarmStart {
   score?: number | null;
   plan?: string[] | null;
   diff?: string | null;
+=======
+export type AgentDispatchStatus = "running" | "pr_opened" | "partial" | "error";
+export type AgentDispatchType = "browser" | "chat" | "voice";
+
+export interface AgentPullRequestResult {
+  agentType: AgentDispatchType;
+  title: string;
+  url: string | null;
+  branch: string | null;
+  number: number | null;
+  devinReviewRequested: boolean;
+  error?: string;
+}
+
+export interface AgentPrDispatchResult {
+  status: AgentDispatchStatus;
+  targetRepo: string;
+  pullRequests: AgentPullRequestResult[];
+}
+
+export interface ClosedTestPullRequestResult {
+  title: string;
+  url: string;
+  branch: string;
+  number: number;
+  state: "closed";
+  targetRepo: string;
+>>>>>>> 835bc23d0eeb0ab252730c59568177928684a2dd
 }
 
 /** Result of the self-healing loop (POST /api/incidents/{id}/heal). */

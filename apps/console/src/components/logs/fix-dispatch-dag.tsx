@@ -31,7 +31,12 @@ import {
 import { LabelTag } from "@/components/common/label-tag";
 import { Button } from "@/components/ui/button";
 import { healIncident } from "@/lib/promptetheus-api";
-import type { EvalReport, HealReport } from "@/lib/types";
+import type {
+  AgentPrDispatchResult,
+  AgentPullRequestResult,
+  EvalReport,
+  HealReport,
+} from "@/lib/types";
 import { cn, pct } from "@/lib/utils";
 import { buildTraceTree, eventSummary, eventTitle, type LogRun, type TraceNode } from "./model";
 import {
@@ -46,11 +51,15 @@ import {
   projectFixDispatchDag,
 } from "./fix-dispatch-dag-model";
 
-type DispatchHeal = (incidentId: string) => Promise<HealReport | null>;
+type DispatchHeal = (
+  incidentId: string,
+  run: LogRun,
+) => Promise<HealReport | AgentPrDispatchResult | null>;
 
 interface FixDispatchDagProps {
   autoDemo?: boolean;
   dispatchHeal?: DispatchHeal;
+  dispatchLabel?: string;
   layout?: "prominent" | "compact";
   prominent?: boolean;
   run: LogRun;
@@ -266,7 +275,8 @@ const MIN_DISPATCH_DURATION_MS = 2100;
 
 export function FixDispatchDag({
   autoDemo = false,
-  dispatchHeal = healIncident,
+  dispatchHeal,
+  dispatchLabel = "Dispatch fix",
   layout,
   prominent = false,
   run,
@@ -277,6 +287,7 @@ export function FixDispatchDag({
   const [activeNodeId, setActiveNodeId] = React.useState<FixDagNodeId>("read_logs");
   const [selectedNodeId, setSelectedNodeId] = React.useState<FixDagNodeId>("read_logs");
   const [report, setReport] = React.useState<HealReport | null>(null);
+  const [agentDispatch, setAgentDispatch] = React.useState<AgentPrDispatchResult | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [fullscreen, setFullscreen] = React.useState(false);
   const timers = React.useRef<Array<ReturnType<typeof setTimeout>>>([]);
@@ -294,6 +305,7 @@ export function FixDispatchDag({
     setActiveNodeId("read_logs");
     setSelectedNodeId("read_logs");
     setReport(null);
+    setAgentDispatch(null);
     setError(null);
 
     FIX_DAG_NODE_IDS.slice(1).forEach((id, index) => {
@@ -319,6 +331,7 @@ export function FixDispatchDag({
     setActiveNodeId("read_logs");
     setSelectedNodeId("read_logs");
     setReport(null);
+    setAgentDispatch(null);
     setError(null);
     return clearTimers;
   }, [clearTimers, incident?.id, run.session.id]);
@@ -376,6 +389,7 @@ export function FixDispatchDag({
     setActiveNodeId("read_logs");
     setSelectedNodeId("read_logs");
     setReport(null);
+    setAgentDispatch(null);
     setError(null);
 
     FIX_DAG_NODE_IDS.slice(1, 5).forEach((id, index) => {
@@ -393,7 +407,7 @@ export function FixDispatchDag({
     };
 
     try {
-      const result = await dispatchHeal(incident.id);
+      const result = await (dispatchHeal ?? defaultDispatchHeal)(incident.id, run);
       settle(() => {
         if (result === null) {
           setPhase("demo");
@@ -401,11 +415,15 @@ export function FixDispatchDag({
           setSelectedNodeId("open_pr");
           return;
         }
-        setReport(result);
-        if (result.status === "pr_opened") {
+        const normalizedReport = isAgentPrDispatchResult(result)
+          ? agentDispatchToHealReport(result, incident.id)
+          : result;
+        setAgentDispatch(isAgentPrDispatchResult(result) ? result : null);
+        setReport(normalizedReport);
+        if (normalizedReport.status === "pr_opened") {
           setPhase("pr_opened");
-          setActiveNodeId(result.pr?.fallback ? "open_pr" : "merge_github");
-          setSelectedNodeId(result.pr?.fallback ? "open_pr" : "merge_github");
+          setActiveNodeId(normalizedReport.pr?.fallback ? "open_pr" : "merge_github");
+          setSelectedNodeId(normalizedReport.pr?.fallback ? "open_pr" : "merge_github");
         } else {
           setPhase("escalated");
           setActiveNodeId("run_evals");
@@ -420,7 +438,7 @@ export function FixDispatchDag({
         setSelectedNodeId("dispatch_fix");
       });
     }
-  }, [clearTimers, dispatchHeal, incident, phase]);
+  }, [clearTimers, dispatchHeal, incident, phase, run]);
 
   const attempts = report?.attempts ?? 0;
   const evalAttempt = React.useMemo(
@@ -437,7 +455,7 @@ export function FixDispatchDag({
       ? "Dispatching..."
       : report || phase === "demo" || phase === "error"
         ? "Re-run dispatch"
-        : "Dispatch fix";
+        : dispatchLabel;
 
   return (
     <div className="space-y-3" aria-label="Fix dispatch DAG">
@@ -579,7 +597,7 @@ export function FixDispatchDag({
         </div>
         </div>
 
-        {isProminent ? <ProofPanel evidence={evidence} /> : null}
+        {isProminent ? <ProofPanel agentDispatch={agentDispatch} evidence={evidence} /> : null}
       </div>
 
       {fullscreen ? (
@@ -599,6 +617,7 @@ export function FixDispatchDag({
   );
 }
 
+<<<<<<< HEAD
 /**
  * One row of the nested "under the hood" tree. Renders an arbitrarily deep tree
  * with file-explorer style branch connectors (the parent `ul` draws the vertical
@@ -1087,6 +1106,75 @@ function FixDagStageLayer({
 }
 
 function ProofPanel({ evidence }: { evidence: FixDagEvidence }) {
+=======
+async function defaultDispatchHeal(incidentId: string): Promise<HealReport | null> {
+  return healIncident(incidentId);
+}
+
+function isAgentPrDispatchResult(
+  result: HealReport | AgentPrDispatchResult,
+): result is AgentPrDispatchResult {
+  return "pullRequests" in result;
+}
+
+function agentDispatchToHealReport(
+  result: AgentPrDispatchResult,
+  incidentId: string,
+): HealReport {
+  const primary = result.pullRequests.find((pullRequest) => pullRequest.url);
+  const opened = result.pullRequests.filter((pullRequest) => pullRequest.url);
+  return {
+    attempts: result.pullRequests.length,
+    incident_id: incidentId,
+    orchestrator: "maintainerOS",
+    pr: primary
+      ? {
+          branch: primary.branch ?? undefined,
+          changed_files: result.pullRequests
+            .filter((pullRequest) => pullRequest.url)
+            .map((pullRequest) => `${pullRequest.agentType} agent`),
+          fallback: false,
+          pr_url: primary.url,
+          title: primary.title,
+        }
+      : null,
+    reason: opened.length ? null : "No demo agent pull requests opened.",
+    source: `logs_agent_dispatch:${result.targetRepo}`,
+    status: opened.length ? "pr_opened" : "escalated",
+    trail: [
+      {
+        attempt: 1,
+        critique: {
+          approved: opened.length === result.pullRequests.length,
+          confidence: opened.length / Math.max(1, result.pullRequests.length),
+          reason:
+            opened.length === result.pullRequests.length
+              ? "Browser, chat, and voice agent PRs opened."
+              : `${opened.length} of ${result.pullRequests.length} agent PRs opened.`,
+        },
+        diagnosis: `Dispatch selected logs into ${result.targetRepo} agent PRs.`,
+        eval: null,
+        kind: "agent_pr_dispatch",
+        passed: opened.length > 0,
+        regression: {
+          opened_prs: opened.length,
+          total_prs: result.pullRequests.length,
+        },
+        runner: "codex",
+      },
+    ],
+    workflow_run_id: null,
+  };
+}
+
+function ProofPanel({
+  agentDispatch,
+  evidence,
+}: {
+  agentDispatch: AgentPrDispatchResult | null;
+  evidence: FixDagEvidence;
+}) {
+>>>>>>> 835bc23d0eeb0ab252730c59568177928684a2dd
   return (
     <aside className="landing-framed-surface overflow-hidden" aria-label="Fix DAG proof">
       <div className="border-b border-border/70 bg-panel/65 p-3">
@@ -1144,7 +1232,73 @@ function ProofPanel({ evidence }: { evidence: FixDagEvidence }) {
           </ul>
         </div>
       ) : null}
+
+      {agentDispatch ? <AgentPullRequestList result={agentDispatch} /> : null}
     </aside>
+  );
+}
+
+function AgentPullRequestList({ result }: { result: AgentPrDispatchResult }) {
+  return (
+    <div className="border-t border-border/70 bg-panel p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+          Agent PRs
+        </p>
+        <span className="mono text-[10px] text-muted-foreground">{result.targetRepo}</span>
+      </div>
+      <ul className="mt-2 space-y-2">
+        {result.pullRequests.map((pullRequest) => (
+          <AgentPullRequestItem key={pullRequest.agentType} pullRequest={pullRequest} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function AgentPullRequestItem({
+  pullRequest,
+}: {
+  pullRequest: AgentPullRequestResult;
+}) {
+  const label = `${pullRequest.agentType[0].toUpperCase()}${pullRequest.agentType.slice(1)} agent`;
+  return (
+    <li className="rounded-lg border border-border/70 bg-elevated/35 p-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold text-foreground">{label}</p>
+          {pullRequest.url ? (
+            <a
+              href={pullRequest.url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-flex max-w-full items-center gap-1 truncate text-xs font-medium text-success underline-offset-4 hover:underline"
+            >
+              <span className="truncate">PR #{pullRequest.number}: {pullRequest.title}</span>
+              <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
+            </a>
+          ) : (
+            <p className="mt-1 text-xs text-destructive">{pullRequest.error ?? "PR failed."}</p>
+          )}
+        </div>
+        <span
+          className={cn(
+            "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase",
+            pullRequest.devinReviewRequested
+              ? "border-success/25 bg-success/10 text-success"
+              : pullRequest.url
+                ? "border-warning/25 bg-warning/10 text-warning"
+                : "border-destructive/25 bg-destructive/10 text-destructive",
+          )}
+        >
+          {pullRequest.devinReviewRequested
+            ? "Devin requested"
+            : pullRequest.url
+              ? "Review pending"
+              : "Failed"}
+        </span>
+      </div>
+    </li>
   );
 }
 

@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
+  AgentPrDispatchResult,
   AnalysisResult,
   HealReport,
   Incident,
@@ -157,6 +158,40 @@ function report(overrides: Partial<HealReport> = {}): HealReport {
   };
 }
 
+function agentPrDispatch(overrides: Partial<AgentPrDispatchResult> = {}): AgentPrDispatchResult {
+  return {
+    pullRequests: [
+      {
+        agentType: "browser",
+        branch: "promptetheus/browser-agent-inc_failed",
+        devinReviewRequested: true,
+        number: 21,
+        title: "Add Promptetheus browser agent replay guard",
+        url: "https://github.com/obro79/demo-agents/pull/21",
+      },
+      {
+        agentType: "chat",
+        branch: "promptetheus/chat-agent-inc_failed",
+        devinReviewRequested: true,
+        number: 22,
+        title: "Add Promptetheus chat agent recovery marker",
+        url: "https://github.com/obro79/demo-agents/pull/22",
+      },
+      {
+        agentType: "voice",
+        branch: "promptetheus/voice-agent-inc_failed",
+        devinReviewRequested: true,
+        number: 23,
+        title: "Add Promptetheus voice agent interruption guard",
+        url: "https://github.com/obro79/demo-agents/pull/23",
+      },
+    ],
+    status: "pr_opened",
+    targetRepo: "obro79/demo-agents",
+    ...overrides,
+  };
+}
+
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
@@ -286,7 +321,7 @@ describe("FixDispatchDag", () => {
       vi.advanceTimersByTime(2200);
     });
 
-    expect(dispatchHeal).toHaveBeenCalledWith(incident.id);
+    expect(dispatchHeal).toHaveBeenCalledWith(incident.id, expect.objectContaining({ incident }));
     expect(screen.getByText("PR ready for GitHub")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open PR in GitHub" })).toHaveAttribute(
       "href",
@@ -305,6 +340,46 @@ describe("FixDispatchDag", () => {
     fireEvent.click(screen.getAllByText("Run evals")[0]);
     const evalProof = within(screen.getByLabelText("Fix DAG proof"));
     expect(evalProof.getByText("Assertion: Books requested time")).toBeInTheDocument();
+  });
+
+  it("shows all agent PR links and Devin review state after logs dispatch", async () => {
+    vi.useFakeTimers();
+    const dispatchHeal = vi.fn().mockResolvedValue(agentPrDispatch());
+    render(
+      <FixDispatchDag
+        dispatchHeal={dispatchHeal}
+        dispatchLabel="Dispatch agent PRs"
+        layout="prominent"
+        run={run()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Dispatch fix for selected run" }));
+
+    await act(async () => {
+      await Promise.resolve();
+      vi.advanceTimersByTime(2200);
+    });
+
+    expect(dispatchHeal).toHaveBeenCalledWith(incident.id, expect.objectContaining({ incident }));
+    expect(screen.getByText("PR ready for GitHub")).toBeInTheDocument();
+
+    const proof = within(screen.getByLabelText("Fix DAG proof"));
+    expect(proof.getByText("Agent PRs")).toBeInTheDocument();
+    expect(proof.getByText("obro79/demo-agents")).toBeInTheDocument();
+    expect(proof.getByRole("link", { name: /PR #21/ })).toHaveAttribute(
+      "href",
+      "https://github.com/obro79/demo-agents/pull/21",
+    );
+    expect(proof.getByRole("link", { name: /PR #22/ })).toHaveAttribute(
+      "href",
+      "https://github.com/obro79/demo-agents/pull/22",
+    );
+    expect(proof.getByRole("link", { name: /PR #23/ })).toHaveAttribute(
+      "href",
+      "https://github.com/obro79/demo-agents/pull/23",
+    );
+    expect(proof.getAllByText("Devin requested")).toHaveLength(3);
   });
 
   it("falls back to demo mode when the API is unavailable", async () => {

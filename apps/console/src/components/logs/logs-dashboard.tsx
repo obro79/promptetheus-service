@@ -15,13 +15,18 @@ import {
   Columns3,
   ExternalLink,
   Eye,
+  ExternalLink,
   FileJson,
   Filter,
   FlaskConical,
   Gauge,
+<<<<<<< HEAD
   GitMerge,
+=======
+>>>>>>> 835bc23d0eeb0ab252730c59568177928684a2dd
   GitPullRequest,
   ListFilter,
+  Loader2,
   MessageSquare,
   PanelRight,
   PlayCircle,
@@ -75,6 +80,7 @@ import type {
   TraceEvent,
   TraceSession,
 } from "@/lib/types";
+import { createClosedLogsTestPr, dispatchLogsAgentPrs } from "@/lib/promptetheus-api";
 import { cn, fmtDuration, fmtRelative, pct, shortId } from "@/lib/utils";
 import { buildAgents, type AgentRow } from "./agents-model";
 import { FixDispatchDag } from "./fix-dispatch-dag";
@@ -271,6 +277,11 @@ export function LogsDashboard({
   const [selectedSeq, setSelectedSeq] = React.useState<number | null>(null);
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [detailTab, setDetailTab] = React.useState<InspectorTab>("run");
+  const [testPrState, setTestPrState] = React.useState<{
+    status: "idle" | "running" | "closed" | "error";
+    error: string | null;
+    result: Awaited<ReturnType<typeof createClosedLogsTestPr>> | null;
+  }>({ error: null, result: null, status: "idle" });
 
   const filters = React.useMemo<LogFilters>(
     () => ({
@@ -354,6 +365,44 @@ export function LogsDashboard({
     setSection("runs");
   };
 
+  const dispatchAgentPrs = React.useCallback(
+    (_incidentId: string, run: LogRun) =>
+      dispatchLogsAgentPrs({
+        agentName: run.session.agent,
+        incidentId: run.incident?.id ?? _incidentId,
+        incidentTitle: run.incident?.title ?? null,
+        rootCause: run.analysis?.root_cause ?? run.incident?.root_cause ?? null,
+        sessionId: run.session.id,
+      }),
+    [],
+  );
+
+  React.useEffect(() => {
+    setTestPrState({ error: null, result: null, status: "idle" });
+  }, [selectedRun?.session.id]);
+
+  const runClosedTestPr = React.useCallback(async () => {
+    if (!selectedRun?.incident || testPrState.status === "running") return;
+
+    setTestPrState({ error: null, result: null, status: "running" });
+    try {
+      const result = await createClosedLogsTestPr({
+        agentName: selectedRun.session.agent,
+        incidentId: selectedRun.incident.id,
+        incidentTitle: selectedRun.incident.title,
+        rootCause: selectedRun.analysis?.root_cause ?? selectedRun.incident.root_cause,
+        sessionId: selectedRun.session.id,
+      });
+      setTestPrState({ error: null, result, status: "closed" });
+    } catch (caught) {
+      setTestPrState({
+        error: caught instanceof Error ? caught.message : "Unable to create and close test PR.",
+        result: null,
+        status: "error",
+      });
+    }
+  }, [selectedRun, testPrState.status]);
+
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-7">
       <LogsNav active={section} onChange={setSection} />
@@ -383,11 +432,63 @@ export function LogsDashboard({
               onClear={clearAllFilters}
             />
 
+<<<<<<< HEAD
             <div className="flex min-w-0 flex-col gap-5">
               {/* The pipeline runs full width to the edge of the pane. */}
               {selectedRun ? (
                 <FixDispatchDag autoDemo prominent run={selectedRun} />
               ) : null}
+=======
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
+              <div className="flex min-w-0 flex-col gap-3">
+                {selectedRun ? (
+                  <>
+                    <TestPullRequestPanel
+                      disabled={!selectedRun.incident}
+                      onRun={runClosedTestPr}
+                      state={testPrState}
+                    />
+                    <FixDispatchDag
+                      dispatchHeal={dispatchAgentPrs}
+                      dispatchLabel="Dispatch agent PRs"
+                      prominent
+                      run={selectedRun}
+                    />
+                  </>
+                ) : null}
+
+                <RunsTable
+                  runs={filteredRuns}
+                  selectedRunId={selectedRun?.session.id}
+                  showColumn={showColumn}
+                  sortKey={sortKey}
+                  sortDirection={sortDirection}
+                  onSort={onSort}
+                  onSelect={(run) => setSelectedRunId(run.session.id)}
+                />
+
+                {selectedRun ? (
+                  <TraceDebugger
+                    run={selectedRun}
+                    traceTree={traceTree}
+                    visibleTrace={visibleTrace}
+                    expanded={expanded}
+                    onExpandedChange={setExpanded}
+                    selectedEvent={selectedEvent}
+                    onEventSelect={(event) => {
+                      setSelectedSeq(event.seq);
+                      setDetailTab("run");
+                    }}
+                    detailTab={detailTab}
+                    onDetailTabChange={setDetailTab}
+                  />
+                ) : (
+                  <div className={cn("flex min-h-[320px] items-center justify-center p-6 text-sm text-muted-foreground", SURFACE)}>
+                    No runs match the current filters.
+                  </div>
+                )}
+              </div>
+>>>>>>> 835bc23d0eeb0ab252730c59568177928684a2dd
 
               {/* Filtered metrics + filter shortcuts sit under the pipeline as a
                   compact strip so the pipeline above can use the full width. */}
@@ -505,6 +606,69 @@ function LogsNav({
         );
       })}
     </nav>
+  );
+}
+
+function TestPullRequestPanel({
+  disabled,
+  onRun,
+  state,
+}: {
+  disabled: boolean;
+  onRun: () => void;
+  state: {
+    status: "idle" | "running" | "closed" | "error";
+    error: string | null;
+    result: Awaited<ReturnType<typeof createClosedLogsTestPr>> | null;
+  };
+}) {
+  return (
+    <section className={cn("flex flex-wrap items-center justify-between gap-3 p-3", SURFACE)}>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex size-8 items-center justify-center rounded-lg border border-accent/25 bg-accent-muted text-accent">
+            <GitPullRequest className="size-3.5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-foreground">GitHub smoke test</h2>
+            <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+              Create a disposable PR in obro79/demo-agents, then close it immediately.
+            </p>
+          </div>
+        </div>
+        {state.status === "closed" && state.result ? (
+          <a
+            href={state.result.url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex max-w-full items-center gap-1 truncate text-xs font-medium text-success underline-offset-4 hover:underline"
+          >
+            <span className="truncate">
+              Closed PR #{state.result.number}: {state.result.title}
+            </span>
+            <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
+          </a>
+        ) : state.status === "error" ? (
+          <p className="mt-2 text-xs text-destructive">{state.error}</p>
+        ) : null}
+      </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={disabled || state.status === "running"}
+        onClick={onRun}
+        aria-label="Create and close test PR"
+      >
+        {state.status === "running" ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <GitPullRequest className="size-3.5" aria-hidden="true" />
+        )}
+        {state.status === "running" ? "Testing..." : "Test PR"}
+      </Button>
+    </section>
   );
 }
 
