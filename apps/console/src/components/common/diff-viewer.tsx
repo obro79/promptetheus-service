@@ -49,7 +49,7 @@ export function DiffViewer({ diff, className }: DiffViewerProps) {
   return (
     <div
       className={cn(
-        "mono overflow-auto rounded-md border border-border bg-canvas text-xs leading-relaxed",
+        "mono overflow-auto rounded-xl border border-border bg-canvas text-xs leading-relaxed",
         className,
       )}
     >

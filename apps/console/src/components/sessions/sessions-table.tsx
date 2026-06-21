@@ -140,7 +140,7 @@ export function SessionsTable({ sessions }: SessionsTableProps) {
 
                 <TableCell className="py-2.5">
                   {s.environment ? (
-                    <span className="mono inline-flex items-center rounded-md bg-elevated px-2 py-1 text-[10px] text-muted-foreground">
+                    <span className="mono inline-flex items-center rounded-full bg-elevated px-2.5 py-1 text-[10px] text-muted-foreground">
                       {s.environment}
                     </span>
                   ) : (

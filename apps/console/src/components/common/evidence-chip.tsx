@@ -55,7 +55,7 @@ export function EvidenceChip({
   );
 
   const base =
-    "inline-flex max-w-full items-center gap-1.5 rounded-md bg-elevated px-2 py-1.5 leading-none";
+    "inline-flex max-w-full items-center gap-1.5 rounded-full bg-elevated px-2.5 py-1.5 leading-none";
 
   if (interactive) {
     return (

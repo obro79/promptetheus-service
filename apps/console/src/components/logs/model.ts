@@ -359,6 +359,40 @@ export function deriveLogMetrics(runs: LogRun[]): LogMetrics {
   };
 }
 
+export interface AgentGroup {
+  projectId: string;
+  label: string;
+  totalRuns: number;
+  failedRuns: number;
+}
+
+export function groupRunsByAgent(runs: LogRun[], projects: Project[]): AgentGroup[] {
+  const byProject = new Map<string, AgentGroup>();
+  for (const project of projects) {
+    byProject.set(project.id, {
+      projectId: project.id,
+      label: project.name,
+      totalRuns: 0,
+      failedRuns: 0,
+    });
+  }
+  for (const run of runs) {
+    const id = run.session.project_id;
+    if (!byProject.has(id)) {
+      byProject.set(id, {
+        projectId: id,
+        label: run.project?.name ?? id,
+        totalRuns: 0,
+        failedRuns: 0,
+      });
+    }
+    const group = byProject.get(id)!;
+    group.totalRuns += 1;
+    if (["failed", "error"].includes(run.session.status)) group.failedRuns += 1;
+  }
+  return Array.from(byProject.values()).filter((g) => g.totalRuns > 0);
+}
+
 function nodeId(event: TraceEvent): string {
   return event.span_id ?? `${event.session_id}:${event.seq}`;
 }

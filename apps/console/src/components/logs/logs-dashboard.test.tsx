@@ -169,4 +169,69 @@ describe("LogsDashboard", () => {
     fireEvent.click(screen.getByLabelText("Expand trace node"));
     expect(within(trace).getByText("browser.click")).toBeInTheDocument();
   });
+
+  it("shows agent selector and expand control for full trace", () => {
+    renderDashboard();
+
+    expect(screen.getByRole("button", { name: /All agents/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: /Expand trace to full view/i })).toBeInTheDocument();
+  });
+
+  it("filters runs to a selected agent and hides runs from other agents", () => {
+    const project2: Project = {
+      id: "prj_other",
+      workspace_id: "ws_logs",
+      name: "Other Agent",
+      api_key_preview: "pk_live_other",
+      connected_repo: null,
+      retention_days: 14,
+      created_at: "2026-06-18T00:00:00Z",
+    };
+    const sessionOther: TraceSession = {
+      id: "ses_other",
+      workspace_id: "ws_logs",
+      project_id: "prj_other",
+      user_goal: "Other agent task",
+      agent: "other-agent@1.0.0",
+      environment: "staging",
+      status: "passed",
+      tags: [],
+      metadata: {},
+      started_at: "2026-06-18T16:00:00Z",
+      event_count: 1,
+      duration_ms: 1000,
+      incident_id: null,
+    };
+
+    render(
+      <LogsDashboard
+        sessions={[...sessions, sessionOther]}
+        projects={[project, project2]}
+        incidents={incidents}
+        eventsBySession={{
+          ...eventsBySession,
+          ses_other: [event("ses_other", 0, "user_message", { content: "Other agent task" })],
+        }}
+        analysesBySession={analysesBySession}
+      />,
+    );
+
+    // Turn off failed-only so all sessions are visible
+    fireEvent.click(screen.getByRole("button", { name: "Failed only" }));
+
+    // "Other agent task" is visible (all agents selected)
+    expect(screen.getAllByText("Other agent task").length).toBeGreaterThan(0);
+
+    // Select "Logs Project" agent — "Other agent task" from prj_other should disappear
+    const agentNav = screen.getByLabelText("Agent navigation and filters");
+    const logsProjectBtn = within(agentNav)
+      .getAllByRole("button")
+      .find((btn) => btn.textContent?.includes("Logs Project"))!;
+    fireEvent.click(logsProjectBtn);
+
+    expect(screen.queryByText("Other agent task")).not.toBeInTheDocument();
+  });
 });

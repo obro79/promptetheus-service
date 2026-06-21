@@ -118,7 +118,7 @@ export function JsonViewer({
   return (
     <div
       className={cn(
-        "mono overflow-auto rounded-md border border-border bg-canvas p-3 text-xs text-foreground",
+        "mono overflow-auto rounded-xl border border-border bg-canvas p-3 text-xs text-foreground",
         className,
       )}
     >

@@ -33,7 +33,7 @@ export function CostBadge({
   return (
     <span
       className={cn(
-        "mono inline-flex items-center gap-1 rounded-md bg-elevated px-2 py-1 text-[11px] leading-none text-muted-foreground tabular-nums",
+        "mono inline-flex items-center gap-1 rounded-full bg-elevated px-2.5 py-1 text-[11px] leading-none text-muted-foreground tabular-nums",
         className,
       )}
       {...props}

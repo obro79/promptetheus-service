@@ -76,6 +76,8 @@ const config: Config = {
         lg: "0.875rem",
         md: "0.625rem",
         sm: "0.375rem",
+        card: "var(--landing-card-radius-sm)",
+        shell: "var(--landing-shell-radius)",
       },
       boxShadow: {
         glow: "0 22px 70px hsl(var(--glow-accent) / 0.22)",
