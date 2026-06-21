@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import FastAPI, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 
@@ -795,7 +796,9 @@ def create_app(
         bundle = build_incident_bundle(app.state.store, incident)
         runner = get_runner(allowed_paths=bundle.get("allowed_paths"))
         try:
-            fix_result = runner.run(bundle)
+            # Offloaded: a runner (e.g. Devin) may block on a long poll, which must
+            # not stall the event loop.
+            fix_result = await run_in_threadpool(runner.run, bundle)
         except ValueError as exc:
             raise _HTTPError(400, str(exc)) from exc
         except NotImplementedError as exc:
@@ -897,7 +900,11 @@ def create_app(
             raise _HTTPError(400, "max_attempts must be an integer")
 
         try:
-            report = run_loop(app.state.store, incident, max_attempts=max_attempts)
+            # Offloaded: the loop may drive a long-polling runner (e.g. Devin),
+            # which must not stall the event loop.
+            report = await run_in_threadpool(
+                run_loop, app.state.store, incident, max_attempts=max_attempts
+            )
         except ValueError as exc:
             raise _HTTPError(400, str(exc)) from exc
 

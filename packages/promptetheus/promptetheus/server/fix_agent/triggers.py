@@ -24,6 +24,11 @@ _FAILURE_TYPES: frozenset[str] = frozenset(
     {"error", "tool_result", "goal_check", "session_end"}
 )
 
+#: Sessions with an auto-heal run in flight, so concurrent failure events (e.g.
+#: SDK retries) don't spawn duplicate runs that open duplicate PRs.
+_inflight: set[str] = set()
+_inflight_lock = threading.Lock()
+
 
 def auto_heal_enabled() -> bool:
     raw = os.environ.get("PROMPTETHEUS_AUTO_HEAL", "0").strip().lower()
@@ -63,8 +68,12 @@ def maybe_trigger_auto_heal(
             return False
         if not any(is_failure_event(event) for event in accepted_events):
             return False
+        with _inflight_lock:
+            if session_id in _inflight:
+                return False
+            _inflight.add(session_id)
         thread = threading.Thread(
-            target=run_auto_heal,
+            target=_run_and_release,
             args=(store, session_id),
             name=f"auto-heal-{session_id}",
             daemon=True,
@@ -72,7 +81,19 @@ def maybe_trigger_auto_heal(
         thread.start()
         return True
     except Exception:
+        with _inflight_lock:
+            _inflight.discard(session_id)
         return False
+
+
+def _run_and_release(store: Any, session_id: str) -> None:
+    """Run the background heal and always clear the in-flight marker."""
+
+    try:
+        run_auto_heal(store, session_id)
+    finally:
+        with _inflight_lock:
+            _inflight.discard(session_id)
 
 
 def run_auto_heal(store: Any, session_id: str) -> dict[str, Any]:
@@ -100,7 +121,10 @@ def run_auto_heal(store: Any, session_id: str) -> dict[str, Any]:
         for incident in incidents:
             try:
                 report = run_loop(store, incident)
-                summary["healed"] += 1
+                # Only a PR-opened report is a successful heal; escalated reports
+                # exhausted the attempt budget without a verified fix.
+                if report.status == "pr_opened":
+                    summary["healed"] += 1
                 store.add_audit(
                     {
                         "workspace_id": incident.get("workspace_id"),

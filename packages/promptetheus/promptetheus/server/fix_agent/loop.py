@@ -31,20 +31,21 @@ from promptetheus.server.observability import telemetry
 
 
 def _resolve_loop_runner(allowed_paths: Any) -> Any:
-    """Pick the heal-loop diagnosis runner from env (Claude by default).
+    """Pick the heal-loop diagnosis runner from ``PROMPTETHEUS_FIX_AGENT_RUNNER``.
 
-    Set ``PROMPTETHEUS_FIX_AGENT_RUNNER=devin`` to drive the bounded loop with the
-    Devin runner, which seeds the session with the top similar past fixes as
-    advanced context. Both runners share the ``run(bundle, *, prior_critique,
-    warm_start)`` signature and fall back to the deterministic runner on failure.
+    Defaults to Claude when unset (the loop's historical behavior); when set it
+    routes through the same ``get_runner`` registry the dispatch endpoint uses, so
+    ``devin``/``codex``/``deterministic`` resolve identically in both paths. Every
+    runner shares the ``run(bundle, *, prior_critique, warm_start)`` signature and
+    falls back to the deterministic runner on failure.
     """
 
     name = os.environ.get("PROMPTETHEUS_FIX_AGENT_RUNNER", "").strip().lower()
-    if name == "devin":
-        from promptetheus.server.fix_agent.runners.devin import DevinRunner
+    if not name:
+        return ClaudeRunner(allowed_paths=allowed_paths)
+    from promptetheus.server.fix_agent.runners import get_runner
 
-        return DevinRunner(allowed_paths=allowed_paths)
-    return ClaudeRunner(allowed_paths=allowed_paths)
+    return get_runner(name=name, allowed_paths=allowed_paths)
 
 
 def _max_attempts(explicit: int | None) -> int:
