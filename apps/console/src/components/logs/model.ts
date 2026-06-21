@@ -2,6 +2,7 @@ import type {
   AnalysisResult,
   Incident,
   Project,
+  ReplayArtifact,
   TraceEvent,
   TraceSession,
 } from "@/lib/types";
@@ -44,6 +45,7 @@ export interface LogRun {
   project: Project | undefined;
   incident: Incident | undefined;
   analysis: AnalysisResult | undefined;
+  artifacts: ReplayArtifact[];
   events: TraceEvent[];
   inputPreview: string;
   outputPreview: string;
@@ -211,12 +213,14 @@ export function buildLogRuns({
   incidents,
   eventsBySession,
   analysesBySession,
+  artifactsBySession = {},
 }: {
   sessions: TraceSession[];
   projects: Project[];
   incidents: Incident[];
   eventsBySession: Record<string, TraceEvent[]>;
   analysesBySession: Record<string, AnalysisResult | undefined>;
+  artifactsBySession?: Record<string, ReplayArtifact[]>;
 }): LogRun[] {
   return sessions.map((session) => {
     const events = [...(eventsBySession[session.id] ?? [])].sort((a, b) => a.seq - b.seq);
@@ -226,6 +230,7 @@ export function buildLogRuns({
       project: projects.find((project) => project.id === session.project_id),
       incident: incidents.find((incident) => incident.id === session.incident_id),
       analysis,
+      artifacts: artifactsBySession[session.id] ?? [],
       events,
       inputPreview: firstEventSummary(events, "user_message") || session.user_goal || session.id,
       outputPreview: lastOutput(events),

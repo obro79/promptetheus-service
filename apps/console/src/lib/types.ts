@@ -229,23 +229,73 @@ export interface HealWarmStart {
   diff?: string | null;
 }
 
-export type AgentDispatchStatus = "running" | "pr_opened" | "partial" | "error";
+export type AgentDispatchStatus = "running" | "devin_dispatched" | "pr_opened" | "partial" | "error";
 export type AgentDispatchType = "browser" | "chat" | "voice";
 
 export interface AgentPullRequestResult {
   agentType: AgentDispatchType;
+  kind?: "devin_issue" | "devin_session" | "pull_request";
   title: string;
   url: string | null;
   branch: string | null;
+  externalId?: string | null;
   number: number | null;
+  openedPrUrl?: string | null;
+  openedPrNumber?: number | null;
+  openedPrTitle?: string | null;
+  openedPrBranch?: string | null;
+  prDetectedAt?: string | null;
+  devinPrRequested?: boolean;
   devinReviewRequested: boolean;
   error?: string;
+}
+
+export type AgentPrTrackingStatus = "tracking" | "not_found" | "tracking_unavailable";
+
+export type FixWorkflowOrchestrator = "orkes" | "local_orkes";
+export type FixWorkflowStageStatus = "pending" | "running" | "passed" | "failed" | "blocked";
+export type FixWorkflowStageId =
+  | "build_eval_set"
+  | "dispatch_devin"
+  | "wait_for_pr"
+  | "run_evals"
+  | "sentry_proof"
+  | "close_loop";
+
+export interface FixWorkflowStage {
+  id: FixWorkflowStageId;
+  label: string;
+  status: FixWorkflowStageStatus;
+  detail: string;
+}
+
+export interface EvalGateReceipt {
+  status: "pending" | "passed" | "failed";
+  caseCount: number;
+  beforeFail: number;
+  afterFail: number | null;
+  assertion: string;
+  confidence: number | null;
+  note: string;
+}
+
+export interface SentryProofReceipt {
+  configured: boolean;
+  traceId: string | null;
+  detail: string;
 }
 
 export interface AgentPrDispatchResult {
   status: AgentDispatchStatus;
   targetRepo: string;
   pullRequests: AgentPullRequestResult[];
+  trackingStatus?: AgentPrTrackingStatus;
+  trackingError?: string | null;
+  orchestrator?: FixWorkflowOrchestrator;
+  workflowRunId?: string | null;
+  workflowStages?: FixWorkflowStage[];
+  evalGate?: EvalGateReceipt | null;
+  sentryProof?: SentryProofReceipt | null;
 }
 
 export interface ClosedTestPullRequestResult {

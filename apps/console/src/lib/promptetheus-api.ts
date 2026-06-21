@@ -205,6 +205,27 @@ export async function dispatchLogsAgentPrs(input: {
   return readJsonOrThrow<AgentPrDispatchResult>(response, "Agent dispatch");
 }
 
+export async function checkLogsAgentPrStatus(input: {
+  dispatchResult: AgentPrDispatchResult;
+  incidentId: string;
+  sessionId: string;
+}): Promise<AgentPrDispatchResult> {
+  const response = await fetch("/api/logs/dispatch-agent/status", {
+    body: JSON.stringify(input),
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+  const body = (await response.json()) as AgentPrDispatchResult | { error?: string };
+  if (!response.ok) {
+    throw new Error("error" in body && body.error ? body.error : `Agent PR status ${response.status}`);
+  }
+  return body as AgentPrDispatchResult;
+}
+
 export async function createClosedLogsTestPr(input: {
   agentName?: string | null;
   incidentId: string;

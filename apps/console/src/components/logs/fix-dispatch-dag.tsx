@@ -19,6 +19,7 @@ import {
   Sparkles,
   Timer,
   X,
+  type LucideIcon,
 } from "lucide-react";
 
 import {
@@ -30,7 +31,7 @@ import {
 } from "@/components/common/brand-marks";
 import { LabelTag } from "@/components/common/label-tag";
 import { Button } from "@/components/ui/button";
-import { healIncident } from "@/lib/promptetheus-api";
+import { checkLogsAgentPrStatus, healIncident } from "@/lib/promptetheus-api";
 import type {
   AgentPrDispatchResult,
   AgentPullRequestResult,
@@ -55,9 +56,15 @@ type DispatchHeal = (
   incidentId: string,
   run: LogRun,
 ) => Promise<HealReport | AgentPrDispatchResult | null>;
+type CheckDispatchStatus = (input: {
+  dispatchResult: AgentPrDispatchResult;
+  incidentId: string;
+  sessionId: string;
+}) => Promise<AgentPrDispatchResult>;
 
 interface FixDispatchDagProps {
   autoDemo?: boolean;
+  checkDispatchStatus?: CheckDispatchStatus;
   dispatchHeal?: DispatchHeal;
   dispatchLabel?: string;
   layout?: "prominent" | "compact";
@@ -65,13 +72,22 @@ interface FixDispatchDagProps {
   run: LogRun;
 }
 
-const NODE_ICON: Record<FixDagNodeId, React.ComponentType<{ className?: string }>> = {
-  dispatch_fix: Sparkles,
-  merge_github: GitMerge,
-  open_pr: GitPullRequest,
-  plan_fix: FileCode2,
+type NodeIconComponent = React.ComponentType<{ className?: string }>;
+
+function makeNodeIcon(Icon: LucideIcon): NodeIconComponent {
+  function NodeIcon({ className }: { className?: string }) {
+    return <Icon className={className} aria-hidden="true" strokeWidth={1.8} />;
+  }
+  return NodeIcon;
+}
+
+const NODE_ICON: Record<FixDagNodeId, NodeIconComponent> = {
+  dispatch_fix: makeNodeIcon(Sparkles),
+  merge_github: makeNodeIcon(GitMerge),
+  open_pr: makeNodeIcon(GitPullRequest),
+  plan_fix: makeNodeIcon(FileCode2),
   read_logs: SupabaseMark,
-  run_evals: ShieldCheck,
+  run_evals: makeNodeIcon(ShieldCheck),
 };
 
 const NODE_POSITIONS: Record<FixDagNodeId, { x: number; y: number }> = {
@@ -269,12 +285,18 @@ const NODE_SUBSTEPS: Record<FixDagNodeId, FixDagSubStep[]> = {
   ],
 };
 
+const DAG_ICON_FRAME =
+  "inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-accent/25 bg-accent-muted text-accent shadow-[0_12px_34px_hsl(var(--glow-accent)/0.18)]";
+
 const ANIMATION_NODE_DELAY_MS = 420;
 const DEMO_NODE_DELAY_MS = 3000;
 const MIN_DISPATCH_DURATION_MS = 2100;
+const PR_POLL_INTERVAL_MS = 5000;
+const PR_POLL_TIMEOUT_MS = 120000;
 
 export function FixDispatchDag({
   autoDemo = false,
+  checkDispatchStatus,
   dispatchHeal,
   dispatchLabel = "Dispatch fix",
   layout,
@@ -290,7 +312,9 @@ export function FixDispatchDag({
   const [agentDispatch, setAgentDispatch] = React.useState<AgentPrDispatchResult | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [fullscreen, setFullscreen] = React.useState(false);
+  const [checkingPr, setCheckingPr] = React.useState(false);
   const timers = React.useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  const prPollStartedAt = React.useRef<number | null>(null);
 
   const clearTimers = React.useCallback(() => {
     for (const timer of timers.current) clearTimeout(timer);
@@ -306,7 +330,9 @@ export function FixDispatchDag({
     setSelectedNodeId("read_logs");
     setReport(null);
     setAgentDispatch(null);
+    setCheckingPr(false);
     setError(null);
+    prPollStartedAt.current = null;
 
     FIX_DAG_NODE_IDS.slice(1).forEach((id, index) => {
       timers.current.push(
@@ -332,7 +358,9 @@ export function FixDispatchDag({
     setSelectedNodeId("read_logs");
     setReport(null);
     setAgentDispatch(null);
+    setCheckingPr(false);
     setError(null);
+    prPollStartedAt.current = null;
     return clearTimers;
   }, [clearTimers, incident?.id, run.session.id]);
 
@@ -380,6 +408,53 @@ export function FixDispatchDag({
     run,
   });
 
+  const checkForPr = React.useCallback(async () => {
+    if (!incident || !agentDispatch || checkingPr || agentDispatchHasOpenedPr(agentDispatch)) return;
+
+    setCheckingPr(true);
+    try {
+      const updated = await (checkDispatchStatus ?? defaultCheckDispatchStatus)({
+        dispatchResult: agentDispatch,
+        incidentId: incident.id,
+        sessionId: run.session.id,
+      });
+      setError(null);
+      setAgentDispatch(updated);
+      if (agentDispatchHasOpenedPr(updated)) {
+        const normalizedReport = agentDispatchToHealReport(updated, incident.id);
+        setReport(normalizedReport);
+        setPhase("pr_opened");
+        setActiveNodeId("merge_github");
+        setSelectedNodeId("merge_github");
+      } else {
+        setReport(null);
+        setPhase("waiting_for_pr");
+        setActiveNodeId("open_pr");
+        setSelectedNodeId("open_pr");
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to check Devin PR status.");
+      setPhase("waiting_for_pr");
+      setActiveNodeId("open_pr");
+      setSelectedNodeId("open_pr");
+    } finally {
+      setCheckingPr(false);
+    }
+  }, [agentDispatch, checkDispatchStatus, checkingPr, incident, run.session.id]);
+
+  React.useEffect(() => {
+    if (!incident || phase !== "waiting_for_pr" || !agentDispatch || agentDispatchHasOpenedPr(agentDispatch)) return;
+    if (agentDispatch.trackingStatus === "tracking_unavailable") return;
+
+    if (prPollStartedAt.current === null) prPollStartedAt.current = Date.now();
+    if (Date.now() - prPollStartedAt.current >= PR_POLL_TIMEOUT_MS) return;
+
+    const timer = setTimeout(() => {
+      void checkForPr();
+    }, PR_POLL_INTERVAL_MS);
+    return () => clearTimeout(timer);
+  }, [agentDispatch, checkForPr, incident, phase]);
+
   const dispatch = React.useCallback(async () => {
     if (!incident || phase === "running") return;
 
@@ -390,7 +465,9 @@ export function FixDispatchDag({
     setSelectedNodeId("read_logs");
     setReport(null);
     setAgentDispatch(null);
+    setCheckingPr(false);
     setError(null);
+    prPollStartedAt.current = null;
 
     FIX_DAG_NODE_IDS.slice(1, 5).forEach((id, index) => {
       timers.current.push(
@@ -415,10 +492,22 @@ export function FixDispatchDag({
           setSelectedNodeId("open_pr");
           return;
         }
+        if (isAgentPrDispatchResult(result)) {
+          setAgentDispatch(result);
+          if (!agentDispatchHasOpenedPr(result) && result.status !== "error") {
+            setReport(null);
+            setPhase("waiting_for_pr");
+            setActiveNodeId("open_pr");
+            setSelectedNodeId("open_pr");
+            prPollStartedAt.current = Date.now();
+            return;
+          }
+        } else {
+          setAgentDispatch(null);
+        }
         const normalizedReport = isAgentPrDispatchResult(result)
           ? agentDispatchToHealReport(result, incident.id)
           : result;
-        setAgentDispatch(isAgentPrDispatchResult(result) ? result : null);
         setReport(normalizedReport);
         if (normalizedReport.status === "pr_opened") {
           setPhase("pr_opened");
@@ -451,18 +540,24 @@ export function FixDispatchDag({
       ? phase === "running"
         ? "Running demo..."
         : "Replay DAG"
-      : phase === "running"
-      ? "Dispatching..."
-      : report || phase === "demo" || phase === "error"
-        ? "Re-run dispatch"
-        : dispatchLabel;
+      : phase === "waiting_for_pr"
+        ? checkingPr
+          ? "Checking..."
+          : "Check for PR"
+        : phase === "running"
+          ? "Dispatching..."
+          : report || phase === "demo" || phase === "error"
+            ? "Re-run dispatch"
+            : dispatchLabel;
+  const buttonAction = autoDemo ? replayDemo : phase === "waiting_for_pr" ? checkForPr : dispatch;
+  const buttonBusy = phase === "running" || checkingPr;
 
   return (
     <div className="space-y-3" aria-label="Fix dispatch DAG">
       <div
         className={cn(
-          "rounded-xl border bg-panel/70 p-3",
-          isProminent ? "border-border bg-panel/80 p-4" : "border-border",
+          "landing-framed-surface surface-hover p-3",
+          isProminent && "border-accent/25 bg-accent/[0.04] p-4",
         )}
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -473,8 +568,8 @@ export function FixDispatchDag({
             </span>
             <div className="flex flex-wrap items-center gap-2">
               {isProminent ? (
-                <span className="inline-flex size-8 items-center justify-center rounded-lg border border-accent/25 bg-accent-muted text-accent">
-                  <Sparkles className="size-4" />
+                <span className={DAG_ICON_FRAME} aria-hidden="true">
+                  <Sparkles className="size-4" strokeWidth={1.8} />
                 </span>
               ) : null}
               <p className="text-sm font-semibold text-foreground">{projection.headline}</p>
@@ -492,25 +587,33 @@ export function FixDispatchDag({
             <Button
               type="button"
               variant="outline"
+              className="min-h-10"
               size="sm"
               onClick={() => setFullscreen(true)}
               disabled={!incident}
               aria-label="Expand DAG to fullscreen"
             >
-              <Maximize2 className="size-3.5" />
+              <Maximize2 className="size-3.5" strokeWidth={1.8} />
               Expand
             </Button>
             <Button
               type="button"
               size="sm"
-              onClick={autoDemo ? replayDemo : dispatch}
-              disabled={!incident || phase === "running"}
-              aria-label={incident ? "Dispatch fix for selected run" : "Dispatch fix unavailable"}
+              className="min-h-10"
+              onClick={buttonAction}
+              disabled={!incident || buttonBusy}
+              aria-label={
+                incident
+                  ? phase === "waiting_for_pr"
+                    ? "Check for Devin PR"
+                    : "Dispatch fix for selected run"
+                  : "Dispatch fix unavailable"
+              }
             >
-              {phase === "running" ? (
-                <Loader2 className="size-3.5 animate-spin" />
+              {buttonBusy ? (
+                <Loader2 className="size-3.5 animate-spin" strokeWidth={1.8} />
               ) : (
-                <Sparkles className="size-3.5" />
+                <Sparkles className="size-3.5" strokeWidth={1.8} />
               )}
               {buttonLabel}
             </Button>
@@ -1115,36 +1218,67 @@ async function defaultDispatchHeal(incidentId: string): Promise<HealReport | nul
   return healIncident(incidentId);
 }
 
+async function defaultCheckDispatchStatus(input: {
+  dispatchResult: AgentPrDispatchResult;
+  incidentId: string;
+  sessionId: string;
+}): Promise<AgentPrDispatchResult> {
+  return checkLogsAgentPrStatus(input);
+}
+
 function isAgentPrDispatchResult(
   result: HealReport | AgentPrDispatchResult,
 ): result is AgentPrDispatchResult {
   return "pullRequests" in result;
 }
 
+function agentDispatchHasOpenedPr(result: AgentPrDispatchResult): boolean {
+  return result.pullRequests.some((pullRequest) => Boolean(agentPullRequestPrUrl(pullRequest)));
+}
+
+function agentPullRequestPrUrl(pullRequest: AgentPullRequestResult): string | null {
+  if (pullRequest.openedPrUrl) return pullRequest.openedPrUrl;
+  if (pullRequest.kind === "pull_request") return pullRequest.url;
+  return null;
+}
+
 function agentDispatchToHealReport(
   result: AgentPrDispatchResult,
   incidentId: string,
 ): HealReport {
-  const primary = result.pullRequests.find((pullRequest) => pullRequest.url);
-  const opened = result.pullRequests.filter((pullRequest) => pullRequest.url);
+  const primary = result.pullRequests.find((pullRequest) => agentPullRequestPrUrl(pullRequest));
+  const opened = result.pullRequests.filter((pullRequest) => agentPullRequestPrUrl(pullRequest));
+  const devinHandoffMode = result.pullRequests.some((pullRequest) =>
+    pullRequest.kind === "devin_session" || pullRequest.kind === "devin_issue",
+  );
   return {
     attempts: result.pullRequests.length,
     incident_id: incidentId,
     warm_start: null,
-    orchestrator: "maintainerOS",
+    orchestrator: result.orchestrator === "orkes" ? "orkes" : "local Orkes workflow",
     pr: primary
       ? {
-          branch: primary.branch ?? undefined,
+          branch: primary.openedPrBranch ?? primary.branch ?? undefined,
           changed_files: result.pullRequests
-            .filter((pullRequest) => pullRequest.url)
-            .map((pullRequest) => `${pullRequest.agentType} agent`),
+            .filter((pullRequest) => agentPullRequestPrUrl(pullRequest))
+            .map((pullRequest) =>
+              pullRequest.kind === "devin_session" || pullRequest.kind === "devin_issue"
+                ? `${pullRequest.agentType} Devin-opened PR`
+                : `${pullRequest.agentType} agent`,
+            ),
           fallback: false,
-          pr_url: primary.url,
-          title: primary.title,
+          pr_url: agentPullRequestPrUrl(primary),
+          title: primary.openedPrTitle ?? primary.title,
         }
       : null,
-    reason: opened.length ? null : "No demo agent pull requests opened.",
-    source: `logs_agent_dispatch:${result.targetRepo}`,
+    reason: opened.length
+      ? null
+      : result.trackingStatus === "tracking_unavailable"
+        ? "Devin dispatched; GitHub PR tracking unavailable."
+        : "Waiting for Devin to open a GitHub PR.",
+    source: devinHandoffMode
+      ? `logs_orkes_devin_pr_tracking:${result.targetRepo}`
+      : `logs_agent_dispatch:${result.targetRepo}`,
     status: opened.length ? "pr_opened" : "escalated",
     trail: [
       {
@@ -1154,10 +1288,14 @@ function agentDispatchToHealReport(
           confidence: opened.length / Math.max(1, result.pullRequests.length),
           reason:
             opened.length === result.pullRequests.length
-              ? "Browser, chat, and voice agent PRs opened."
-              : `${opened.length} of ${result.pullRequests.length} agent PRs opened.`,
+              ? devinHandoffMode
+                ? "Browser, chat, and voice Devin PRs detected."
+                : "Browser, chat, and voice agent PRs opened."
+              : `${opened.length} of ${result.pullRequests.length} agent dispatches completed.`,
         },
-        diagnosis: `Dispatch selected logs into ${result.targetRepo} agent PRs.`,
+        diagnosis: devinHandoffMode
+          ? `Orkes workflow dispatched Devin and tracked GitHub PRs in ${result.targetRepo} from the selected logs.`
+          : `Dispatch selected logs into ${result.targetRepo} agent PRs.`,
         eval: null,
         kind: "agent_pr_dispatch",
         passed: opened.length > 0,
@@ -1168,7 +1306,7 @@ function agentDispatchToHealReport(
         runner: "codex",
       },
     ],
-    workflow_run_id: null,
+    workflow_run_id: result.workflowRunId ?? null,
   };
 }
 
@@ -1212,7 +1350,7 @@ function ProofPanel({
                 )}
               >
                 {item.value}
-                <ExternalLink className="ml-1 inline size-3" aria-hidden="true" />
+                <ExternalLink className="ml-1 inline size-3" aria-hidden="true" strokeWidth={1.8} />
               </a>
             ) : (
               <span className={cn("min-w-0 break-words text-xs font-medium", evidenceToneClass(item.tone))}>
@@ -1243,19 +1381,117 @@ function ProofPanel({
 }
 
 function AgentPullRequestList({ result }: { result: AgentPrDispatchResult }) {
+  const devinSessionMode = result.pullRequests.some((pullRequest) => pullRequest.kind === "devin_session");
+  const devinIssueMode = !devinSessionMode && result.pullRequests.some((pullRequest) => pullRequest.kind === "devin_issue");
   return (
     <div className="border-t border-border/70 bg-panel p-3">
+      {result.workflowStages?.length ? <WorkflowReceipt result={result} /> : null}
       <div className="flex items-center justify-between gap-2">
         <p className="text-[10px] font-semibold uppercase text-muted-foreground">
-          Agent PRs
+          {devinSessionMode ? "Devin sessions" : devinIssueMode ? "Devin PR requests" : "Agent PRs"}
         </p>
         <span className="mono text-[10px] text-muted-foreground">{result.targetRepo}</span>
       </div>
+      {result.trackingStatus ? (
+        <p
+          className={cn(
+            "mt-2 rounded-xl border px-3 py-2 text-xs leading-5",
+            result.trackingStatus === "tracking_unavailable"
+              ? "border-warning/25 bg-warning/10 text-warning"
+              : result.trackingStatus === "tracking"
+                ? "border-success/25 bg-success/10 text-success"
+                : "border-accent/20 bg-accent-muted text-accent",
+          )}
+        >
+          {result.trackingStatus === "tracking_unavailable"
+            ? result.trackingError ?? "Devin dispatched; GitHub PR tracking unavailable."
+            : result.trackingStatus === "tracking"
+              ? "GitHub PR detected from Devin."
+              : "Checking GitHub for a Devin-created PR."}
+        </p>
+      ) : null}
       <ul className="mt-2 space-y-2">
         {result.pullRequests.map((pullRequest) => (
           <AgentPullRequestItem key={pullRequest.agentType} pullRequest={pullRequest} />
         ))}
       </ul>
+    </div>
+  );
+}
+
+function WorkflowReceipt({ result }: { result: AgentPrDispatchResult }) {
+  const orchestratorLabel = result.orchestrator === "orkes" ? "Orkes workflow" : "Local Orkes workflow";
+  return (
+    <div className="mb-3 rounded-xl border border-accent/20 bg-accent-muted/50 p-3 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.62)]">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase text-accent">{orchestratorLabel}</p>
+          <p className="mono mt-1 truncate text-[10px] text-muted-foreground">
+            {result.workflowRunId ?? "workflow pending"}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full border border-accent/25 bg-panel/80 px-2.5 py-1 text-[10px] font-semibold uppercase text-accent">
+          eval gated
+        </span>
+      </div>
+
+      {result.evalGate ? (
+        <div className="mt-2 rounded-xl border border-border/60 bg-panel/70 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase text-muted-foreground">Eval gate</p>
+            <span
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase",
+                result.evalGate.status === "passed"
+                  ? "border-success/25 bg-success/10 text-success"
+                  : result.evalGate.status === "failed"
+                    ? "border-destructive/25 bg-destructive/10 text-destructive"
+                    : "border-warning/25 bg-warning/10 text-warning",
+              )}
+            >
+              {result.evalGate.status}
+            </span>
+          </div>
+          <p className="mt-1 text-xs leading-5 text-foreground">{result.evalGate.assertion}</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">{result.evalGate.note}</p>
+          <div className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-muted-foreground">
+            <span>Cases {result.evalGate.caseCount}</span>
+            <span>Before fail {result.evalGate.beforeFail}</span>
+            <span>After fail {result.evalGate.afterFail ?? "pending"}</span>
+          </div>
+        </div>
+      ) : null}
+
+      {result.sentryProof ? (
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          Sentry: {result.sentryProof.configured ? "configured" : "local only"}
+          {result.sentryProof.traceId ? ` - ${result.sentryProof.traceId}` : ""}. {result.sentryProof.detail}
+        </p>
+      ) : null}
+
+      <ol className="mt-2 space-y-1.5">
+        {(result.workflowStages ?? []).map((stage) => (
+          <li key={stage.id} className="flex items-start gap-2 text-xs">
+            <span
+              className={cn(
+                "mt-1.5 size-2 shrink-0 rounded-full",
+                stage.status === "passed"
+                  ? "bg-success"
+                  : stage.status === "running"
+                    ? "bg-accent"
+                    : stage.status === "failed" || stage.status === "blocked"
+                      ? "bg-destructive"
+                      : "bg-muted-foreground/35",
+              )}
+              aria-hidden="true"
+            />
+            <span className="min-w-0">
+              <span className="font-medium text-foreground">{stage.label}</span>
+              <span className="text-muted-foreground"> - {stage.detail}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -1266,40 +1502,72 @@ function AgentPullRequestItem({
   pullRequest: AgentPullRequestResult;
 }) {
   const label = `${pullRequest.agentType[0].toUpperCase()}${pullRequest.agentType.slice(1)} agent`;
+  const devinSession = pullRequest.kind === "devin_session";
+  const devinIssue = pullRequest.kind === "devin_issue";
+  const openedPrUrl = agentPullRequestPrUrl(pullRequest);
   return (
-    <li className="rounded-lg border border-border/70 bg-elevated/35 p-2.5">
+    <li className="rounded-xl border border-border/70 bg-elevated/45 p-3 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.62)]">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-xs font-semibold text-foreground">{label}</p>
+          {openedPrUrl ? (
+            <a
+              href={openedPrUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-flex max-w-full items-center gap-1 truncate text-xs font-medium text-success underline-offset-4 hover:underline"
+            >
+              <span className="truncate">
+                PR #{pullRequest.openedPrNumber ?? pullRequest.number ?? "detected"}:{" "}
+                {pullRequest.openedPrTitle ?? pullRequest.title}
+              </span>
+              <ExternalLink className="size-3 shrink-0" aria-hidden="true" strokeWidth={1.8} />
+            </a>
+          ) : null}
           {pullRequest.url ? (
             <a
               href={pullRequest.url}
               target="_blank"
               rel="noreferrer"
-              className="mt-1 inline-flex max-w-full items-center gap-1 truncate text-xs font-medium text-success underline-offset-4 hover:underline"
+              className={cn(
+                "mt-1 inline-flex max-w-full items-center gap-1 truncate text-xs font-medium underline-offset-4 hover:underline",
+                openedPrUrl ? "text-muted-foreground" : "text-accent",
+              )}
             >
-              <span className="truncate">PR #{pullRequest.number}: {pullRequest.title}</span>
-              <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
+              <span className="truncate">
+                {devinSession
+                  ? `Session${pullRequest.externalId ? ` ${pullRequest.externalId}` : ""}: ${pullRequest.title}`
+                  : `${devinIssue ? "Task" : "PR"} #${pullRequest.number}: ${pullRequest.title}`}
+              </span>
+              <ExternalLink className="size-3 shrink-0" aria-hidden="true" strokeWidth={1.8} />
             </a>
-          ) : (
+          ) : !openedPrUrl ? (
             <p className="mt-1 text-xs text-destructive">{pullRequest.error ?? "PR failed."}</p>
-          )}
+          ) : null}
         </div>
         <span
           className={cn(
-            "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase",
-            pullRequest.devinReviewRequested
+            "shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase",
+            openedPrUrl
               ? "border-success/25 bg-success/10 text-success"
-              : pullRequest.url
-                ? "border-warning/25 bg-warning/10 text-warning"
-                : "border-destructive/25 bg-destructive/10 text-destructive",
+              : pullRequest.devinReviewRequested
+                ? "border-success/25 bg-success/10 text-success"
+                : pullRequest.devinPrRequested
+                  ? "border-accent/25 bg-accent-muted text-accent"
+                  : pullRequest.url
+                    ? "border-warning/25 bg-warning/10 text-warning"
+                    : "border-destructive/25 bg-destructive/10 text-destructive",
           )}
         >
-          {pullRequest.devinReviewRequested
-            ? "Devin requested"
-            : pullRequest.url
-              ? "Review pending"
-              : "Failed"}
+          {openedPrUrl
+            ? "PR opened"
+            : pullRequest.devinReviewRequested
+              ? "Devin requested"
+              : pullRequest.devinPrRequested
+                ? "Devin creating PR"
+                : pullRequest.url
+                  ? "Review pending"
+                  : "Failed"}
         </span>
       </div>
     </li>
@@ -1396,7 +1664,7 @@ function FixDagNodeCard({
       onClick={onSelect}
       aria-pressed={selected}
       className={cn(
-        "absolute min-h-[88px] w-[132px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border bg-panel p-2.5 text-left shadow-sm outline-none transition-all hover:border-accent/30 focus-visible:ring-2 focus-visible:ring-ring",
+        "absolute min-h-[88px] w-[132px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border bg-panel/85 p-2.5 text-left shadow-[0_16px_42px_hsl(var(--shadow-color)/0.12)] outline-none backdrop-blur transition-all hover:border-accent/30 hover:shadow-[0_18px_48px_hsl(var(--glow-accent)/0.16)] focus-visible:ring-2 focus-visible:ring-ring",
         nodeTone(node.status).border,
         selected && "ring-2 ring-accent/25",
         current && node.status === "active" && "shadow-glow",
@@ -1415,11 +1683,12 @@ function FixDagNodeCard({
       <span className="flex min-w-0 items-center gap-2 pr-4">
         <span
           className={cn(
-            "inline-flex size-7 shrink-0 items-center justify-center rounded-lg border",
+            "inline-flex size-8 shrink-0 items-center justify-center rounded-xl border",
             nodeTone(node.status).icon,
           )}
+          aria-hidden="true"
         >
-          <Icon className="size-3.5" aria-hidden="true" />
+          <Icon className="size-3.5" />
         </span>
         <span className="min-w-0">
           <span className="block truncate text-xs font-semibold text-foreground">{node.label}</span>
@@ -1456,8 +1725,11 @@ function NodeInspector({
     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <span className={cn("inline-flex size-8 items-center justify-center rounded-lg border", nodeTone(node.status).icon)}>
-            <Icon className="size-4" aria-hidden="true" />
+          <span
+            className={cn("inline-flex size-9 items-center justify-center rounded-xl border", nodeTone(node.status).icon)}
+            aria-hidden="true"
+          >
+            <Icon className="size-4" />
           </span>
           <div className="min-w-0">
             <h3 className="truncate text-sm font-semibold text-foreground">{node.label}</h3>
@@ -1479,13 +1751,13 @@ function NodeInspector({
         prUrl ? (
           <Button asChild variant="outline" size="sm" className="shrink-0">
             <a href={prUrl} target="_blank" rel="noreferrer" aria-label="Open PR in GitHub">
-              <ExternalLink className="size-3.5" />
+              <ExternalLink className="size-3.5" strokeWidth={1.8} />
               Open PR in GitHub
             </a>
           </Button>
         ) : (
-          <span className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full border border-border bg-elevated px-3 text-xs text-muted-foreground">
-            <CircleDot className="size-3" />
+          <span className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border border-border bg-elevated px-3 text-xs text-muted-foreground">
+            <CircleDot className="size-3" strokeWidth={1.8} />
             No GitHub PR link yet
           </span>
         )
@@ -1506,10 +1778,10 @@ function ModeTag({ mode }: { mode: ReturnType<typeof projectFixDispatchDag>["mod
   }[mode];
   return (
     <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase", tone)}>
-      {mode === "running" ? <Loader2 className="size-3 animate-spin" /> : null}
-      {mode === "error" ? <AlertCircle className="size-3" /> : null}
-      {mode === "live" ? <CheckCircle2 className="size-3" /> : null}
-      {mode === "demo" ? <Network className="size-3" /> : null}
+      {mode === "running" ? <Loader2 className="size-3 animate-spin" strokeWidth={1.8} /> : null}
+      {mode === "error" ? <AlertCircle className="size-3" strokeWidth={1.8} /> : null}
+      {mode === "live" ? <CheckCircle2 className="size-3" strokeWidth={1.8} /> : null}
+      {mode === "demo" ? <Network className="size-3" strokeWidth={1.8} /> : null}
       {mode.replace("_", " ")}
     </span>
   );

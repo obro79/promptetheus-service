@@ -73,6 +73,7 @@ import type {
   AnalysisResult,
   Incident,
   Project,
+  ReplayArtifact,
   TraceEvent,
   TraceSession,
 } from "@/lib/types";
@@ -97,7 +98,17 @@ import {
   type TraceNode,
 } from "./model";
 
-type InspectorTab = "run" | "feedback" | "fix" | "metadata";
+type InspectorTab = "run" | "replay" | "feedback" | "fix" | "metadata";
+type ReplayMediaKind = "audio" | "video";
+
+interface ReplayMedia {
+  src: string;
+  kind: ReplayMediaKind;
+  title: string;
+  source: "artifact" | "demo";
+  durationS: number | null;
+  eventTimeMap: Record<string, number>;
+}
 
 interface LogsDashboardProps {
   sessions: TraceSession[];
@@ -105,6 +116,7 @@ interface LogsDashboardProps {
   incidents: Incident[];
   eventsBySession: Record<string, TraceEvent[]>;
   analysesBySession: Record<string, AnalysisResult | undefined>;
+  artifactsBySession?: Record<string, ReplayArtifact[]>;
 }
 
 type LogSection =
@@ -128,12 +140,34 @@ const NAV_ITEMS: Array<{
   { value: "settings", label: "Settings", Icon: Settings2 },
 ];
 
-/** Flat shadcn / Codex-style surface language shared across every panel:
- *  crisp 1px border, small radius, solid panel fill — no glass blur or large
- *  radii. */
-const SURFACE = "rounded-lg border border-border/70 bg-panel";
-const PANEL_HEADER =
-  "flex min-h-11 items-center justify-between gap-2 border-b border-border/60 px-3.5 py-2";
+const SURFACE = "landing-framed-surface";
+const PANEL_HEADER = "instrument-header";
+const ICON_FRAME =
+  "inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-accent/25 bg-accent-muted text-accent shadow-[0_12px_34px_hsl(var(--glow-accent)/0.18)]";
+const ICON_FRAME_MUTED =
+  "inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-elevated/70 text-muted-foreground";
+const SEGMENTED_BUTTON =
+  "inline-flex min-h-10 items-center justify-center rounded-full border px-3 text-xs font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
+const META_BADGE =
+  "mono inline-flex items-center rounded-full border border-border/70 bg-elevated/70 px-2.5 py-1 text-[10px] text-muted-foreground";
+const LOGS_JSON_VIEWER =
+  "[&_button]:min-h-10 [&_button]:min-w-10 [&_button]:rounded-full [&_button]:px-1.5 [&_svg]:size-3.5";
+
+function LogsIconFrame({
+  Icon,
+  active,
+  className,
+}: {
+  Icon: LucideIcon;
+  active?: boolean;
+  className?: string;
+}) {
+  return (
+    <span className={cn(active ? ICON_FRAME : ICON_FRAME_MUTED, className)} aria-hidden="true">
+      <Icon className="size-4" strokeWidth={1.8} />
+    </span>
+  );
+}
 
 const STATUS_FILTERS: Array<{ value: LogFilters["status"]; label: string }> = [
   { value: "all", label: "All" },
@@ -228,12 +262,70 @@ function firstFailedEvent(run: LogRun): TraceEvent | undefined {
   );
 }
 
+function replayMediaForRun(run: LogRun): ReplayMedia {
+  const playableArtifact = run.artifacts.find(
+    (artifact) =>
+      (artifact.kind === "video" || artifact.kind === "audio") &&
+      !artifact.storage_path.startsWith("/mock-artifacts/"),
+  );
+  if (playableArtifact) {
+    return {
+      durationS: playableArtifact.duration_s || null,
+      eventTimeMap: playableArtifact.event_time_map,
+      kind: playableArtifact.kind === "audio" ? "audio" : "video",
+      source: "artifact",
+      src: playableArtifact.storage_path,
+      title: playableArtifact.artifact_id.replaceAll("_", " "),
+    };
+  }
+
+  const tags = new Set(run.session.tags.map((tag) => tag.toLowerCase()));
+  const agent = (run.session.agent ?? "").toLowerCase();
+  const failed = ["failed", "error"].includes(run.session.status);
+  const isVoice = tags.has("voice") || agent.includes("voice");
+  const isSupport = tags.has("support") || agent.includes("support") || agent.includes("chat");
+
+  if (isVoice) {
+    return {
+      durationS: null,
+      eventTimeMap: {},
+      kind: "video",
+      source: "demo",
+      src: failed ? "/assets/demo-agents/voice-fail.webm" : "/assets/demo-agents/voice-pass.webm",
+      title: failed ? "Voice failure replay" : "Voice passing replay",
+    };
+  }
+
+  if (isSupport) {
+    return {
+      durationS: null,
+      eventTimeMap: {},
+      kind: "video",
+      source: "demo",
+      src: failed
+        ? "/assets/demo-agents/chat-agent-failed.webm"
+        : "/assets/demo-agents/chat-agent-successful.webm",
+      title: failed ? "Support failure replay" : "Support passing replay",
+    };
+  }
+
+  return {
+    durationS: null,
+    eventTimeMap: {},
+    kind: "video",
+    source: "demo",
+    src: failed ? "/assets/demo-agents/browser-fail-trimmed.mp4" : "/assets/demo-agents/browser-pass.webm",
+    title: failed ? "Browser failure replay" : "Browser passing replay",
+  };
+}
+
 export function LogsDashboard({
   sessions,
   projects,
   incidents,
   eventsBySession,
   analysesBySession,
+  artifactsBySession,
 }: LogsDashboardProps) {
   const runs = React.useMemo(
     () =>
@@ -243,8 +335,9 @@ export function LogsDashboard({
         incidents,
         eventsBySession,
         analysesBySession,
+        artifactsBySession,
       }),
-    [analysesBySession, eventsBySession, incidents, projects, sessions],
+    [analysesBySession, artifactsBySession, eventsBySession, incidents, projects, sessions],
   );
   const allTags = React.useMemo(
     () => uniqueSorted(runs.flatMap((run) => run.session.tags)),
@@ -439,7 +532,7 @@ export function LogsDashboard({
                   />
                   <FixDispatchDag
                     dispatchHeal={dispatchAgentPrs}
-                    dispatchLabel="Dispatch agent PRs"
+                    dispatchLabel="Ask Devin to open PRs"
                     prominent
                     run={selectedRun}
                   />
@@ -532,7 +625,10 @@ function LogsNav({
   return (
     <nav
       aria-label="Logs sections"
-      className="flex shrink-0 gap-1 overflow-x-auto pb-1 lg:sticky lg:top-24 lg:w-[196px] lg:flex-col lg:gap-0.5 lg:overflow-visible lg:border-r lg:border-border/60 lg:pb-0 lg:pr-3"
+      className={cn(
+        "landing-framed-surface -mx-1 flex shrink-0 gap-2 overflow-x-auto p-2 sm:mx-0",
+        "lg:sticky lg:top-24 lg:w-[212px] lg:flex-col lg:overflow-visible",
+      )}
     >
       {NAV_ITEMS.map((item) => {
         const isActive = item.value === active;
@@ -544,19 +640,13 @@ function LogsNav({
             onClick={() => onChange(item.value)}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "group flex min-h-9 shrink-0 items-center gap-2.5 rounded-md px-2.5 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+              "group flex min-h-11 shrink-0 items-center gap-2.5 rounded-2xl border px-2.5 pr-3 text-left text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
               isActive
-                ? "bg-muted text-foreground"
-                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                ? "border-accent/25 bg-accent-muted/90 text-accent shadow-[0_12px_34px_hsl(var(--glow-accent)/0.18)]"
+                : "border-transparent text-muted-foreground hover:border-accent/20 hover:bg-panel/70 hover:text-foreground",
             )}
           >
-            <Icon
-              className={cn(
-                "size-4 shrink-0 transition-colors",
-                isActive ? "text-foreground" : "text-muted-foreground/70 group-hover:text-foreground",
-              )}
-              strokeWidth={1.8}
-            />
+            <LogsIconFrame Icon={Icon} active={isActive} className="size-8 rounded-xl shadow-none" />
             <span className="truncate">{item.label}</span>
           </button>
         );
@@ -579,12 +669,10 @@ function TestPullRequestPanel({
   };
 }) {
   return (
-    <section className={cn("flex flex-wrap items-center justify-between gap-3 p-3", SURFACE)}>
+    <section className={cn("surface-hover flex flex-wrap items-center justify-between gap-3 p-4", SURFACE)}>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex size-8 items-center justify-center rounded-lg border border-accent/25 bg-accent-muted text-accent">
-            <GitPullRequest className="size-3.5" aria-hidden="true" />
-          </span>
+          <LogsIconFrame Icon={GitPullRequest} active />
           <div className="min-w-0">
             <h2 className="text-sm font-semibold text-foreground">GitHub smoke test</h2>
             <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
@@ -602,7 +690,7 @@ function TestPullRequestPanel({
             <span className="truncate">
               Closed PR #{state.result.number}: {state.result.title}
             </span>
-            <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
+            <ExternalLink className="size-3 shrink-0" aria-hidden="true" strokeWidth={1.8} />
           </a>
         ) : state.status === "error" ? (
           <p className="mt-2 text-xs text-destructive">{state.error}</p>
@@ -612,15 +700,15 @@ function TestPullRequestPanel({
       <Button
         type="button"
         variant="outline"
-        size="sm"
+        size="md"
         disabled={disabled || state.status === "running"}
         onClick={onRun}
         aria-label="Create and close test PR"
       >
         {state.status === "running" ? (
-          <Loader2 className="size-3.5 animate-spin" />
+          <Loader2 className="size-3.5 animate-spin" strokeWidth={1.8} />
         ) : (
-          <GitPullRequest className="size-3.5" aria-hidden="true" />
+          <GitPullRequest className="size-3.5" aria-hidden="true" strokeWidth={1.8} />
         )}
         {state.status === "running" ? "Testing..." : "Test PR"}
       </Button>
@@ -671,7 +759,7 @@ function AgentsPanel({
 
       <div
         className={cn(
-          "hidden border-t border-border/60 bg-muted/30 px-4 py-2 text-[11px] font-medium text-muted-foreground",
+          "hidden border-t border-border/55 bg-elevated/35 px-4 py-2 text-[11px] font-medium text-muted-foreground",
           AGENT_GRID,
         )}
       >
@@ -727,9 +815,7 @@ function AgentListItem({
       >
         {/* Name */}
         <span className="flex min-w-0 items-center gap-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted text-muted-foreground">
-            <Bot className="size-4" strokeWidth={1.8} />
-          </span>
+          <LogsIconFrame Icon={Bot} active={expanded} />
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium text-foreground">
               {agent.name}
@@ -771,7 +857,7 @@ function AgentListItem({
           {fmtMoney(agent.totalCost)}
         </span>
         <span className="hidden justify-end md:flex">
-          <span className="mono rounded-md bg-elevated px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          <span className={cn(META_BADGE, "px-2 py-0.5")}>
             v{agent.version}
           </span>
         </span>
@@ -810,7 +896,7 @@ function AgentDrawer({
         aria-hidden
         className="pointer-events-none absolute left-[36px] top-0 hidden h-[26px] w-[28px] rounded-bl-[11px] border-b border-l border-border-strong/45 md:block"
       />
-      <div className="relative rounded-md border border-border/60 bg-muted/30 p-4">
+      <div className="relative rounded-[var(--landing-card-radius-sm)] border border-border/60 bg-panel/55 p-4 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.72)]">
         <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
           {/* Left: overview + recent runs */}
           <div className="flex flex-col gap-4">
@@ -832,13 +918,13 @@ function AgentDrawer({
 
             <div>
               <SectionLabel>Recent runs</SectionLabel>
-              <ul className="mt-2 overflow-hidden rounded-md border border-border/60 bg-panel">
+              <ul className="mt-2 overflow-hidden rounded-xl border border-border/60 bg-panel/70">
                 {recent.map((run) => (
                   <li key={run.session.id}>
                     <button
                       type="button"
                       onClick={() => onOpenRun(run)}
-                      className="flex w-full items-center gap-3 border-b border-border/50 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
+                      className="flex min-h-11 w-full items-center gap-3 border-b border-border/50 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-elevated/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
                     >
                       <StatusPill status={run.session.status} />
                       <span className="block min-w-0 flex-1 truncate text-[13px] text-foreground">
@@ -861,7 +947,7 @@ function AgentDrawer({
           <div className="flex flex-col gap-4">
             <div>
               <SectionLabel>Latest trace</SectionLabel>
-              <ol className="mt-2 space-y-0.5 rounded-md border border-border/60 bg-panel p-2">
+              <ol className="mt-2 space-y-0.5 rounded-xl border border-border/60 bg-panel/70 p-2">
                 {previewEvents.length === 0 ? (
                   <li className="px-2 py-3 text-[12px] text-muted-foreground">
                     No trace events recorded.
@@ -876,7 +962,7 @@ function AgentDrawer({
                     return (
                       <li
                         key={event.seq}
-                        className="flex items-center gap-2.5 rounded-md px-2 py-1.5"
+                        className="flex min-h-9 items-center gap-2.5 rounded-xl px-2 py-1.5"
                       >
                         <Icon
                           className={cn(
@@ -905,7 +991,7 @@ function AgentDrawer({
             {failed?.errorPreview ? (
               <div>
                 <SectionLabel>Error preview</SectionLabel>
-                <div className="mt-2 flex items-start gap-2 rounded-md border border-warning/25 bg-warning/[0.06] p-3">
+                <div className="mt-2 flex items-start gap-2 rounded-xl border border-warning/25 bg-warning/[0.06] p-3">
                   <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" strokeWidth={1.8} />
                   <p className="mono min-w-0 text-[11px] leading-5 text-warning/90 line-clamp-3">
                     {failed.errorPreview}
@@ -918,30 +1004,33 @@ function AgentDrawer({
               <Button
                 type="button"
                 size="sm"
+                className="min-h-10"
                 onClick={() => latest && onOpenRun(latest)}
                 disabled={!latest}
               >
-                <Eye className="size-3.5" />
+                <Eye className="size-3.5" strokeWidth={1.8} />
                 View full trace
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
+                className="min-h-10"
                 onClick={() => latest && onOpenRun(latest)}
                 disabled={!latest}
               >
-                <PlayCircle className="size-3.5" />
+                <PlayCircle className="size-3.5" strokeWidth={1.8} />
                 Replay run
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
+                className="min-h-10"
                 onClick={() => onOpenRun(failed ?? latest)}
                 disabled={!latest}
               >
-                <Bug className="size-3.5" />
+                <Bug className="size-3.5" strokeWidth={1.8} />
                 Debug
               </Button>
             </div>
@@ -970,7 +1059,7 @@ function AgentStat({
   tone?: "warning";
 }) {
   return (
-    <div className="rounded-md border border-border/60 bg-panel px-3 py-2.5">
+    <div className="rounded-xl border border-border/60 bg-panel/70 px-3 py-2.5 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.62)]">
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd
         className={cn(
@@ -1019,7 +1108,7 @@ function EvaluationsPanel({
     <div className="flex flex-col gap-3">
       <ChartCard title="Run outcomes" subtitle={`${total} runs evaluated`}>
         <div
-          className="flex h-3 w-full overflow-hidden rounded-md border border-border/60"
+          className="flex h-3 w-full overflow-hidden rounded-full border border-border/60 bg-elevated/60"
           role="img"
           aria-label={`${passed} passed, ${failed} failed or error, ${running} running`}
         >
@@ -1120,8 +1209,8 @@ function BarRow({
         <span className="truncate text-xs font-medium text-foreground">{label}</span>
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{display}</span>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-sm bg-muted">
-        <div className={cn("h-full rounded-sm", fill)} style={{ width: `${width}%` }} />
+      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div className={cn("h-full rounded-full", fill)} style={{ width: `${width}%` }} />
       </div>
     </div>
   );
@@ -1146,18 +1235,18 @@ function LogsPanel({
 }) {
   return (
     <div className="flex flex-col gap-3">
-      <div className={cn("flex flex-col gap-2 overflow-hidden p-2 sm:flex-row sm:items-center", SURFACE)}>
+      <div className={cn("flex flex-col gap-2 overflow-hidden p-2.5 sm:flex-row sm:items-center", SURFACE)}>
         <label className="relative min-w-0 flex-1">
           <span className="sr-only">Search logs</span>
-          <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.8} />
           <input
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="Search runs, inputs, outputs, errors…"
-            className="h-10 w-full rounded-md bg-transparent pl-10 pr-3 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:bg-elevated/40"
+            className="h-11 w-full rounded-full border border-transparent bg-panel/35 pl-11 pr-4 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/60 transition-colors focus-visible:border-accent/25 focus-visible:bg-elevated/55"
           />
         </label>
-        <div className="flex flex-wrap items-center gap-1 px-1">
+        <div className="flex flex-wrap items-center gap-1.5 px-1">
           {STATUS_FILTERS.map((filter) => {
             const active = status === filter.value;
             return (
@@ -1167,10 +1256,10 @@ function LogsPanel({
                 aria-pressed={active}
                 onClick={() => onStatusChange(filter.value)}
                 className={cn(
-                  "inline-flex min-h-8 items-center rounded-full px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                  SEGMENTED_BUTTON,
                   active
-                    ? "bg-accent/10 text-accent"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "border-accent/25 bg-accent-muted text-accent shadow-sm"
+                    : "border-transparent text-muted-foreground hover:border-accent/20 hover:bg-panel/65 hover:text-foreground",
                 )}
               >
                 {filter.label}
@@ -1192,7 +1281,7 @@ function LogsPanel({
                 <button
                   type="button"
                   onClick={() => onOpenRun(run)}
-                  className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-elevated/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
+                  className="flex min-h-12 w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-elevated/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
                 >
                   <StatusPill status={run.session.status} />
                   <span className="min-w-0 flex-1">
@@ -1240,9 +1329,7 @@ function EmptyPanel({
 }) {
   return (
     <div className={cn("flex min-h-[440px] flex-col items-center justify-center px-6 text-center", SURFACE)}>
-      <span className="flex size-12 items-center justify-center rounded-md border border-border/60 bg-muted text-muted-foreground">
-        <Icon className="size-5" strokeWidth={1.8} />
-      </span>
+      <LogsIconFrame Icon={Icon} active className="size-12 rounded-2xl" />
       <h2 className="mt-4 text-base font-semibold text-foreground">{title}</h2>
       <p className="mt-1.5 max-w-sm text-sm leading-6 text-muted-foreground">{description}</p>
     </div>
@@ -1569,7 +1656,7 @@ function LogFiltersBar({
       <div className={cn("flex flex-col overflow-hidden lg:flex-row lg:items-stretch", SURFACE)}>
         <label className="relative min-w-0 flex-1 border-b border-border/60 transition-colors focus-within:bg-elevated/55 lg:border-b-0 lg:border-r">
           <span className="sr-only">Search logs</span>
-          <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.8} />
           <input
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
@@ -1584,7 +1671,7 @@ function LogFiltersBar({
               aria-label="Clear search"
               className="absolute right-1 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <X className="size-3.5" />
+              <X className="size-3.5" strokeWidth={1.8} />
             </button>
           ) : null}
         </label>
@@ -1599,10 +1686,10 @@ function LogFiltersBar({
                 aria-pressed={active}
                 onClick={() => onStatusChange(filter.value)}
                 className={cn(
-                  "inline-flex min-h-8 items-center rounded-full px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                  SEGMENTED_BUTTON,
                   active
-                    ? "bg-accent/10 text-accent shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "border-accent/25 bg-accent-muted text-accent shadow-sm"
+                    : "border-transparent text-muted-foreground hover:border-accent/20 hover:bg-panel/65 hover:text-foreground",
                 )}
               >
                 {filter.label}
@@ -1616,19 +1703,20 @@ function LogFiltersBar({
             type="button"
             variant={failedOnly ? "default" : "outline"}
             size="sm"
+            className="min-h-10"
             aria-pressed={failedOnly}
             onClick={() => onFailedOnlyChange(!failedOnly)}
           >
-            <ListFilter className="size-3.5" />
+            <ListFilter className="size-3.5" strokeWidth={1.8} />
             Failed only
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Timer className="size-3.5" />
+              <Button variant="outline" size="sm" className="min-h-10">
+                <Timer className="size-3.5" strokeWidth={1.8} />
                 {TIME_RANGES.find((range) => range.value === timeRange)?.label}
-                <ChevronDown className="size-3" />
+                <ChevronDown className="size-3" strokeWidth={1.8} />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -1660,9 +1748,9 @@ function LogFiltersBar({
                 onClick={onClear}
                 aria-label="Clear all filters"
                 title="Clear all filters"
-                className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex size-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <RotateCcw className="size-3.5" />
+                <RotateCcw className="size-3.5" strokeWidth={1.8} />
               </button>
             ) : null}
           </div>
@@ -1682,8 +1770,8 @@ function ColumnMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Columns3 className="size-3.5" />
+        <Button variant="outline" size="sm" className="min-h-10">
+          <Columns3 className="size-3.5" strokeWidth={1.8} />
           Columns
         </Button>
       </DropdownMenuTrigger>
@@ -1860,7 +1948,7 @@ function RunsTable({
                 ) : null}
                 {showColumn("environment") ? (
                   <TableCell className="hidden py-2 xl:table-cell">
-                    <span className="mono inline-flex items-center rounded-md bg-elevated px-2 py-1 text-[10px] text-muted-foreground">
+                    <span className={META_BADGE}>
                       {run.session.environment ?? "unknown"}
                     </span>
                   </TableCell>
@@ -1923,7 +2011,7 @@ function SortableHead({
       <button
         type="button"
         onClick={() => onSort(sortId)}
-        className="inline-flex items-center gap-1 text-left font-medium transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="inline-flex min-h-10 items-center gap-1 rounded-full px-2 text-left font-medium transition-colors hover:bg-elevated/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {label}
         <ChevronDown
@@ -1931,6 +2019,7 @@ function SortableHead({
             "size-3 transition-transform",
             active && sortDirection === "asc" && "rotate-180",
           )}
+          strokeWidth={1.8}
         />
       </button>
     </TableHead>
@@ -1970,7 +2059,7 @@ function LatencyBadge({ ms }: { ms: number }) {
   return (
     <span
       className={cn(
-        "mono inline-flex rounded-md border px-1.5 py-0.5 text-[10px]",
+        "mono inline-flex rounded-full border px-2 py-0.5 text-[10px]",
         slow
           ? "border-warning/30 bg-warning/10 text-warning"
           : "border-success/30 bg-success/10 text-success",
@@ -2016,17 +2105,17 @@ function TraceDebugger({
             </p>
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="sm" type="button">
-              <Filter className="size-3" />
+            <Button variant="outline" size="sm" type="button" className="min-h-10">
+              <Filter className="size-3.5" strokeWidth={1.8} />
               Waterfall
             </Button>
             <button
               type="button"
               onClick={() => onExpandedChange(allExpandable(traceTree))}
-              className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex size-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Expand trace tree"
             >
-              <PanelRight className="size-3.5" />
+              <PanelRight className="size-3.5" strokeWidth={1.8} />
             </button>
           </div>
         </div>
@@ -2044,7 +2133,7 @@ function TraceDebugger({
               <li key={node.id}>
                 <div
                   className={cn(
-                    "grid h-9 w-full grid-cols-[minmax(0,1fr)_auto] items-center border-l-2 pr-3 text-left text-xs transition-colors",
+                    "grid min-h-10 w-full grid-cols-[minmax(0,1fr)_auto] items-center border-l-2 pr-3 text-left text-xs transition-colors",
                     selected
                       ? "border-l-accent bg-accent/10 text-foreground"
                       : "border-l-transparent text-muted-foreground hover:bg-elevated/70",
@@ -2062,25 +2151,26 @@ function TraceDebugger({
                           else next.add(node.id);
                           onExpandedChange(next);
                         }}
-                        className="flex size-4 items-center justify-center rounded hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="flex size-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         aria-label={
                           expanded.has(node.id) ? "Collapse trace node" : "Expand trace node"
                         }
                       >
                         <ChevronRight
                           className={cn(
-                            "size-3 transition-transform",
+                            "size-3.5 transition-transform",
                             expanded.has(node.id) && "rotate-90",
                           )}
+                          strokeWidth={1.8}
                         />
                       </button>
                     ) : (
-                      <span className="size-4" />
+                      <span className="size-10" />
                     )}
                     <button
                       type="button"
                       onClick={() => onEventSelect(event)}
-                      className="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-full px-2 text-left transition-colors hover:bg-elevated/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <Icon
                         className={cn(
@@ -2091,6 +2181,7 @@ function TraceDebugger({
                               ? "text-accent"
                               : "text-muted-foreground",
                         )}
+                        strokeWidth={1.8}
                       />
                       <span className="truncate text-foreground">{eventTitle(event)}</span>
                       {event.type === "llm_call" ? (
@@ -2103,7 +2194,7 @@ function TraceDebugger({
                       ) : null}
                     </button>
                   </span>
-                  <span className="mono ml-2 shrink-0 rounded-md bg-elevated px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  <span className={cn(META_BADGE, "ml-2 shrink-0 px-2 py-0.5")}>
                     {fmtDuration(eventLatency(event))}
                   </span>
                 </div>
@@ -2142,6 +2233,7 @@ function RunInspector({
 }) {
   const eventPayload = event?.payload ?? {};
   const eventMetadata = event?.metadata ?? null;
+  const replayMedia = React.useMemo(() => replayMediaForRun(run), [run]);
 
   return (
     <section className={cn("flex min-h-[520px] flex-col overflow-hidden", SURFACE)} aria-label="Run inspector">
@@ -2161,13 +2253,14 @@ function RunInspector({
             type="button"
             variant={tab === "fix" ? "default" : "outline"}
             size="sm"
+            className="min-h-10"
             onClick={() => onTabChange("fix")}
             aria-label="Open Fix DAG"
           >
-            <Sparkles className="size-3.5" />
+            <Sparkles className="size-3.5" strokeWidth={1.8} />
             Fix DAG
           </Button>
-          <span className="mono hidden rounded-md border border-border bg-elevated px-2 py-1 text-[10px] text-muted-foreground sm:inline">
+          <span className={cn(META_BADGE, "hidden sm:inline-flex")}>
             {costEstimate(run.totalTokens)}
           </span>
         </div>
@@ -2178,18 +2271,23 @@ function RunInspector({
         onValueChange={(value) => onTabChange(value as InspectorTab)}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <TabsList className="mx-3 mt-1 flex">
-          <TabsTrigger value="run">Run</TabsTrigger>
-          <TabsTrigger value="feedback">Feedback</TabsTrigger>
-          <TabsTrigger value="fix">
-            <Sparkles className="size-3.5" />
+        <TabsList className="mx-3 mt-1 flex overflow-x-auto">
+          <TabsTrigger value="run" className="min-w-11 px-3">Run</TabsTrigger>
+          <TabsTrigger value="replay" className="min-w-11 px-3">
+            <PlayCircle className="size-3.5" strokeWidth={1.8} />
+            Replay
+          </TabsTrigger>
+          <TabsTrigger value="feedback" className="min-w-11 px-3">Feedback</TabsTrigger>
+          <TabsTrigger value="fix" className="min-w-11 px-3">
+            <Sparkles className="size-3.5" strokeWidth={1.8} />
             Fix DAG
           </TabsTrigger>
-          <TabsTrigger value="metadata">Metadata</TabsTrigger>
+          <TabsTrigger value="metadata" className="min-w-11 px-3">Metadata</TabsTrigger>
         </TabsList>
 
         <div className="min-h-0 flex-1 overflow-auto px-4 pb-4">
           <TabsContent value="run" className="mt-3 space-y-4">
+            <ReplaySummaryCard media={replayMedia} run={run} onOpenReplay={() => onTabChange("replay")} />
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
               <Readout label="Status" value={run.session.status} />
               <Readout label="Latency" value={fmtDuration(run.latencyMs)} />
@@ -2208,8 +2306,12 @@ function RunInspector({
               </InspectorSection>
             ) : null}
             <InspectorSection title="Selected event payload">
-              <JsonViewer data={eventPayload} collapseDepth={2} />
+              <JsonViewer data={eventPayload} collapseDepth={2} className={LOGS_JSON_VIEWER} />
             </InspectorSection>
+          </TabsContent>
+
+          <TabsContent value="replay" className="mt-3">
+            <ReplayEmbed media={replayMedia} run={run} event={event} onEvidenceSelect={onEvidenceSelect} />
           </TabsContent>
 
           <TabsContent value="feedback" className="mt-3 space-y-4">
@@ -2242,7 +2344,7 @@ function RunInspector({
                       key={seq}
                       type="button"
                       onClick={() => onEvidenceSelect(seq)}
-                      className="mono min-h-8 rounded-md border border-border bg-elevated px-2 text-[11px] text-accent transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="mono min-h-10 rounded-full border border-accent/20 bg-accent-muted/60 px-3 text-[11px] text-accent transition-colors hover:bg-accent-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       seq {seq}
                     </button>
@@ -2268,6 +2370,7 @@ function RunInspector({
                   analysis: run.analysis,
                 }}
                 collapseDepth={2}
+                className={LOGS_JSON_VIEWER}
               />
             </InspectorSection>
             <InspectorSection title="Event envelope" defaultOpen>
@@ -2285,6 +2388,7 @@ function RunInspector({
                     : {}
                 }
                 collapseDepth={2}
+                className={LOGS_JSON_VIEWER}
               />
             </InspectorSection>
           </TabsContent>
@@ -2294,9 +2398,139 @@ function RunInspector({
   );
 }
 
+function ReplaySummaryCard({
+  media,
+  onOpenReplay,
+  run,
+}: {
+  media: ReplayMedia;
+  onOpenReplay: () => void;
+  run: LogRun;
+}) {
+  const mappedEvents = Object.keys(media.eventTimeMap).length;
+  return (
+    <div className="rounded-xl border border-border/60 bg-elevated/55 p-3 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.62)]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <LogsIconFrame Icon={PlayCircle} active />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-foreground">Replay attached</p>
+              <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{media.title}</p>
+            </div>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            Embedded beside the trace so the selected log can be replayed without leaving
+            the logs workflow.
+          </p>
+        </div>
+        <Button type="button" variant="outline" size="sm" className="min-h-10" onClick={onOpenReplay}>
+          <PlayCircle className="size-3.5" strokeWidth={1.8} />
+          Open replay
+        </Button>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <Readout label="Source" value={media.source === "artifact" ? "artifact" : "demo media"} />
+        <Readout label="Mapped events" value={mappedEvents ? String(mappedEvents) : String(run.events.length)} />
+        <Readout
+          label="Duration"
+          value={media.durationS ? fmtDuration(media.durationS * 1000) : fmtDuration(run.session.duration_ms)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ReplayEmbed({
+  event,
+  media,
+  onEvidenceSelect,
+  run,
+}: {
+  event: TraceEvent | undefined;
+  media: ReplayMedia;
+  onEvidenceSelect: (seq: number) => void;
+  run: LogRun;
+}) {
+  const selectedOffset = event ? media.eventTimeMap[String(event.seq)] : undefined;
+  const mapped = Object.entries(media.eventTimeMap)
+    .map(([seq, seconds]) => ({ seconds, seq: Number(seq) }))
+    .filter((item) => Number.isFinite(item.seq) && Number.isFinite(item.seconds))
+    .sort((a, b) => a.seconds - b.seconds);
+
+  return (
+    <div className="space-y-3" role="region" aria-label="Run replay">
+      <div className="overflow-hidden rounded-[var(--landing-card-radius-sm)] border border-border/70 bg-canvas">
+        <div className="flex items-center justify-between gap-2 border-b border-border/70 bg-panel/75 px-3 py-2">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-foreground">{media.title}</p>
+            <p className="mono mt-0.5 truncate text-[10px] text-muted-foreground">{media.src}</p>
+          </div>
+          <LabelTag label={media.source === "artifact" ? "artifact" : "demo replay"} />
+        </div>
+
+        {media.kind === "audio" ? (
+          <div className="p-3">
+            <audio className="w-full" controls preload="metadata" src={media.src} />
+          </div>
+        ) : (
+          <div className="bg-black">
+            <video
+              className="aspect-video w-full bg-black object-contain"
+              controls
+              muted
+              playsInline
+              preload="metadata"
+              src={media.src}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <Readout label="Run" value={run.session.id} />
+        <Readout label="Status" value={run.session.status} />
+        <Readout label="Events" value={String(run.events.length)} />
+        <Readout
+          label="Selected"
+          value={
+            event
+              ? selectedOffset !== undefined
+                ? `seq ${event.seq} @ ${selectedOffset.toFixed(1)}s`
+                : `seq ${event.seq}`
+              : "none"
+          }
+        />
+      </div>
+
+      <InspectorSection title="Replay timeline" defaultOpen>
+        {mapped.length ? (
+          <div className="flex flex-wrap gap-1.5">
+            {mapped.map(({ seconds, seq }) => (
+              <button
+                key={`${seq}-${seconds}`}
+                type="button"
+                onClick={() => onEvidenceSelect(seq)}
+                className="mono min-h-10 rounded-full border border-accent/20 bg-accent-muted/60 px-3 text-[11px] text-accent transition-colors hover:bg-accent-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                seq {seq} · {seconds.toFixed(1)}s
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm leading-6 text-muted-foreground">
+            This embedded demo replay is linked to the selected run, but no artifact
+            event-time map is available for this session yet.
+          </p>
+        )}
+      </InspectorSection>
+    </div>
+  );
+}
+
 function Readout({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-border bg-elevated px-3 py-2">
+    <div className="rounded-xl border border-border/60 bg-elevated/75 px-3 py-2 shadow-[inset_0_1px_0_hsl(0_0%_100%/0.62)]">
       <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</dt>
       <dd className="mono mt-1 truncate text-xs text-foreground">{value}</dd>
     </div>
@@ -2313,10 +2547,10 @@ function InspectorSection({
   defaultOpen?: boolean;
 }) {
   return (
-    <details open={defaultOpen} className="group rounded-md border border-border bg-panel/50">
-      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between px-3 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    <details open={defaultOpen} className="group rounded-xl border border-border/70 bg-panel/50">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         {title}
-        <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
+        <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" strokeWidth={1.8} />
       </summary>
       <div className="border-t border-border/70 p-3">{children}</div>
     </details>
@@ -2333,7 +2567,7 @@ function CodeBlock({
   return (
     <pre
       className={cn(
-        "max-h-52 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-canvas p-3 text-xs leading-5",
+        "max-h-52 overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-canvas p-3 text-xs leading-5",
         tone === "error" ? "text-warning" : "text-foreground/90",
       )}
     >
@@ -2400,13 +2634,13 @@ function FilterRail({
       <div className={cn("overflow-hidden", SURFACE)}>
         <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5">
           <h2 className="flex items-center gap-2 text-xs font-semibold text-foreground">
-            <ListFilter className="size-3.5" />
+            <ListFilter className="size-3.5 text-accent" strokeWidth={1.8} />
             Filter shortcuts
           </h2>
           <button
             type="button"
             onClick={onClearFilters}
-            className="text-[11px] text-accent transition-colors hover:text-accent-bright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="min-h-10 rounded-full px-3 text-[11px] text-accent transition-colors hover:bg-accent-muted hover:text-accent-bright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Clear
           </button>
@@ -2432,7 +2666,7 @@ function FilterRail({
               />
             ))}
           </FilterGroup>
-          <FilterGroup title="Tags" icon={<Tags className="size-3" />} horizontal={horizontal}>
+          <FilterGroup title="Tags" icon={<Tags className="size-3" strokeWidth={1.8} />} horizontal={horizontal}>
             {tags.map((tag) => (
               <CheckFilter
                 key={tag}
@@ -2458,9 +2692,9 @@ function MetricTile({
   Icon: LucideIcon;
 }) {
   return (
-    <div className="bg-panel px-3 py-2.5">
+    <div className="bg-panel/80 px-3 py-2.5">
       <dt className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-        <Icon className="size-3" />
+        <Icon className="size-3 text-accent/80" strokeWidth={1.8} />
         {label}
       </dt>
       <dd className="mono mt-1 truncate text-sm text-foreground">{value}</dd>
@@ -2509,12 +2743,12 @@ function CheckFilter({
   onChange: () => void;
 }) {
   return (
-    <label className="flex min-h-7 cursor-pointer items-center gap-2 rounded-md px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground">
+    <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-xl px-2 text-[11px] text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground">
       <input
         type="checkbox"
         checked={checked}
         onChange={onChange}
-        className="size-3 rounded border-border accent-accent"
+        className="size-4 rounded border-border accent-accent"
       />
       <span className="truncate">{label}</span>
     </label>
