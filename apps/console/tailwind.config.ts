@@ -110,6 +110,15 @@ const config: Config = {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.4" },
         },
+        materialize: {
+          from: { opacity: "0", transform: "scale(0.92)", filter: "blur(8px)" },
+          to: { opacity: "1", transform: "scale(1)", filter: "blur(0)" },
+        },
+        "ticker-up": {
+          "0%": { opacity: "0", transform: "translateY(115%)" },
+          "20%": { opacity: "1" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.15s ease-out",
@@ -117,6 +126,8 @@ const config: Config = {
         "fade-in": "fade-in 0.15s ease-out",
         "slide-in": "slide-in 0.15s ease-out",
         pulse: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        materialize: "materialize 0.55s cubic-bezier(0.22, 1, 0.36, 1) both",
+        "ticker-up": "ticker-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both",
       },
     },
   },
