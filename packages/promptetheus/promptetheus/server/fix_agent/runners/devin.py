@@ -31,12 +31,14 @@ from promptetheus.server.fix_agent.runner import (
 from promptetheus.server.fix_agent.runners.deterministic import DeterministicRunner
 from promptetheus.server.models import FixAgentResult
 
-_DEFAULT_API_URL = "https://api.devin.ai/v1"
+_DEFAULT_API_URL = "https://api.devin.ai"
 _MAX_EVENTS = 24  # cap events injected into the prompt
 #: Terminal Devin session states — stop polling once any of these is reached.
 _TERMINAL_STATES: frozenset[str] = frozenset(
     {"exit", "error", "blocked", "finished", "suspended"}
 )
+#: status_detail values that mean the agent is done (v3 keeps status="running").
+_TERMINAL_DETAILS: frozenset[str] = frozenset({"finished", "blocked", "suspended"})
 
 #: JSON Schema (Draft 7) the Devin session must satisfy via provide_structured_output.
 _OUTPUT_SCHEMA: dict[str, Any] = {
@@ -133,8 +135,15 @@ class DevinRunner:
             list(allowed_paths) if allowed_paths else list(DEFAULT_ALLOWED_PATHS)
         )
         self.api_url = os.environ.get("PROMPTETHEUS_DEVIN_API_URL", _DEFAULT_API_URL).rstrip("/")
+        # When set, drive the v3 org-scoped API (enterprise) instead of v1.
+        self.org_id = (os.environ.get("PROMPTETHEUS_DEVIN_ORG_ID") or "").strip()
         self.poll_timeout = _env_int("PROMPTETHEUS_DEVIN_POLL_TIMEOUT", 600)
         self.poll_interval = _env_int("PROMPTETHEUS_DEVIN_POLL_INTERVAL", 10)
+
+    def _sessions_path(self) -> str:
+        if self.org_id:
+            return f"/v3/organizations/{self.org_id}/sessions"
+        return "/v1/sessions"
 
     def run(
         self,
@@ -231,8 +240,9 @@ class DevinRunner:
         if playbook:
             payload["playbook_id"] = playbook
 
+        sessions_path = self._sessions_path()
         with httpx.Client(base_url=self.api_url, headers=headers, timeout=30.0) as client:
-            created = client.post("/sessions", json=payload)
+            created = client.post(sessions_path, json=payload)
             created.raise_for_status()
             body = created.json()
             session_id = body.get("session_id")
@@ -242,16 +252,17 @@ class DevinRunner:
 
             deadline = time.monotonic() + self.poll_timeout
             while time.monotonic() < deadline:
-                detail = client.get(f"/sessions/{session_id}")
+                detail = client.get(f"{sessions_path}/{session_id}")
                 detail.raise_for_status()
                 data = detail.json()
                 output = data.get("structured_output")
                 status = str(data.get("status") or "")
+                detail_status = str(data.get("status_detail") or "")
                 if isinstance(output, dict) and output.get("diff"):
                     output["_session_id"] = session_id
                     output["_session_url"] = session_url
                     return output
-                if status in _TERMINAL_STATES:
+                if status in _TERMINAL_STATES or detail_status in _TERMINAL_DETAILS:
                     if isinstance(output, dict):
                         output["_session_id"] = session_id
                         output["_session_url"] = session_url
