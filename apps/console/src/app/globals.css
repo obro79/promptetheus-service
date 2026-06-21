@@ -3958,6 +3958,34 @@
     font-feature-settings: "ss01" 0;
   }
 
+  /* ── Logs page: a calmer, flatter treatment ──────────────────────────────
+     The default console look leans on translucent blurred surfaces, glow
+     shadows, monospace numerals and accent-tinted borders. On the dense logs
+     page that reads as noise, so within `.logs-refined` we flatten the
+     surfaces, render numbers in the sans face (keeping tabular alignment), and
+     drop the colored chip borders. Scoped here so the rest of the app — landing,
+     settings, sessions — keeps its original styling. */
+  .logs-refined .landing-framed-surface {
+    background: hsl(var(--panel));
+    box-shadow: none;
+    backdrop-filter: none;
+    border-color: hsl(var(--border) / 0.6);
+  }
+
+  /* Numbers and labels in plain Inter — real code (<code>) stays monospace. */
+  .logs-refined :where(span, p, dd, dt, td, th, div, label, button).mono {
+    font-family: var(--font-sans);
+    font-feature-settings: normal;
+    font-variant-ligatures: normal;
+    letter-spacing: normal;
+  }
+
+  /* Soften status chips: keep the tonal fill, drop the hard colored outline. */
+  .logs-refined [class*="border-success"],
+  .logs-refined [class*="border-warning"] {
+    border-color: transparent;
+  }
+
   .micro {
     font-family: var(--font-sans);
     font-size: 0.75rem;

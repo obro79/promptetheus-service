@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Code2,
   MessageSquare,
+  Pause,
   Play,
   Radio,
   TriangleAlert,
@@ -329,8 +330,15 @@ const SECTIONS: DemoSection[] = [
 
 // ─── Presentation ─────────────────────────────────────────────────────────────
 
+const STEP_MS = 10000;
+
+/** Recordings play a touch slower than real time so the failures are easier to
+ *  follow. Spacebar toggles play/pause across every video on the page. */
+const PLAYBACK_RATE = 0.75;
+
 export function DemoPresentation() {
   const [active, setActive] = React.useState(0);
+  const [paused, setPaused] = React.useState(false);
   const total = SECTIONS.length;
 
   const goTo = React.useCallback(
@@ -342,12 +350,35 @@ export function DemoPresentation() {
 
   React.useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "ArrowRight") goTo(active + 1);
-      else if (event.key === "ArrowLeft") goTo(active - 1);
+      if (event.key === "ArrowRight") {
+        goTo(active + 1);
+      } else if (event.key === "ArrowLeft") {
+        goTo(active - 1);
+      } else if (event.code === "Space" || event.key === " ") {
+        // Spacebar toggles play/pause for every video. Skip it while a control
+        // is focused so the key still activates buttons normally.
+        const tag = (event.target as HTMLElement | null)?.tagName;
+        if (tag === "BUTTON" || tag === "A" || tag === "INPUT" || tag === "TEXTAREA") {
+          return;
+        }
+        event.preventDefault();
+        setPaused((value) => !value);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [active, goTo]);
+
+  // Auto-advance every STEP_MS, looping. Resets whenever `active` changes, so
+  // manual navigation restarts the countdown from the current step. Stops while
+  // paused so a held frame stays on screen.
+  React.useEffect(() => {
+    if (paused) return;
+    const id = window.setTimeout(() => {
+      setActive((current) => (current + 1) % total);
+    }, STEP_MS);
+    return () => window.clearTimeout(id);
+  }, [active, total, paused]);
 
   const section = SECTIONS[active];
 
@@ -368,7 +399,9 @@ export function DemoPresentation() {
           </h2>
         </div>
         <div className="flex items-center gap-3">
+          <CountdownRing stepKey={active} paused={paused} />
           <div className="flex items-center gap-1.5">
+            <PlayPauseButton paused={paused} onClick={() => setPaused((value) => !value)} />
             <NavButton
               direction="prev"
               disabled={active === 0}
@@ -420,7 +453,7 @@ export function DemoPresentation() {
                 style={{ animationDelay: `${120 + index * 120}ms` }}
                 className="animate-materialize"
               >
-                <AgentMediaCard card={card} index={index} />
+                <AgentMediaCard card={card} index={index} paused={paused} />
               </div>
             ))}
           </div>
@@ -431,6 +464,93 @@ export function DemoPresentation() {
 }
 
 // ─── Pieces ───────────────────────────────────────────────────────────────────
+
+/** Small radial countdown — the stroke fills its circumference over `duration`,
+ *  restarting each time `stepKey` changes. Holds empty while paused. */
+function CountdownRing({
+  stepKey,
+  paused = false,
+  duration = STEP_MS,
+  size = 22,
+  stroke = 2.5,
+}: {
+  stepKey: number;
+  paused?: boolean;
+  duration?: number;
+  size?: number;
+  stroke?: number;
+}) {
+  const radius = (size - stroke) / 2;
+  const circ = 2 * Math.PI * radius;
+  const [run, setRun] = React.useState(false);
+
+  React.useEffect(() => {
+    setRun(false);
+    if (paused) return;
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setRun(true));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [stepKey, paused]);
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      className="-rotate-90"
+      role="img"
+      aria-label="Time until next step"
+    >
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        strokeWidth={stroke}
+        className="stroke-border"
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        strokeWidth={stroke}
+        strokeLinecap="round"
+        className="stroke-accent"
+        style={{
+          strokeDasharray: circ,
+          strokeDashoffset: run ? 0 : circ,
+          transition: run ? `stroke-dashoffset ${duration}ms linear` : "none",
+        }}
+      />
+    </svg>
+  );
+}
+
+/** Play/pause toggle for every video on the page. Mirrors the spacebar shortcut
+ *  and reflects the current paused state. */
+function PlayPauseButton({ paused, onClick }: { paused: boolean; onClick: () => void }) {
+  const Icon = paused ? Play : Pause;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={paused ? "Play videos (space)" : "Pause videos (space)"}
+      title={paused ? "Play (Space)" : "Pause (Space)"}
+      className={cn(
+        "flex size-9 items-center justify-center rounded-md border border-border/70 bg-panel text-foreground transition-colors",
+        "hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+      )}
+    >
+      <Icon className={cn("size-4", paused && "translate-x-0.5")} aria-hidden />
+    </button>
+  );
+}
 
 function NavButton({
   direction,
@@ -532,9 +652,11 @@ function StepRail({
 function AgentMediaCard({
   card,
   index = 0,
+  paused = false,
 }: {
   card: DemoCard;
   index?: number;
+  paused?: boolean;
 }) {
   const tone = TONES[card.tone];
   const AgentIcon = card.icon;
@@ -548,6 +670,18 @@ function AgentMediaCard({
   React.useEffect(() => {
     if (videoRef.current) videoRef.current.muted = muted;
   }, [muted]);
+
+  // Slow the recordings down a touch and honor the deck-wide play/pause toggle.
+  React.useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.playbackRate = PLAYBACK_RATE;
+    if (paused) {
+      video.pause();
+    } else {
+      void video.play().catch(() => {});
+    }
+  }, [paused, card.video]);
 
   return (
     <article className="group mx-auto flex w-full max-w-[19rem] flex-col gap-3">

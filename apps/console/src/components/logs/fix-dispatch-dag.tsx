@@ -3,20 +3,31 @@
 import * as React from "react";
 import {
   AlertCircle,
-  BookOpen,
   CheckCircle2,
+  ChevronRight,
   CircleDot,
   ExternalLink,
   FileCode2,
+  GitBranch,
   GitMerge,
   GitPullRequest,
   Loader2,
+  Maximize2,
+  Minimize2,
   Network,
   ShieldCheck,
   Sparkles,
-  type LucideIcon,
+  Timer,
+  X,
 } from "lucide-react";
 
+import {
+  BrowserbaseMark,
+  DevinMark,
+  McpMark,
+  RedisMark,
+  SupabaseMark,
+} from "@/components/common/brand-marks";
 import { LabelTag } from "@/components/common/label-tag";
 import { Button } from "@/components/ui/button";
 import { healIncident } from "@/lib/promptetheus-api";
@@ -27,7 +38,7 @@ import type {
   HealReport,
 } from "@/lib/types";
 import { cn, pct } from "@/lib/utils";
-import type { LogRun } from "./model";
+import { buildTraceTree, eventSummary, eventTitle, type LogRun, type TraceNode } from "./model";
 import {
   FIX_DAG_NODE_IDS,
   buildFixDagEvidence,
@@ -54,26 +65,209 @@ interface FixDispatchDagProps {
   run: LogRun;
 }
 
-const NODE_ICON: Record<FixDagNodeId, LucideIcon> = {
+const NODE_ICON: Record<FixDagNodeId, React.ComponentType<{ className?: string }>> = {
   dispatch_fix: Sparkles,
   merge_github: GitMerge,
   open_pr: GitPullRequest,
   plan_fix: FileCode2,
-  read_logs: BookOpen,
+  read_logs: SupabaseMark,
   run_evals: ShieldCheck,
 };
 
 const NODE_POSITIONS: Record<FixDagNodeId, { x: number; y: number }> = {
-  read_logs: { x: 82, y: 108 },
-  plan_fix: { x: 224, y: 108 },
-  dispatch_fix: { x: 366, y: 108 },
-  run_evals: { x: 508, y: 108 },
-  open_pr: { x: 650, y: 108 },
-  merge_github: { x: 792, y: 108 },
+  read_logs: { x: 96, y: 92 },
+  plan_fix: { x: 264, y: 92 },
+  dispatch_fix: { x: 432, y: 92 },
+  run_evals: { x: 600, y: 92 },
+  open_pr: { x: 768, y: 92 },
+  merge_github: { x: 936, y: 92 },
 };
 
-const CANVAS = { width: 880, height: 230 };
-const NODE_WIDTH = 124;
+const CANVAS = { width: 1040, height: 268 };
+const NODE_WIDTH = 132;
+
+/** Y where the node row ends (center 92 + roughly half the node height). */
+const NODE_BOTTOM_Y = 144;
+/** Y where the infrastructure branch chips sit, below the node row. */
+const BRANCH_Y = 200;
+
+/**
+ * The infrastructure each step runs on, branched underneath its node so the DAG
+ * shows *where* the work happened — the agent deployment, Redis memory, the
+ * Browserbase replay — with the real sponsor logos.
+ */
+const INFRA_BRANCHES: Array<{
+  underNode: FixDagNodeId;
+  Mark: (props: { className?: string }) => React.ReactElement;
+  label: string;
+  detail: string;
+}> = [
+  { underNode: "read_logs", Mark: McpMark, label: "MCP", detail: "Supabase context" },
+  { underNode: "plan_fix", Mark: DevinMark, label: "Devin", detail: "fix agent deployed" },
+  { underNode: "dispatch_fix", Mark: RedisMark, label: "Redis", detail: "warm-start memory" },
+  { underNode: "run_evals", Mark: BrowserbaseMark, label: "Browserbase", detail: "cloud replay" },
+];
+
+/**
+ * The roadmap each step occupies: its position in the pipeline (1–6) and a
+ * representative wall-clock cost, so the DAG reads as an ordered timeline —
+ * "what runs, in what order, and how long it takes".
+ */
+const STEP_META: Record<FixDagNodeId, { step: number; duration: string }> = {
+  read_logs: { step: 1, duration: "0.4s" },
+  plan_fix: { step: 2, duration: "1.2s" },
+  dispatch_fix: { step: 3, duration: "3.8s" },
+  run_evals: { step: 4, duration: "2.1s" },
+  open_pr: { step: 5, duration: "0.9s" },
+  merge_github: { step: 6, duration: "human" },
+};
+
+/**
+ * The work that happens *inside* each pipeline stage — the nested layer the
+ * fullscreen view exposes so you can see what the agent actually does under the
+ * hood, not just the six top-level tiles. Each sub-step can branch further into
+ * the concrete operations it performs.
+ */
+interface FixDagSubStep {
+  label: string;
+  detail: string;
+  children?: FixDagSubStep[];
+}
+
+const NODE_SUBSTEPS: Record<FixDagNodeId, FixDagSubStep[]> = {
+  read_logs: [
+    {
+      label: "Open MCP session",
+      detail: "Authenticate to the Promptetheus MCP server (Supabase-backed)",
+      children: [
+        { label: "list_sessions", detail: "MCP tool — locate the failed run by id" },
+        { label: "RLS scope", detail: "Workspace-isolated read, service role gated" },
+      ],
+    },
+    {
+      label: "Fetch trace over MCP",
+      detail: "get_session_events pulls the ordered event rows from Postgres",
+      children: [
+        { label: "events table", detail: "seq-ordered tool calls, LLM spans, browser actions" },
+        { label: "artifacts", detail: "Signed URLs for replay snapshots in Supabase Storage" },
+      ],
+    },
+    {
+      label: "Locate critical step",
+      detail: "Mark the seq where the run diverged",
+      children: [
+        { label: "analysis_results", detail: "critical_step_seq from the detector pass" },
+      ],
+    },
+    {
+      label: "Collect evidence refs",
+      detail: "Gather the receipts cited by detectors",
+    },
+  ],
+  plan_fix: [
+    {
+      label: "Cluster failures",
+      detail: "Group sibling sessions into one incident",
+      children: [
+        { label: "fingerprint", detail: "Stable hash of the failure signature" },
+        { label: "representative run", detail: "Pick the clearest reproduction" },
+      ],
+    },
+    {
+      label: "Build incident bundle",
+      detail: "Root cause + representative trace + labels",
+      children: [
+        { label: "root_cause", detail: "Synthesized from the critical step + detectors" },
+        { label: "labels", detail: "Failure taxonomy applied to the cluster" },
+      ],
+    },
+    {
+      label: "Draft fix plan",
+      detail: "Step-by-step change set handed to the agent",
+      children: [
+        { label: "target files", detail: "Files the change is expected to touch" },
+        { label: "acceptance check", detail: "What the eval gate must prove" },
+      ],
+    },
+  ],
+  dispatch_fix: [
+    {
+      label: "Select & provision agent",
+      detail: "Deploy the fix agent against the bundle",
+      children: [
+        { label: "pick runner", detail: "Devin or deterministic fallback" },
+        { label: "spin workspace", detail: "Sandboxed container, repo cloned at HEAD" },
+        { label: "mount bundle", detail: "Incident plan + evidence handed to the agent" },
+      ],
+    },
+    {
+      label: "Warm-start memory",
+      detail: "Hydrate prior context from Redis",
+      children: [
+        { label: "load fingerprint", detail: "Recall prior attempts on this incident" },
+        { label: "seed context", detail: "Pre-fill the agent's working set" },
+      ],
+    },
+    {
+      label: "Apply changes",
+      detail: "Agent edits the repo on a fix branch",
+      children: [
+        { label: "propose diff", detail: "Agent reasons over the plan and edits files" },
+        { label: "write to branch", detail: "Commit onto promptetheus/<incident>-fix" },
+        { label: "local typecheck", detail: "Fast feedback before the eval gate" },
+      ],
+    },
+  ],
+  run_evals: [
+    {
+      label: "Spin replay sandbox",
+      detail: "Browserbase cloud replay of the run",
+      children: [
+        { label: "rehydrate state", detail: "Restore the failing step's inputs" },
+        { label: "replay headless", detail: "Re-run the agent against the candidate" },
+      ],
+    },
+    {
+      label: "Before / after diff",
+      detail: "Confirm the failure no longer reproduces",
+      children: [
+        { label: "before", detail: "Original run still fails the assertion" },
+        { label: "after", detail: "Patched run passes the same assertion" },
+      ],
+    },
+    {
+      label: "Critique gate",
+      detail: "Score meaningfulness and confidence",
+      children: [
+        { label: "meaningful?", detail: "Reject no-op or cosmetic changes" },
+        { label: "confidence", detail: "Gate threshold before a PR is opened" },
+      ],
+    },
+  ],
+  open_pr: [
+    {
+      label: "Create branch",
+      detail: "promptetheus/<incident>-fix",
+    },
+    {
+      label: "Commit changed files",
+      detail: "Bundle the verified diff",
+    },
+    {
+      label: "Open pull request",
+      detail: "Attach evidence and eval receipts",
+      children: [
+        { label: "PR body", detail: "Root cause, before/after evals, evidence refs" },
+        { label: "link incident", detail: "PR url written back to the incident row" },
+      ],
+    },
+  ],
+  merge_github: [
+    { label: "Request review", detail: "Hand off to a human in GitHub" },
+    { label: "Await approval", detail: "The loop stops here — never auto-merge" },
+    { label: "Merge", detail: "A human merges from GitHub" },
+  ],
+};
 
 const ANIMATION_NODE_DELAY_MS = 420;
 const DEMO_NODE_DELAY_MS = 3000;
@@ -95,6 +289,7 @@ export function FixDispatchDag({
   const [report, setReport] = React.useState<HealReport | null>(null);
   const [agentDispatch, setAgentDispatch] = React.useState<AgentPrDispatchResult | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [fullscreen, setFullscreen] = React.useState(false);
   const timers = React.useRef<Array<ReturnType<typeof setTimeout>>>([]);
 
   const clearTimers = React.useCallback(() => {
@@ -146,6 +341,20 @@ export function FixDispatchDag({
     replayDemo();
     return clearTimers;
   }, [autoDemo, clearTimers, incident, replayDemo, run.session.id]);
+
+  React.useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFullscreen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [fullscreen]);
 
   const projection = projectFixDispatchDag({
     activeNodeId,
@@ -253,11 +462,15 @@ export function FixDispatchDag({
       <div
         className={cn(
           "rounded-xl border bg-panel/70 p-3",
-          isProminent ? "border-accent/25 bg-accent/[0.04] p-4" : "border-border",
+          isProminent ? "border-border bg-panel/80 p-4" : "border-border",
         )}
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
+            <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              <Network className="size-3" aria-hidden="true" />
+              Powered by Orkes AgentSpan
+            </span>
             <div className="flex flex-wrap items-center gap-2">
               {isProminent ? (
                 <span className="inline-flex size-8 items-center justify-center rounded-lg border border-accent/25 bg-accent-muted text-accent">
@@ -275,24 +488,37 @@ export function FixDispatchDag({
               {projection.detail}
             </p>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            onClick={autoDemo ? replayDemo : dispatch}
-            disabled={!incident || phase === "running"}
-            aria-label={incident ? "Dispatch fix for selected run" : "Dispatch fix unavailable"}
-          >
-            {phase === "running" ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="size-3.5" />
-            )}
-            {buttonLabel}
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setFullscreen(true)}
+              disabled={!incident}
+              aria-label="Expand DAG to fullscreen"
+            >
+              <Maximize2 className="size-3.5" />
+              Expand
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={autoDemo ? replayDemo : dispatch}
+              disabled={!incident || phase === "running"}
+              aria-label={incident ? "Dispatch fix for selected run" : "Dispatch fix unavailable"}
+            >
+              {phase === "running" ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="size-3.5" />
+              )}
+              {buttonLabel}
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className={cn(isProminent && "grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]")}>
+      <div className={cn(isProminent && "flex flex-col gap-3")}>
         <div className="landing-framed-surface overflow-hidden">
         <div className="overflow-x-auto">
           <div
@@ -347,6 +573,21 @@ export function FixDispatchDag({
                 onSelect={() => setSelectedNodeId(node.id)}
               />
             ))}
+
+            {INFRA_BRANCHES.map((branch) => {
+              const node = projection.nodes.find((n) => n.id === branch.underNode);
+              const reached = node ? node.status !== "pending" : false;
+              return (
+                <InfraBranch
+                  key={branch.label}
+                  x={NODE_POSITIONS[branch.underNode].x}
+                  Mark={branch.Mark}
+                  label={branch.label}
+                  detail={branch.detail}
+                  reached={reached}
+                />
+              );
+            })}
           </div>
         </div>
 
@@ -362,7 +603,511 @@ export function FixDispatchDag({
 
         {isProminent ? <ProofPanel agentDispatch={agentDispatch} evidence={evidence} /> : null}
       </div>
+
+      {fullscreen ? (
+        <FixDagFullscreen
+          agentDispatch={agentDispatch}
+          buttonLabel={buttonLabel}
+          evidence={evidence}
+          onClose={() => setFullscreen(false)}
+          onDispatch={autoDemo ? replayDemo : dispatch}
+          phase={phase}
+          projection={projection}
+          run={run}
+          selectedNodeId={selectedNode?.id ?? projection.currentNodeId}
+          onSelectNode={setSelectedNodeId}
+        />
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * One row of the nested "under the hood" tree. Renders an arbitrarily deep tree
+ * with file-explorer style branch connectors (the parent `ul` draws the vertical
+ * spine, each row draws its own elbow) so every layer reads as indented and
+ * clearly *underneath* its parent — down to individual trace events.
+ */
+interface DagTreeItem {
+  id: string;
+  label: string;
+  detail?: string;
+  mono?: boolean;
+  tone?: "default" | "accent" | "success" | "warning" | "muted";
+  Mark?: (props: { className?: string }) => React.ReactElement;
+  href?: string;
+  children?: DagTreeItem[];
+}
+
+function dagDotTone(tone: DagTreeItem["tone"]): string {
+  if (tone === "accent") return "bg-accent/70";
+  if (tone === "success") return "bg-success";
+  if (tone === "warning") return "bg-warning";
+  if (tone === "muted") return "bg-border";
+  return "bg-muted-foreground/50";
+}
+
+function dagTextTone(tone: DagTreeItem["tone"]): string {
+  if (tone === "accent") return "text-accent";
+  if (tone === "success") return "text-success";
+  if (tone === "warning") return "text-warning";
+  if (tone === "muted") return "text-muted-foreground";
+  return "text-foreground";
+}
+
+function DagTree({ items, surface = "bg-panel" }: { items: DagTreeItem[]; surface?: string }) {
+  return (
+    <ul className="relative ml-[7px] list-none border-l border-border/60 pl-0">
+      {items.map((item, index) => (
+        <DagTreeRow
+          key={item.id}
+          item={item}
+          last={index === items.length - 1}
+          surface={surface}
+        />
+      ))}
+    </ul>
+  );
+}
+
+function DagTreeRow({
+  item,
+  last,
+  surface,
+}: {
+  item: DagTreeItem;
+  last: boolean;
+  surface: string;
+}) {
+  const Mark = item.Mark;
+  return (
+    <li className="relative pl-4">
+      {/* horizontal elbow into the row */}
+      <span aria-hidden className="absolute left-0 top-[12px] h-px w-3 bg-border/60" />
+      {/* mask the spine below the last child so the branch terminates cleanly */}
+      {last ? (
+        <span aria-hidden className={cn("absolute -left-px top-[13px] bottom-0 w-px", surface)} />
+      ) : null}
+      <div className="flex items-start gap-2 py-1">
+        {Mark ? (
+          <Mark className="mt-0.5 size-3.5 shrink-0" />
+        ) : (
+          <span
+            aria-hidden
+            className={cn("mt-[7px] size-1.5 shrink-0 rounded-full", dagDotTone(item.tone))}
+          />
+        )}
+        <div className="min-w-0">
+          {item.href ? (
+            <a
+              href={item.href}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(
+                "text-xs font-medium underline-offset-2 hover:underline",
+                dagTextTone(item.tone),
+              )}
+            >
+              {item.label}
+              <ExternalLink className="ml-1 inline size-3" aria-hidden="true" />
+            </a>
+          ) : (
+            <span className={cn("text-xs font-medium", item.mono && "mono", dagTextTone(item.tone))}>
+              {item.label}
+            </span>
+          )}
+          {item.detail ? (
+            <span className="ml-1.5 break-words text-xs text-muted-foreground">— {item.detail}</span>
+          ) : null}
+        </div>
+      </div>
+      {item.children?.length ? <DagTree items={item.children} surface={surface} /> : null}
+    </li>
+  );
+}
+
+function subStepsToItems(prefix: string, steps: FixDagSubStep[]): DagTreeItem[] {
+  return steps.map((step, index) => {
+    const id = `${prefix}-${index}`;
+    return {
+      id,
+      label: step.label,
+      detail: step.detail,
+      children: step.children ? subStepsToItems(id, step.children) : undefined,
+    } satisfies DagTreeItem;
+  });
+}
+
+function traceTreeToItems(nodes: TraceNode[]): DagTreeItem[] {
+  return nodes.map((node) => {
+    const summary = eventSummary(node.event);
+    return {
+      id: `ev-${node.event.seq}`,
+      label: `#${node.event.seq} ${eventTitle(node.event)}`,
+      detail: summary ? summary.slice(0, 120) : undefined,
+      mono: true,
+      tone: node.event.type === "error" ? "warning" : "muted",
+      children: node.children.length ? traceTreeToItems(node.children) : undefined,
+    } satisfies DagTreeItem;
+  });
+}
+
+/** Build the nested tree under a stage: its sub-steps, the real trace events it
+ *  touches, the infra it deploys onto, and the PR branch / files it carries. */
+function buildStageChildren(
+  node: FixDagNode,
+  run: LogRun,
+  ctx: {
+    infra: (typeof INFRA_BRANCHES)[number] | null;
+    prBranch: string | null;
+    prFiles: string[];
+    prUrl: string | null;
+  },
+): DagTreeItem[] {
+  const items: DagTreeItem[] = subStepsToItems(`${node.id}-sub`, NODE_SUBSTEPS[node.id]);
+
+  if (node.id === "read_logs") {
+    // Nest the real trace events MCP returned under the "Fetch trace" sub-step.
+    const traceItems = traceTreeToItems(buildTraceTree(run.events));
+    if (traceItems.length && items[1]) {
+      items[1] = {
+        ...items[1],
+        children: [...(items[1].children ?? []), ...traceItems],
+      };
+    }
+    const criticalSeq =
+      run.analysis?.critical_step_seq ?? run.incident?.critical_step_seq ?? null;
+    const critical =
+      criticalSeq === null ? undefined : run.events.find((event) => event.seq === criticalSeq);
+    if (critical && items[2]) {
+      items[2] = {
+        ...items[2],
+        tone: "warning",
+        children: [
+          ...(items[2].children ?? []),
+          {
+            id: `crit-${critical.seq}`,
+            label: `#${critical.seq} ${eventTitle(critical)}`,
+            detail: eventSummary(critical) || undefined,
+            mono: true,
+            tone: "warning",
+          },
+        ],
+      };
+    }
+  }
+
+  if (ctx.infra) {
+    items.push({
+      id: `${node.id}-infra`,
+      label: ctx.infra.label,
+      detail: ctx.infra.detail,
+      Mark: ctx.infra.Mark,
+      tone: "accent",
+    });
+  }
+  if (ctx.prBranch) {
+    items.push({
+      id: `${node.id}-branch`,
+      label: ctx.prBranch,
+      detail: "fix branch",
+      mono: true,
+      tone: "accent",
+      Mark: (props) => <GitBranch className={cn("text-accent", props.className)} />,
+    });
+  }
+  if (ctx.prFiles.length) {
+    items.push({
+      id: `${node.id}-files`,
+      label: "Changed files",
+      children: ctx.prFiles.map((file) => ({
+        id: `file-${node.id}-${file}`,
+        label: file,
+        mono: true,
+        tone: "muted",
+        Mark: (props) => <FileCode2 className={cn("text-muted-foreground", props.className)} />,
+      })),
+    });
+  }
+  if (ctx.prUrl) {
+    items.push({
+      id: `${node.id}-pr`,
+      label: "Open PR in GitHub",
+      href: ctx.prUrl,
+      tone: "success",
+    });
+  }
+
+  return items;
+}
+
+/**
+ * The near-fullscreen "under the hood" view. Drops the filter/shortcut chrome
+ * and expands every pipeline stage into a deeply nested branch tree — sub-steps,
+ * real trace events, deployed infra, and the PR — while the Proof receipts live
+ * in a drawer that pops open from the right.
+ */
+function FixDagFullscreen({
+  agentDispatch,
+  buttonLabel,
+  evidence,
+  onClose,
+  onDispatch,
+  phase,
+  projection,
+  run,
+  selectedNodeId,
+  onSelectNode,
+}: {
+  agentDispatch: AgentPrDispatchResult | null;
+  buttonLabel: string;
+  evidence: FixDagEvidence;
+  onClose: () => void;
+  onDispatch: () => void;
+  phase: FixDagPhase;
+  projection: ReturnType<typeof projectFixDispatchDag>;
+  run: LogRun;
+  selectedNodeId: FixDagNodeId;
+  onSelectNode: (id: FixDagNodeId) => void;
+}) {
+  const [collapsed, setCollapsed] = React.useState<Set<FixDagNodeId>>(new Set());
+  const [drawerOpen, setDrawerOpen] = React.useState(true);
+
+  const prFiles =
+    projection.prPreview || projection.prUrl
+      ? run.incident?.fix_agent_result?.changed_files ?? []
+      : [];
+  const prBranch = `promptetheus/${run.incident?.id ?? run.session.id}-fix`;
+
+  const toggleStage = (id: FixDagNodeId) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectStage = (id: FixDagNodeId) => {
+    onSelectNode(id);
+    setDrawerOpen(true);
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Fix dispatch DAG — fullscreen"
+      className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm"
+    >
+      <header className="flex items-center justify-between gap-3 border-b border-border/70 bg-panel/80 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="inline-flex size-8 items-center justify-center rounded-lg border border-accent/25 bg-accent-muted text-accent">
+            <Network className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-foreground">{projection.headline}</p>
+            <p className="truncate text-xs text-muted-foreground">{projection.detail}</p>
+          </div>
+          <ModeTag mode={projection.mode} />
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            onClick={onDispatch}
+            disabled={!run.incident || phase === "running"}
+          >
+            {phase === "running" ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="size-3.5" />
+            )}
+            {buttonLabel}
+          </Button>
+          <Button
+            type="button"
+            variant={drawerOpen ? "default" : "outline"}
+            size="sm"
+            aria-pressed={drawerOpen}
+            onClick={() => setDrawerOpen((open) => !open)}
+          >
+            <ShieldCheck className="size-3.5" />
+            Proof
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={onClose} aria-label="Close fullscreen DAG">
+            <Minimize2 className="size-3.5" />
+            Collapse
+          </Button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-y-auto px-4 py-5">
+          <ol className="mx-auto flex max-w-4xl flex-col gap-3">
+            {projection.nodes.map((node, index) => {
+              const infra = INFRA_BRANCHES.find((branch) => branch.underNode === node.id) ?? null;
+              const isPrStage = node.id === "open_pr" || node.id === "merge_github";
+              const children = buildStageChildren(node, run, {
+                infra,
+                prBranch: isPrStage ? prBranch : null,
+                prFiles: isPrStage ? prFiles : [],
+                prUrl: isPrStage ? projection.prUrl : null,
+              });
+              return (
+                <FixDagStageLayer
+                  key={node.id}
+                  node={node}
+                  children={children}
+                  collapsed={collapsed.has(node.id)}
+                  onToggle={() => toggleStage(node.id)}
+                  selected={node.id === selectedNodeId}
+                  onSelect={() => selectStage(node.id)}
+                  last={index === projection.nodes.length - 1}
+                />
+              );
+            })}
+          </ol>
+        </div>
+
+        <aside
+          aria-label="Proof receipts"
+          className={cn(
+            "shrink-0 overflow-hidden border-l border-border/70 bg-panel/60 transition-[width] duration-300",
+            drawerOpen ? "w-[360px]" : "w-0 border-l-0",
+          )}
+        >
+          <div className="flex h-full w-[360px] flex-col">
+            <div className="flex items-center justify-between gap-2 border-b border-border/70 px-3 py-2.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Proof — {evidence.title}
+              </p>
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                aria-label="Close proof drawer"
+                className="flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              <ProofPanel agentDispatch={agentDispatch} evidence={evidence} />
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A single pipeline stage rendered as an expandable layer: the stage tile, then
+ * its nested branch tree (sub-steps → trace events → infra → PR) indented
+ * underneath. Collapsible so deep runs stay scannable.
+ */
+function FixDagStageLayer({
+  node,
+  children,
+  collapsed,
+  onToggle,
+  selected,
+  onSelect,
+  last,
+}: {
+  node: FixDagNode;
+  children: DagTreeItem[];
+  collapsed: boolean;
+  onToggle: () => void;
+  selected: boolean;
+  onSelect: () => void;
+  last: boolean;
+}) {
+  const Icon = NODE_ICON[node.id];
+  const meta = STEP_META[node.id];
+  const tone = nodeTone(node.status);
+  const reached = node.status !== "pending" && node.status !== "disabled";
+
+  return (
+    <li className="relative">
+      {!last ? (
+        <span
+          aria-hidden
+          className={cn(
+            "absolute left-[18px] top-[48px] bottom-[-12px] w-px",
+            reached ? "bg-accent/40" : "bg-border",
+          )}
+        />
+      ) : null}
+      <div
+        className={cn(
+          "rounded-xl border bg-panel transition-colors",
+          tone.border,
+          selected && "ring-2 ring-accent/25",
+        )}
+      >
+        <div className="flex items-center gap-2 px-2 py-2.5">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? "Expand stage" : "Collapse stage"}
+            className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <ChevronRight className={cn("size-4 transition-transform", !collapsed && "rotate-90")} />
+          </button>
+          <button
+            type="button"
+            onClick={onSelect}
+            aria-pressed={selected}
+            className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <span
+              className={cn(
+                "relative inline-flex size-9 shrink-0 items-center justify-center rounded-lg border",
+                tone.icon,
+              )}
+            >
+              <Icon className="size-4" aria-hidden="true" />
+              {node.status === "active" ? (
+                <span className="absolute inset-0 animate-pulse rounded-lg ring-2 ring-accent/40" />
+              ) : null}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-foreground">
+                  {meta.step}. {node.label}
+                </span>
+                <span className={cn("mono text-[10px] uppercase", tone.text)}>
+                  {node.status.replace("_", " ")}
+                </span>
+              </span>
+              <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                {node.description}
+              </span>
+            </span>
+            <span className="mono hidden shrink-0 items-center gap-1 text-[11px] text-muted-foreground sm:flex">
+              <Timer className="size-3" aria-hidden="true" />
+              {meta.duration}
+            </span>
+          </button>
+        </div>
+
+        {!collapsed ? (
+          <div className="border-t border-border/60 px-3 py-3 pl-11">
+            <DagTree items={children} />
+          </div>
+        ) : null}
+      </div>
+    </li>
   );
 }
 
@@ -385,6 +1130,7 @@ function agentDispatchToHealReport(
   return {
     attempts: result.pullRequests.length,
     incident_id: incidentId,
+    warm_start: null,
     orchestrator: "maintainerOS",
     pr: primary
       ? {
@@ -581,6 +1327,55 @@ function evidenceToneClass(tone: FixDagEvidenceTone | undefined) {
   return "text-foreground";
 }
 
+/**
+ * A sponsor-infrastructure branch dropping from a DAG node down to a logo chip,
+ * showing which service that step ran on. Dims until the step is reached.
+ */
+function InfraBranch({
+  x,
+  Mark,
+  label,
+  detail,
+  reached,
+}: {
+  x: number;
+  Mark: (props: { className?: string }) => React.ReactElement;
+  label: string;
+  detail: string;
+  reached: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "absolute flex -translate-x-1/2 flex-col items-center transition-opacity duration-500",
+        reached ? "opacity-100" : "opacity-35",
+      )}
+      style={{ left: x, top: NODE_BOTTOM_Y }}
+      aria-hidden="true"
+    >
+      <span
+        className={cn(
+          "w-px",
+          reached ? "bg-accent/50" : "bg-border",
+        )}
+        style={{ height: BRANCH_Y - NODE_BOTTOM_Y - 4 }}
+      />
+      <span
+        className={cn(
+          "flex items-center gap-1.5 whitespace-nowrap rounded-lg border bg-panel px-2 py-1 shadow-sm",
+          reached ? "border-accent/30" : "border-border/70",
+        )}
+      >
+        <Mark className="size-4 shrink-0" />
+        <span className="flex flex-col leading-none">
+          <span className="text-[10px] font-semibold text-foreground">{label}</span>
+          <span className="mt-0.5 text-[9px] text-muted-foreground">{detail}</span>
+        </span>
+      </span>
+    </div>
+  );
+}
+
 function FixDagNodeCard({
   current,
   node,
@@ -594,13 +1389,14 @@ function FixDagNodeCard({
 }) {
   const Icon = NODE_ICON[node.id];
   const position = NODE_POSITIONS[node.id];
+  const meta = STEP_META[node.id];
   return (
     <button
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
       className={cn(
-        "absolute min-h-[84px] w-[124px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border bg-panel p-2.5 text-left shadow-sm outline-none transition-all hover:border-accent/30 focus-visible:ring-2 focus-visible:ring-ring",
+        "absolute min-h-[88px] w-[132px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border bg-panel p-2.5 text-left shadow-sm outline-none transition-all hover:border-accent/30 focus-visible:ring-2 focus-visible:ring-ring",
         nodeTone(node.status).border,
         selected && "ring-2 ring-accent/25",
         current && node.status === "active" && "shadow-glow",
@@ -610,7 +1406,13 @@ function FixDagNodeCard({
       {current && node.status === "active" ? (
         <span className="absolute inset-x-0 top-0 h-0.5 animate-pulse bg-accent" />
       ) : null}
-      <span className="flex min-w-0 items-center gap-2">
+      <span
+        className="absolute right-1.5 top-1.5 inline-flex size-4 items-center justify-center rounded-full border border-border/70 bg-elevated text-[9px] font-semibold text-muted-foreground"
+        aria-hidden="true"
+      >
+        {meta.step}
+      </span>
+      <span className="flex min-w-0 items-center gap-2 pr-4">
         <span
           className={cn(
             "inline-flex size-7 shrink-0 items-center justify-center rounded-lg border",
@@ -626,7 +1428,11 @@ function FixDagNodeCard({
           </span>
         </span>
       </span>
-      <span className="mt-2 block truncate text-[10px] leading-4 text-muted-foreground">
+      <span className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
+        <Timer className="size-3 shrink-0" aria-hidden="true" />
+        <span className="mono">{meta.duration}</span>
+      </span>
+      <span className="mt-1 block truncate text-[10px] leading-4 text-muted-foreground">
         {node.summary}
       </span>
     </button>

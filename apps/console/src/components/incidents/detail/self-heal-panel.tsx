@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import {
+  Brain,
   CheckCircle2,
   GitPullRequest,
   Loader2,
@@ -13,7 +14,7 @@ import {
 import { ConfidenceMeter } from "@/components/common/confidence-meter";
 import { LabelTag } from "@/components/common/label-tag";
 import { healIncident } from "@/lib/promptetheus-api";
-import type { HealAttempt, HealReport } from "@/lib/types";
+import type { HealAttempt, HealReport, HealWarmStart } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Phase = "idle" | "running" | "done" | "error" | "disabled";
@@ -118,6 +119,8 @@ function HealReportView({ report }: { report: HealReport }) {
         ) : null}
       </div>
 
+      {report.warm_start ? <WarmStartBanner warm={report.warm_start} /> : null}
+
       <ol className="space-y-2">
         {report.trail.map((attempt) => (
           <AttemptRow key={attempt.attempt} attempt={attempt} />
@@ -125,6 +128,40 @@ function HealReportView({ report }: { report: HealReport }) {
       </ol>
 
       {report.pr ? <PrCard pr={report.pr} /> : null}
+    </div>
+  );
+}
+
+/**
+ * The data-flywheel "money shot": the Redis fix-memory matched a prior verified
+ * fix and warm-started this heal from it. This is the one thing a read-only
+ * observability tool structurally can't do — the agent reused what it learned.
+ */
+function WarmStartBanner({ warm }: { warm: HealWarmStart }) {
+  const pct =
+    typeof warm.score === "number" ? `${Math.round(warm.score * 100)}%` : null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2">
+      <Brain className="size-4 shrink-0 text-accent" />
+      <span className="text-xs font-semibold text-accent">Memory reuse</span>
+      <span className="text-[11px] text-muted-foreground">
+        warm-started from a prior verified fix
+        {warm.label ? (
+          <>
+            {" "}— <span className="font-medium text-foreground">{warm.label}</span>
+          </>
+        ) : null}
+        {warm.from_incident_id ? (
+          <span className="mono ml-1 text-[10px] text-muted-foreground">
+            ({warm.from_incident_id})
+          </span>
+        ) : null}
+      </span>
+      {pct ? (
+        <span className="ml-auto inline-flex items-center gap-1 rounded-md bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent">
+          {pct} match
+        </span>
+      ) : null}
     </div>
   );
 }

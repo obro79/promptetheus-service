@@ -30,6 +30,16 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // API routes must answer with JSON so client fetch()s surface a real error
+  // instead of trying to JSON.parse the redirected HTML sign-in page
+  // ("Unexpected token '<', \"<!DOCTYPE\"...").
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.json(
+      { error: "Console authentication required. Sign in to continue." },
+      { status: 401 },
+    );
+  }
+
   const url = request.nextUrl.clone();
   url.pathname = "/";
   url.searchParams.set("auth", "required");

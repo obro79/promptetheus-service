@@ -87,8 +87,9 @@ export const FIX_DAG_NODE_IDS: FixDagNodeId[] = [
 export const FIX_DAG_NODES: FixDagNodeDefinition[] = [
   {
     id: "read_logs",
-    label: "Read logs",
-    description: "Collect the selected run, event payloads, root cause, and evidence refs.",
+    label: "Get logs via MCP",
+    description:
+      "Pull the selected run, event payloads, root cause, and evidence refs from Supabase over the Promptetheus MCP server.",
   },
   {
     id: "plan_fix",
@@ -118,7 +119,7 @@ export const FIX_DAG_NODES: FixDagNodeDefinition[] = [
 ];
 
 const NODE_SUMMARY: Record<FixDagNodeId, string> = {
-  read_logs: "Ready to package run evidence.",
+  read_logs: "Ready to pull run evidence over MCP.",
   plan_fix: "Waiting for dispatch.",
   dispatch_fix: "Waiting for fix agent handoff.",
   run_evals: "Waiting for eval gate.",
