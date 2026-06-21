@@ -1,0 +1,31 @@
+# Copy to terraform.tfvars (gitignored) and fill in. Never commit real values.
+
+region         = "us-east-1"
+name           = "redis8"
+instance_type  = "t3.micro"
+
+# Set a strong password. Avoid URL-special chars (@ + / : space) to keep
+# REDIS_URL simple; the redis_url output URL-encodes it regardless.
+redis_password = "CHANGE-ME"
+
+# Restrict to your app's egress. Use the app's NAT/static IP, or run the app in
+# this VPC and reference its security group instead of a CIDR.
+allowed_cidrs = ["YOUR.APP.IP.ADDR/32"]
+
+# Optional:
+# subnet_id           = "subnet-xxxxxxxx"
+# associate_public_ip = true
+# root_volume_size    = 20
+
+# SSH access (key-based). key_name must be an existing EC2 key pair.
+# key_name          = "my-keypair"
+# ssh_allowed_cidrs = ["YOUR.ADMIN.IP/32"]
+
+# Keyless shell via SSM Session Manager (no open SSH port). Needs IAM create perms to apply.
+# enable_ssm = true
+
+# Set true if the VPC's default Network ACL is locked down (e.g. only allows one port
+# inbound). NACLs are stateless, so a restrictive default NACL breaks the box's OWN
+# outbound (Docker pull, SSM) by dropping ephemeral return traffic. This creates a
+# dedicated NACL for just this subnet; other subnets are untouched.
+# manage_network_acl = true
