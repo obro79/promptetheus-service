@@ -1,0 +1,18 @@
+# Copy to terraform.tfvars (gitignored) and fill in. Never commit real values.
+
+region         = "us-east-1"
+name           = "redis8"
+instance_type  = "t3.micro"
+
+# Set a strong password. Avoid URL-special chars (@ + / : space) to keep
+# REDIS_URL simple; the redis_url output URL-encodes it regardless.
+redis_password = "CHANGE-ME"
+
+# Restrict to your app's egress. Use the app's NAT/static IP, or run the app in
+# this VPC and reference its security group instead of a CIDR.
+allowed_cidrs = ["YOUR.APP.IP.ADDR/32"]
+
+# Optional:
+# subnet_id           = "subnet-xxxxxxxx"
+# associate_public_ip = true
+# root_volume_size    = 20
