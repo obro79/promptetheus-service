@@ -7,12 +7,20 @@
     "agent": "browser-agent@1.4.0",
     "environment": "production",
     "status": "failed",
-    "tags": ["browser", "booking", "hero"],
-    "metadata": { "model": "claude-opus-4", "viewport": "1280x800", "locale": "en-US" },
+    "tags": [
+      "browser",
+      "booking",
+      "hero"
+    ],
+    "metadata": {
+      "model": "claude-opus-4",
+      "viewport": "1280x800",
+      "locale": "en-US"
+    },
     "started_at": "2026-06-18T14:02:11.000Z",
     "event_count": 19,
     "duration_ms": 23840,
-    "incident_id": "inc_browser_goal_mismatch"
+    "incident_id": "incident_ws_dev_browser_goal_mismatch"
   },
   {
     "id": "ses_book_thu3pm",
@@ -22,12 +30,18 @@
     "agent": "browser-agent@1.4.0",
     "environment": "production",
     "status": "failed",
-    "tags": ["browser", "booking"],
-    "metadata": { "model": "claude-opus-4", "viewport": "1280x800" },
+    "tags": [
+      "browser",
+      "booking"
+    ],
+    "metadata": {
+      "model": "claude-opus-4",
+      "viewport": "1280x800"
+    },
     "started_at": "2026-06-18T13:41:55.000Z",
     "event_count": 11,
     "duration_ms": 19120,
-    "incident_id": "inc_browser_goal_mismatch"
+    "incident_id": "incident_ws_dev_browser_goal_mismatch"
   },
   {
     "id": "ses_book_mon9am",
@@ -37,12 +51,17 @@
     "agent": "browser-agent@1.4.0",
     "environment": "production",
     "status": "failed",
-    "tags": ["browser", "booking"],
-    "metadata": { "model": "claude-opus-4" },
+    "tags": [
+      "browser",
+      "booking"
+    ],
+    "metadata": {
+      "model": "claude-opus-4"
+    },
     "started_at": "2026-06-18T11:18:03.000Z",
     "event_count": 9,
     "duration_ms": 17440,
-    "incident_id": "inc_browser_goal_mismatch"
+    "incident_id": "incident_ws_dev_browser_goal_mismatch"
   },
   {
     "id": "ses_refund_ticket",
@@ -52,12 +71,17 @@
     "agent": "browser-agent@1.4.0",
     "environment": "production",
     "status": "failed",
-    "tags": ["browser", "checkout"],
-    "metadata": { "model": "claude-opus-4" },
+    "tags": [
+      "browser",
+      "checkout"
+    ],
+    "metadata": {
+      "model": "claude-opus-4"
+    },
     "started_at": "2026-06-18T10:52:40.000Z",
     "event_count": 10,
     "duration_ms": 21010,
-    "incident_id": "inc_ignored_ui_warning"
+    "incident_id": "incident_ws_dev_ignored_ui_warning"
   },
   {
     "id": "ses_form_submit",
@@ -67,12 +91,17 @@
     "agent": "browser-agent@1.4.0",
     "environment": "production",
     "status": "failed",
-    "tags": ["browser", "forms"],
-    "metadata": { "model": "claude-opus-4" },
+    "tags": [
+      "browser",
+      "forms"
+    ],
+    "metadata": {
+      "model": "claude-opus-4"
+    },
     "started_at": "2026-06-18T09:33:17.000Z",
     "event_count": 7,
     "duration_ms": 14730,
-    "incident_id": "inc_false_success_claim"
+    "incident_id": "incident_ws_dev_false_success_claim"
   },
   {
     "id": "ses_delete_workspace",
@@ -82,12 +111,17 @@
     "agent": "browser-agent@1.4.0",
     "environment": "staging",
     "status": "error",
-    "tags": ["browser", "settings"],
-    "metadata": { "model": "claude-opus-4" },
+    "tags": [
+      "browser",
+      "settings"
+    ],
+    "metadata": {
+      "model": "claude-opus-4"
+    },
     "started_at": "2026-06-18T08:47:52.000Z",
     "event_count": 8,
     "duration_ms": 9980,
-    "incident_id": "inc_wrong_element_clicked"
+    "incident_id": "incident_ws_dev_browser_goal_mismatch"
   },
   {
     "id": "ses_no_purchase",
@@ -97,12 +131,18 @@
     "agent": "browser-agent@1.4.0",
     "environment": "production",
     "status": "failed",
-    "tags": ["browser", "checkout", "policy"],
-    "metadata": { "model": "claude-opus-4" },
+    "tags": [
+      "browser",
+      "checkout",
+      "policy"
+    ],
+    "metadata": {
+      "model": "claude-opus-4"
+    },
     "started_at": "2026-06-17T19:21:09.000Z",
     "event_count": 8,
     "duration_ms": 16200,
-    "incident_id": "inc_forbidden_action"
+    "incident_id": "incident_ws_dev_forbidden_action"
   },
   {
     "id": "ses_support_refund",
@@ -112,12 +152,17 @@
     "agent": "support-agent@2.1.0",
     "environment": "production",
     "status": "failed",
-    "tags": ["support", "refund"],
-    "metadata": { "model": "claude-sonnet-4" },
+    "tags": [
+      "support",
+      "refund"
+    ],
+    "metadata": {
+      "model": "claude-sonnet-4"
+    },
     "started_at": "2026-06-17T16:05:44.000Z",
     "event_count": 9,
     "duration_ms": 6820,
-    "incident_id": "inc_support_wrong_refund"
+    "incident_id": "incident_ws_dev_forbidden_action"
   },
   {
     "id": "ses_coding_falsefix",
@@ -127,12 +172,17 @@
     "agent": "coding-agent@0.9.2",
     "environment": "ci",
     "status": "failed",
-    "tags": ["coding", "ci"],
-    "metadata": { "model": "claude-opus-4" },
+    "tags": [
+      "coding",
+      "ci"
+    ],
+    "metadata": {
+      "model": "claude-opus-4"
+    },
     "started_at": "2026-06-17T14:38:21.000Z",
     "event_count": 9,
     "duration_ms": 41300,
-    "incident_id": "inc_coding_false_fix"
+    "incident_id": "incident_ws_dev_false_success_claim"
   },
   {
     "id": "ses_book_wed11am",
@@ -142,8 +192,13 @@
     "agent": "browser-agent@1.4.0",
     "environment": "production",
     "status": "passed",
-    "tags": ["browser", "booking"],
-    "metadata": { "model": "claude-opus-4" },
+    "tags": [
+      "browser",
+      "booking"
+    ],
+    "metadata": {
+      "model": "claude-opus-4"
+    },
     "started_at": "2026-06-18T12:11:30.000Z",
     "event_count": 8,
     "duration_ms": 18650,
@@ -157,8 +212,13 @@
     "agent": "browser-agent@1.4.0",
     "environment": "production",
     "status": "passed",
-    "tags": ["browser", "booking"],
-    "metadata": { "model": "claude-opus-4" },
+    "tags": [
+      "browser",
+      "booking"
+    ],
+    "metadata": {
+      "model": "claude-opus-4"
+    },
     "started_at": "2026-06-18T07:55:12.000Z",
     "event_count": 6,
     "duration_ms": 15920,
@@ -172,8 +232,13 @@
     "agent": "support-agent@2.1.0",
     "environment": "production",
     "status": "passed",
-    "tags": ["support", "status"],
-    "metadata": { "model": "claude-sonnet-4" },
+    "tags": [
+      "support",
+      "status"
+    ],
+    "metadata": {
+      "model": "claude-sonnet-4"
+    },
     "started_at": "2026-06-18T06:30:48.000Z",
     "event_count": 5,
     "duration_ms": 4120,
@@ -187,8 +252,14 @@
     "agent": "browser-agent@1.4.0",
     "environment": "production",
     "status": "running",
-    "tags": ["browser", "booking", "live"],
-    "metadata": { "model": "claude-opus-4" },
+    "tags": [
+      "browser",
+      "booking",
+      "live"
+    ],
+    "metadata": {
+      "model": "claude-opus-4"
+    },
     "started_at": "2026-06-18T16:58:02.000Z",
     "event_count": 4,
     "duration_ms": 8300,
@@ -202,11 +273,19 @@
     "agent": "refund-voice-agent@3.2.0",
     "environment": "production",
     "status": "failed",
-    "tags": ["voice", "refund", "hero"],
-    "metadata": { "model": "claude-sonnet-4", "modality": "voice", "locale": "en-US" },
+    "tags": [
+      "voice",
+      "refund",
+      "hero"
+    ],
+    "metadata": {
+      "model": "claude-sonnet-4",
+      "modality": "voice",
+      "locale": "en-US"
+    },
     "started_at": "2026-06-18T16:12:11.000Z",
     "event_count": 12,
     "duration_ms": 30200,
-    "incident_id": "inc_voice_false_success"
+    "incident_id": "incident_ws_dev_forbidden_action"
   }
 ]

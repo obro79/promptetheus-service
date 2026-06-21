@@ -37,6 +37,9 @@ _LEXICAL_THRESHOLD = 0.5
 #: Default number of similar fixes to surface as advanced fix-agent context.
 _DEFAULT_SIMILAR_LIMIT = 3
 
+#: Default neighbourhood size (k) for KNN-vote incident clustering.
+_DEFAULT_CLUSTER_K = 5
+
 _client: Any = None
 _client_resolved = False
 
@@ -168,12 +171,13 @@ def _as_match(row: dict[str, Any], score: float) -> dict[str, Any]:
     }
 
 
-def _ranked_similar(bundle: dict[str, Any], limit: int) -> list[dict[str, Any]]:
-    """Rank verified past fixes by similarity to bundle's incident. Never raises.
+def _neighbors(bundle: dict[str, Any], limit: int) -> list[tuple[float, dict[str, Any]]]:
+    """Nearest stored fixes to bundle's incident as `(score, row)`. Never raises.
 
     Prefers a Redis Vector Set KNN query (`VSIM`) when an embedding is available;
     falls back to an O(n) scan with cosine (embeddings) or lexical (no embedder)
-    scoring. Excludes the bundle's own incident and entries below the threshold.
+    scoring. Excludes the bundle's own incident and entries below the threshold,
+    and returns at most `limit` rows sorted by descending similarity.
     """
 
     client = _redis()
@@ -200,7 +204,7 @@ def _ranked_similar(bundle: dict[str, Any], limit: int) -> list[dict[str, Any]]:
                     scored.append((score, row))
             if scored:
                 scored.sort(key=lambda item: item[0], reverse=True)
-                return [_as_match(row, score) for score, row in scored[:limit]]
+                return scored[:limit]
 
         # Fallback: scan every stored fix and score it directly.
         ids = client.smembers(f"ptfix:ids:{workspace}")
@@ -219,9 +223,15 @@ def _ranked_similar(bundle: dict[str, Any], limit: int) -> list[dict[str, Any]]:
             if score >= threshold:
                 scored.append((score, row))
         scored.sort(key=lambda item: item[0], reverse=True)
-        return [_as_match(row, score) for score, row in scored[:limit]]
+        return scored[:limit]
     except Exception:
         return []
+
+
+def _ranked_similar(bundle: dict[str, Any], limit: int) -> list[dict[str, Any]]:
+    """Rank verified past fixes by similarity to bundle's incident. Never raises."""
+
+    return [_as_match(row, score) for score, row in _neighbors(bundle, limit)]
 
 
 def find_similar_fix(bundle: dict[str, Any]) -> dict[str, Any] | None:
@@ -244,6 +254,59 @@ def find_similar_fixes(
     if limit < 1:
         return []
     return _ranked_similar(bundle, limit)
+
+
+def cluster_incident(
+    bundle: dict[str, Any], k: int = _DEFAULT_CLUSTER_K
+) -> dict[str, Any] | None:
+    """Assign the incident to a cluster via KNN majority vote. Never raises.
+
+    Runs a `k`-nearest-neighbour query over the workspace Vector Set (`VSIM`, with
+    the same cosine/lexical fallbacks as retrieval) and votes on the neighbours'
+    failure labels. The winning label is the incident's cluster; the vote share is
+    a confidence. Returns ``None`` when memory is unavailable or no neighbour
+    clears the similarity threshold, so the loop degrades to a safe no-op.
+
+    Returned shape::
+
+        {
+            "label": str,            # cluster (majority neighbour label)
+            "size": int,             # neighbours that formed the cluster
+            "members": list[str],    # neighbour incident ids
+            "confidence": float,     # winning vote share in [0, 1]
+            "mean_score": float,     # mean neighbour similarity
+            "matches_incident_label": bool,
+        }
+    """
+
+    if k < 1:
+        return None
+    neighbors = _neighbors(bundle, k)
+    if not neighbors:
+        return None
+
+    votes: dict[str, int] = {}
+    members: list[str] = []
+    score_sum = 0.0
+    for score, row in neighbors:
+        label = str(row.get("label") or "unlabeled")
+        votes[label] = votes.get(label, 0) + 1
+        member_id = row.get("incident_id")
+        if member_id is not None:
+            members.append(str(member_id))
+        score_sum += score
+
+    total = len(neighbors)
+    cluster_label, vote_count = max(votes.items(), key=lambda item: item[1])
+    incident = bundle.get("incident") or {}
+    return {
+        "label": cluster_label,
+        "size": total,
+        "members": members,
+        "confidence": round(vote_count / total, 3),
+        "mean_score": round(score_sum / total, 3),
+        "matches_incident_label": cluster_label == (incident.get("label") or None),
+    }
 
 
 def remember_fix(
@@ -320,6 +383,7 @@ def timeline_read(incident_id: str) -> list[dict[str, Any]]:
 
 
 __all__ = [
+    "cluster_incident",
     "find_similar_fix",
     "find_similar_fixes",
     "remember_fix",
