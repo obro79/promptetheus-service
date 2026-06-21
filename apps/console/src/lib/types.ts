@@ -140,6 +140,49 @@ export interface RegressionRun {
   created_at: string;
 }
 
+/** One attempt in the self-healing loop trail (POST /api/incidents/{id}/heal). */
+export interface HealAttempt {
+  kind: string;
+  attempt: number;
+  runner: "deterministic" | "claude" | "codex" | null;
+  diagnosis: string | null;
+  critique: {
+    approved: boolean;
+    confidence: number;
+    reason: string;
+  } | null;
+  regression: {
+    before_fail?: number;
+    after_pass?: number;
+    after_fail?: number;
+    [key: string]: unknown;
+  } | null;
+  passed: boolean;
+}
+
+/** A PR (real or fallback preview) attached to a verified heal. */
+export interface HealPr {
+  branch?: string;
+  title?: string;
+  body?: string;
+  changed_files?: string[];
+  fallback?: boolean;
+  pr_url?: string | null;
+}
+
+/** Result of the self-healing loop (POST /api/incidents/{id}/heal). */
+export interface HealReport {
+  status: "pr_opened" | "escalated";
+  incident_id: string;
+  attempts: number;
+  source: string;
+  pr: HealPr | null;
+  trail: HealAttempt[];
+  reason: string | null;
+  workflow_run_id: string | null;
+  orchestrator: string;
+}
+
 /** The incident-context bundle (GET /api/incidents/{id}/context). */
 export interface IncidentContext {
   incident: Incident;

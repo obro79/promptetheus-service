@@ -127,10 +127,17 @@ def _attempt_event(attempt: int, fix: Any, record: dict[str, Any]) -> dict[str, 
     }
 
 
-def heal_incident(
+def run_attempts(
     store: Any, incident: dict[str, Any], *, max_attempts: int | None = None
-) -> HealReport:
-    """Run the bounded heal loop for one incident. Stops at the PR; human merges."""
+) -> dict[str, Any]:
+    """Run diagnose -> verify up to the attempt cap WITHOUT opening a PR.
+
+    This is the shared core of both the in-process loop (`heal_incident`, which
+    opens the PR itself) and the Agentspan approval flow (which opens the PR only
+    after a human approves the gated tool). Returns a result dict carrying the
+    verified fix (or None), the bundle, the trail, the source, and the attempt
+    count — everything `open_verified_fix` needs to finish the job.
+    """
 
     cap = _max_attempts(max_attempts)
     incident_id = str(incident.get("id") or "incident")
@@ -141,7 +148,8 @@ def heal_incident(
     warm = memory.find_similar_fix(bundle)
     if warm:
         memory.timeline_publish(
-            incident_id, {"kind": "warm_start", "from": warm.get("from_incident_id"), "score": warm.get("score")}
+            incident_id,
+            {"kind": "warm_start", "from": warm.get("from_incident_id"), "score": warm.get("score")},
         )
 
     trail: list[dict[str, Any]] = []
@@ -158,30 +166,75 @@ def heal_incident(
         warm = None  # only warm-start the first attempt
 
         if record.get("passed"):
-            pr = pr_step(incident, bundle, fix)
-            memory.remember_fix(incident, bundle, fix)
-            _finalize_incident(store, incident, fix, pr)
-            memory.timeline_publish(
-                incident_id, {"kind": "pr_opened", "attempts": attempt, "pr": pr}
-            )
-            return HealReport(
-                status="pr_opened",
-                incident_id=incident_id,
-                attempts=attempt,
-                source=source,
-                pr=pr,
-                trail=trail,
-            )
+            return {
+                "verified": True,
+                "fix": fix,
+                "bundle": bundle,
+                "trail": trail,
+                "source": source,
+                "attempts": attempt,
+                "incident_id": incident_id,
+            }
+
+    return {
+        "verified": False,
+        "fix": None,
+        "bundle": bundle,
+        "trail": trail,
+        "source": source,
+        "attempts": cap,
+        "incident_id": incident_id,
+    }
+
+
+def open_verified_fix(
+    store: Any, incident: dict[str, Any], result: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Open the PR for a verified `run_attempts` result, remember it, finalize.
+
+    Used both by `heal_incident` (immediately) and by the Agentspan approval-gated
+    tool (only after a human approves). Returns the PR dict (or None).
+    """
+
+    bundle = result["bundle"]
+    fix = result["fix"]
+    pr = pr_step(incident, bundle, fix)
+    memory.remember_fix(incident, bundle, fix)
+    _finalize_incident(store, incident, fix, pr)
+    memory.timeline_publish(
+        result["incident_id"], {"kind": "pr_opened", "attempts": result["attempts"], "pr": pr}
+    )
+    return pr
+
+
+def heal_incident(
+    store: Any, incident: dict[str, Any], *, max_attempts: int | None = None
+) -> HealReport:
+    """Run the bounded heal loop for one incident. Stops at the PR; human merges."""
+
+    result = run_attempts(store, incident, max_attempts=max_attempts)
+    incident_id = result["incident_id"]
+
+    if result["verified"]:
+        pr = open_verified_fix(store, incident, result)
+        return HealReport(
+            status="pr_opened",
+            incident_id=incident_id,
+            attempts=result["attempts"],
+            source=result["source"],
+            pr=pr,
+            trail=result["trail"],
+        )
 
     memory.timeline_publish(
-        incident_id, {"kind": "escalated", "attempts": cap, "reason": "max_attempts"}
+        incident_id, {"kind": "escalated", "attempts": result["attempts"], "reason": "max_attempts"}
     )
     return HealReport(
         status="escalated",
         incident_id=incident_id,
-        attempts=cap,
-        source=source,
-        trail=trail,
+        attempts=result["attempts"],
+        source=result["source"],
+        trail=result["trail"],
         reason="max_attempts",
     )
 
@@ -221,6 +274,8 @@ def github_active() -> bool:
 
 __all__ = [
     "heal_incident",
+    "run_attempts",
+    "open_verified_fix",
     "diagnose_step",
     "verify_step",
     "pr_step",

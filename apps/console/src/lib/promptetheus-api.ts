@@ -1,4 +1,4 @@
-import type { Project, Workspace } from "./types";
+import type { HealReport, Project, Workspace } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_PROMPTETHEUS_API_URL;
 const ENV_CONSOLE_TOKEN = process.env.NEXT_PUBLIC_PROMPTETHEUS_CONSOLE_TOKEN;
@@ -139,6 +139,20 @@ export async function rotateProjectApiKey(
     ...result,
     project: normalizeProject(result.project),
   };
+}
+
+/**
+ * Run the self-healing loop for an incident (POST /api/incidents/{id}/heal).
+ * Returns null when the API isn't configured so the static demo still renders.
+ */
+export async function healIncident(
+  incidentId: string,
+  maxAttempts?: number,
+): Promise<HealReport | null> {
+  return apiFetch<HealReport>(`/api/incidents/${incidentId}/heal`, {
+    method: "POST",
+    body: JSON.stringify(maxAttempts ? { max_attempts: maxAttempts } : {}),
+  });
 }
 
 export async function updateProjectSettings(
