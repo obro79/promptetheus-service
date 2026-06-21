@@ -42,7 +42,7 @@ export default function LogsPage() {
 
   return (
     <ConsolePage>
-      <ConsolePageHeader>
+      <ConsolePageHeader className="logs-header-spacious">
         <div className="min-w-0">
           <ConsoleEyebrow icon={<ListTree className="size-3.5" strokeWidth={1.8} aria-hidden />}>
             Trace logs
@@ -65,6 +65,8 @@ export default function LogsPage() {
           <MetricReadout label="Passed" value={passed} tone="signal" />
         </dl>
       </ConsolePageHeader>
+
+      <div aria-hidden className="logs-header-arc" />
 
       <ConsolePageContent>
         <LogsDashboard
