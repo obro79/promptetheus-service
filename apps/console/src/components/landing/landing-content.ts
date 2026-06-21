@@ -15,9 +15,11 @@ export const landingNavItems = [
 ] as const;
 
 export const landingHero = {
+  category: "Incident response for AI agents",
   title: "When agents fail in production, know why",
   body:
     "Promptetheus records messy agent runs, detects likely failures, replays the exact bad step, and packages a verified fix path for the coding agent.",
+  proofSteps: ["Capture the run", "Replay the failure", "Ship the fix"],
   primaryCta: { label: "See the demo", href: "/demo" },
   secondaryCta: { label: "Open console", href: "/incidents" },
 } as const;
