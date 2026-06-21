@@ -152,6 +152,7 @@ function report(overrides: Partial<HealReport> = {}): HealReport {
       },
     ],
     workflow_run_id: null,
+    warm_start: null,
     ...overrides,
   };
 }

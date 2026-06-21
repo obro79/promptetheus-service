@@ -180,11 +180,16 @@ def _run_attempts_core(
     source = bundle.get("source") or "unknown"
     runner = _resolve_loop_runner(bundle.get("allowed_paths"))
 
-    warm = memory.find_similar_fix(bundle)
-    if warm:
+    warm_used = memory.find_similar_fix(bundle)
+    warm = warm_used
+    if warm_used:
         memory.timeline_publish(
             incident_id,
-            {"kind": "warm_start", "from": warm.get("from_incident_id"), "score": warm.get("score")},
+            {
+                "kind": "warm_start",
+                "from": warm_used.get("from_incident_id"),
+                "score": warm_used.get("score"),
+            },
         )
 
     trail: list[dict[str, Any]] = []
@@ -209,6 +214,7 @@ def _run_attempts_core(
                 "source": source,
                 "attempts": attempt,
                 "incident_id": incident_id,
+                "warm_start": warm_used,
             }
 
     return {
@@ -219,6 +225,7 @@ def _run_attempts_core(
         "source": source,
         "attempts": cap,
         "incident_id": incident_id,
+        "warm_start": warm_used,
     }
 
 
@@ -259,6 +266,7 @@ def heal_incident(
             source=result["source"],
             pr=pr,
             trail=result["trail"],
+            warm_start=result.get("warm_start"),
         )
 
     memory.timeline_publish(
@@ -271,6 +279,7 @@ def heal_incident(
         source=result["source"],
         trail=result["trail"],
         reason="max_attempts",
+        warm_start=result.get("warm_start"),
     )
 
 
