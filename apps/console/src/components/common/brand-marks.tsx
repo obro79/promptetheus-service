@@ -85,6 +85,52 @@ export function DevinMark({ className, title = "Devin" }: MarkProps) {
   );
 }
 
+/** Supabase — the lightning-bolt mark, simplified, in brand green. */
+export function SupabaseMark({ className, title = "Supabase" }: MarkProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={cn("size-4", className)}
+      role="img"
+      aria-label={title}
+      fill="none"
+    >
+      <title>{title}</title>
+      <path
+        d="M13 2.5 4.3 12.4c-.6.7-.1 1.8.8 1.8H12v7.3c0 .9 1.2 1.3 1.7.6l8.7-9.9c.6-.7.1-1.8-.8-1.8H15V3.1c0-.9-1.2-1.3-1.7-.6Z"
+        fill="#3ECF8E"
+        fillOpacity="0.18"
+        stroke="#3ECF8E"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** Model Context Protocol — three nodes linked into a context graph. */
+export function McpMark({ className, title = "MCP" }: MarkProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={cn("size-4", className)}
+      role="img"
+      aria-label={title}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <title>{title}</title>
+      <circle cx="5" cy="12" r="2.2" />
+      <circle cx="18" cy="6" r="2.2" />
+      <circle cx="18" cy="18" r="2.2" />
+      <path d="M7 11 16 6.8M7 13l9 4.2" />
+    </svg>
+  );
+}
+
 /** Claude / Anthropic — the sunburst mark, simplified. */
 export function ClaudeMark({ className, title = "Claude" }: MarkProps) {
   return (

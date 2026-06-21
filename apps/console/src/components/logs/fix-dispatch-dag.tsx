@@ -3,7 +3,6 @@
 import * as React from "react";
 import {
   AlertCircle,
-  BookOpen,
   CheckCircle2,
   ChevronRight,
   CircleDot,
@@ -20,13 +19,14 @@ import {
   Sparkles,
   Timer,
   X,
-  type LucideIcon,
 } from "lucide-react";
 
 import {
   BrowserbaseMark,
   DevinMark,
+  McpMark,
   RedisMark,
+  SupabaseMark,
 } from "@/components/common/brand-marks";
 import { LabelTag } from "@/components/common/label-tag";
 import { Button } from "@/components/ui/button";
@@ -56,12 +56,12 @@ interface FixDispatchDagProps {
   run: LogRun;
 }
 
-const NODE_ICON: Record<FixDagNodeId, LucideIcon> = {
+const NODE_ICON: Record<FixDagNodeId, React.ComponentType<{ className?: string }>> = {
   dispatch_fix: Sparkles,
   merge_github: GitMerge,
   open_pr: GitPullRequest,
   plan_fix: FileCode2,
-  read_logs: BookOpen,
+  read_logs: SupabaseMark,
   run_evals: ShieldCheck,
 };
 
@@ -93,6 +93,7 @@ const INFRA_BRANCHES: Array<{
   label: string;
   detail: string;
 }> = [
+  { underNode: "read_logs", Mark: McpMark, label: "MCP", detail: "Supabase context" },
   { underNode: "plan_fix", Mark: DevinMark, label: "Devin", detail: "fix agent deployed" },
   { underNode: "dispatch_fix", Mark: RedisMark, label: "Redis", detail: "warm-start memory" },
   { underNode: "run_evals", Mark: BrowserbaseMark, label: "Browserbase", detail: "cloud replay" },
@@ -115,37 +116,142 @@ const STEP_META: Record<FixDagNodeId, { step: number; duration: string }> = {
 /**
  * The work that happens *inside* each pipeline stage — the nested layer the
  * fullscreen view exposes so you can see what the agent actually does under the
- * hood, not just the six top-level tiles.
+ * hood, not just the six top-level tiles. Each sub-step can branch further into
+ * the concrete operations it performs.
  */
-const NODE_SUBSTEPS: Record<
-  FixDagNodeId,
-  Array<{ label: string; detail: string }>
-> = {
+interface FixDagSubStep {
+  label: string;
+  detail: string;
+  children?: FixDagSubStep[];
+}
+
+const NODE_SUBSTEPS: Record<FixDagNodeId, FixDagSubStep[]> = {
   read_logs: [
-    { label: "Fetch trace", detail: "Pull the failed session and its ordered events" },
-    { label: "Parse payloads", detail: "Decode tool calls, LLM spans, browser actions" },
-    { label: "Locate critical step", detail: "Mark the seq where the run diverged" },
-    { label: "Collect evidence refs", detail: "Gather the receipts cited by detectors" },
+    {
+      label: "Open MCP session",
+      detail: "Authenticate to the Promptetheus MCP server (Supabase-backed)",
+      children: [
+        { label: "list_sessions", detail: "MCP tool — locate the failed run by id" },
+        { label: "RLS scope", detail: "Workspace-isolated read, service role gated" },
+      ],
+    },
+    {
+      label: "Fetch trace over MCP",
+      detail: "get_session_events pulls the ordered event rows from Postgres",
+      children: [
+        { label: "events table", detail: "seq-ordered tool calls, LLM spans, browser actions" },
+        { label: "artifacts", detail: "Signed URLs for replay snapshots in Supabase Storage" },
+      ],
+    },
+    {
+      label: "Locate critical step",
+      detail: "Mark the seq where the run diverged",
+      children: [
+        { label: "analysis_results", detail: "critical_step_seq from the detector pass" },
+      ],
+    },
+    {
+      label: "Collect evidence refs",
+      detail: "Gather the receipts cited by detectors",
+    },
   ],
   plan_fix: [
-    { label: "Cluster failures", detail: "Group sibling sessions into one incident" },
-    { label: "Build incident bundle", detail: "Root cause + representative trace + labels" },
-    { label: "Draft fix plan", detail: "Step-by-step change set handed to the agent" },
+    {
+      label: "Cluster failures",
+      detail: "Group sibling sessions into one incident",
+      children: [
+        { label: "fingerprint", detail: "Stable hash of the failure signature" },
+        { label: "representative run", detail: "Pick the clearest reproduction" },
+      ],
+    },
+    {
+      label: "Build incident bundle",
+      detail: "Root cause + representative trace + labels",
+      children: [
+        { label: "root_cause", detail: "Synthesized from the critical step + detectors" },
+        { label: "labels", detail: "Failure taxonomy applied to the cluster" },
+      ],
+    },
+    {
+      label: "Draft fix plan",
+      detail: "Step-by-step change set handed to the agent",
+      children: [
+        { label: "target files", detail: "Files the change is expected to touch" },
+        { label: "acceptance check", detail: "What the eval gate must prove" },
+      ],
+    },
   ],
   dispatch_fix: [
-    { label: "Provision agent", detail: "Deploy the fix agent against the bundle" },
-    { label: "Warm-start memory", detail: "Hydrate prior context from Redis" },
-    { label: "Apply changes", detail: "Agent edits the repo on a fix branch" },
+    {
+      label: "Select & provision agent",
+      detail: "Deploy the fix agent against the bundle",
+      children: [
+        { label: "pick runner", detail: "Devin or deterministic fallback" },
+        { label: "spin workspace", detail: "Sandboxed container, repo cloned at HEAD" },
+        { label: "mount bundle", detail: "Incident plan + evidence handed to the agent" },
+      ],
+    },
+    {
+      label: "Warm-start memory",
+      detail: "Hydrate prior context from Redis",
+      children: [
+        { label: "load fingerprint", detail: "Recall prior attempts on this incident" },
+        { label: "seed context", detail: "Pre-fill the agent's working set" },
+      ],
+    },
+    {
+      label: "Apply changes",
+      detail: "Agent edits the repo on a fix branch",
+      children: [
+        { label: "propose diff", detail: "Agent reasons over the plan and edits files" },
+        { label: "write to branch", detail: "Commit onto promptetheus/<incident>-fix" },
+        { label: "local typecheck", detail: "Fast feedback before the eval gate" },
+      ],
+    },
   ],
   run_evals: [
-    { label: "Spin replay sandbox", detail: "Browserbase cloud replay of the run" },
-    { label: "Before / after diff", detail: "Confirm the failure no longer reproduces" },
-    { label: "Critique gate", detail: "Score meaningfulness and confidence" },
+    {
+      label: "Spin replay sandbox",
+      detail: "Browserbase cloud replay of the run",
+      children: [
+        { label: "rehydrate state", detail: "Restore the failing step's inputs" },
+        { label: "replay headless", detail: "Re-run the agent against the candidate" },
+      ],
+    },
+    {
+      label: "Before / after diff",
+      detail: "Confirm the failure no longer reproduces",
+      children: [
+        { label: "before", detail: "Original run still fails the assertion" },
+        { label: "after", detail: "Patched run passes the same assertion" },
+      ],
+    },
+    {
+      label: "Critique gate",
+      detail: "Score meaningfulness and confidence",
+      children: [
+        { label: "meaningful?", detail: "Reject no-op or cosmetic changes" },
+        { label: "confidence", detail: "Gate threshold before a PR is opened" },
+      ],
+    },
   ],
   open_pr: [
-    { label: "Create branch", detail: "promptetheus/<incident>-fix" },
-    { label: "Commit changed files", detail: "Bundle the verified diff" },
-    { label: "Open pull request", detail: "Attach evidence and eval receipts" },
+    {
+      label: "Create branch",
+      detail: "promptetheus/<incident>-fix",
+    },
+    {
+      label: "Commit changed files",
+      detail: "Bundle the verified diff",
+    },
+    {
+      label: "Open pull request",
+      detail: "Attach evidence and eval receipts",
+      children: [
+        { label: "PR body", detail: "Root cause, before/after evals, evidence refs" },
+        { label: "link incident", detail: "PR url written back to the incident row" },
+      ],
+    },
   ],
   merge_github: [
     { label: "Request review", detail: "Hand off to a human in GitHub" },
@@ -597,6 +703,18 @@ function DagTreeRow({
   );
 }
 
+function subStepsToItems(prefix: string, steps: FixDagSubStep[]): DagTreeItem[] {
+  return steps.map((step, index) => {
+    const id = `${prefix}-${index}`;
+    return {
+      id,
+      label: step.label,
+      detail: step.detail,
+      children: step.children ? subStepsToItems(id, step.children) : undefined,
+    } satisfies DagTreeItem;
+  });
+}
+
 function traceTreeToItems(nodes: TraceNode[]): DagTreeItem[] {
   return nodes.map((node) => {
     const summary = eventSummary(node.event);
@@ -623,16 +741,16 @@ function buildStageChildren(
     prUrl: string | null;
   },
 ): DagTreeItem[] {
-  const items: DagTreeItem[] = NODE_SUBSTEPS[node.id].map((substep, index) => ({
-    id: `${node.id}-sub-${index}`,
-    label: substep.label,
-    detail: substep.detail,
-  }));
+  const items: DagTreeItem[] = subStepsToItems(`${node.id}-sub`, NODE_SUBSTEPS[node.id]);
 
   if (node.id === "read_logs") {
+    // Nest the real trace events MCP returned under the "Fetch trace" sub-step.
     const traceItems = traceTreeToItems(buildTraceTree(run.events));
-    if (traceItems.length && items[0]) {
-      items[0] = { ...items[0], children: traceItems };
+    if (traceItems.length && items[1]) {
+      items[1] = {
+        ...items[1],
+        children: [...(items[1].children ?? []), ...traceItems],
+      };
     }
     const criticalSeq =
       run.analysis?.critical_step_seq ?? run.incident?.critical_step_seq ?? null;
@@ -643,6 +761,7 @@ function buildStageChildren(
         ...items[2],
         tone: "warning",
         children: [
+          ...(items[2].children ?? []),
           {
             id: `crit-${critical.seq}`,
             label: `#${critical.seq} ${eventTitle(critical)}`,

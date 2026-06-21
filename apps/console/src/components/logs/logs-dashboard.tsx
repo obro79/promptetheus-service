@@ -381,45 +381,16 @@ export function LogsDashboard({
               onClear={clearAllFilters}
             />
 
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_260px]">
-              <div className="flex min-w-0 flex-col gap-5">
-                {selectedRun ? (
-                  <FixDispatchDag autoDemo prominent run={selectedRun} />
-                ) : null}
+            <div className="flex min-w-0 flex-col gap-5">
+              {/* The pipeline runs full width to the edge of the pane. */}
+              {selectedRun ? (
+                <FixDispatchDag autoDemo prominent run={selectedRun} />
+              ) : null}
 
-                <RunsTable
-                  runs={filteredRuns}
-                  selectedRunId={selectedRun?.session.id}
-                  showColumn={showColumn}
-                  sortKey={sortKey}
-                  sortDirection={sortDirection}
-                  onSort={onSort}
-                  onSelect={(run) => setSelectedRunId(run.session.id)}
-                />
-
-                {selectedRun ? (
-                  <TraceDebugger
-                    run={selectedRun}
-                    traceTree={traceTree}
-                    visibleTrace={visibleTrace}
-                    expanded={expanded}
-                    onExpandedChange={setExpanded}
-                    selectedEvent={selectedEvent}
-                    onEventSelect={(event) => {
-                      setSelectedSeq(event.seq);
-                      setDetailTab("run");
-                    }}
-                    detailTab={detailTab}
-                    onDetailTabChange={setDetailTab}
-                  />
-                ) : (
-                  <div className={cn("flex min-h-[320px] items-center justify-center p-6 text-sm text-muted-foreground", SURFACE)}>
-                    No runs match the current filters.
-                  </div>
-                )}
-              </div>
-
+              {/* Filtered metrics + filter shortcuts sit under the pipeline as a
+                  compact strip so the pipeline above can use the full width. */}
               <FilterRail
+                horizontal
                 metrics={metrics}
                 projects={projects}
                 selectedProjects={selectedProjects}
@@ -436,6 +407,37 @@ export function LogsDashboard({
                 onTagToggle={(tag) => setSelectedTags((values) => toggleValue(values, tag))}
                 onClearFilters={clearAllFilters}
               />
+
+              <RunsTable
+                runs={filteredRuns}
+                selectedRunId={selectedRun?.session.id}
+                showColumn={showColumn}
+                sortKey={sortKey}
+                sortDirection={sortDirection}
+                onSort={onSort}
+                onSelect={(run) => setSelectedRunId(run.session.id)}
+              />
+
+              {selectedRun ? (
+                <TraceDebugger
+                  run={selectedRun}
+                  traceTree={traceTree}
+                  visibleTrace={visibleTrace}
+                  expanded={expanded}
+                  onExpandedChange={setExpanded}
+                  selectedEvent={selectedEvent}
+                  onEventSelect={(event) => {
+                    setSelectedSeq(event.seq);
+                    setDetailTab("run");
+                  }}
+                  detailTab={detailTab}
+                  onDetailTabChange={setDetailTab}
+                />
+              ) : (
+                <div className={cn("flex min-h-[320px] items-center justify-center p-6 text-sm text-muted-foreground", SURFACE)}>
+                  No runs match the current filters.
+                </div>
+              )}
             </div>
           </div>
         ) : section === "agents" ? (
@@ -2207,6 +2209,7 @@ function FilterRail({
   selectedTags,
   onTagToggle,
   onClearFilters,
+  horizontal = false,
 }: {
   metrics: ReturnType<typeof deriveLogMetrics>;
   projects: Project[];
@@ -2219,15 +2222,27 @@ function FilterRail({
   selectedTags: string[];
   onTagToggle: (tag: string) => void;
   onClearFilters: () => void;
+  horizontal?: boolean;
 }) {
   return (
-    <aside className="flex flex-col gap-3">
+    <aside
+      className={cn(
+        horizontal
+          ? "grid gap-3 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]"
+          : "flex flex-col gap-3",
+      )}
+    >
       <div className={cn("overflow-hidden", SURFACE)}>
         <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5">
           <h2 className="text-xs font-semibold text-foreground">Filtered metrics</h2>
           <span className="text-[10px] text-muted-foreground">live</span>
         </div>
-        <dl className="grid grid-cols-2 gap-px bg-border/60">
+        <dl
+          className={cn(
+            "grid gap-px bg-border/60",
+            horizontal ? "grid-cols-3 sm:grid-cols-6 lg:grid-cols-2 xl:grid-cols-3" : "grid-cols-2",
+          )}
+        >
           <MetricTile label="Runs" value={String(metrics.totalRuns)} Icon={Activity} />
           <MetricTile label="Failures" value={String(metrics.failedRuns)} Icon={AlertCircle} />
           <MetricTile label="Error rate" value={pct(metrics.errorRate)} Icon={Gauge} />
@@ -2251,36 +2266,38 @@ function FilterRail({
             Clear
           </button>
         </div>
-        <FilterGroup title="Projects">
-          {projects.map((project) => (
-            <CheckFilter
-              key={project.id}
-              label={project.name}
-              checked={selectedProjects.includes(project.id)}
-              onChange={() => onProjectToggle(project.id)}
-            />
-          ))}
-        </FilterGroup>
-        <FilterGroup title="Environment">
-          {environments.map((environment) => (
-            <CheckFilter
-              key={environment}
-              label={environment}
-              checked={selectedEnvironments.includes(environment)}
-              onChange={() => onEnvironmentToggle(environment)}
-            />
-          ))}
-        </FilterGroup>
-        <FilterGroup title="Tags" icon={<Tags className="size-3" />}>
-          {tags.map((tag) => (
-            <CheckFilter
-              key={tag}
-              label={tag}
-              checked={selectedTags.includes(tag)}
-              onChange={() => onTagToggle(tag)}
-            />
-          ))}
-        </FilterGroup>
+        <div className={cn(horizontal && "grid sm:grid-cols-3")}>
+          <FilterGroup title="Projects" horizontal={horizontal}>
+            {projects.map((project) => (
+              <CheckFilter
+                key={project.id}
+                label={project.name}
+                checked={selectedProjects.includes(project.id)}
+                onChange={() => onProjectToggle(project.id)}
+              />
+            ))}
+          </FilterGroup>
+          <FilterGroup title="Environment" horizontal={horizontal}>
+            {environments.map((environment) => (
+              <CheckFilter
+                key={environment}
+                label={environment}
+                checked={selectedEnvironments.includes(environment)}
+                onChange={() => onEnvironmentToggle(environment)}
+              />
+            ))}
+          </FilterGroup>
+          <FilterGroup title="Tags" icon={<Tags className="size-3" />} horizontal={horizontal}>
+            {tags.map((tag) => (
+              <CheckFilter
+                key={tag}
+                label={tag}
+                checked={selectedTags.includes(tag)}
+                onChange={() => onTagToggle(tag)}
+              />
+            ))}
+          </FilterGroup>
+        </div>
       </div>
     </aside>
   );
@@ -2310,18 +2327,29 @@ function FilterGroup({
   title,
   icon,
   children,
+  horizontal = false,
 }: {
   title: string;
   icon?: React.ReactNode;
   children: React.ReactNode;
+  horizontal?: boolean;
 }) {
   return (
-    <div className="border-b border-border/70 p-3 last:border-b-0">
+    <div
+      className={cn(
+        "border-border/70 p-3",
+        horizontal
+          ? "border-b last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0"
+          : "border-b last:border-b-0",
+      )}
+    >
       <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
         {icon}
         {title}
       </p>
-      <div className="space-y-1.5">{children}</div>
+      <div className={cn("space-y-1.5", horizontal && "max-h-28 overflow-y-auto pr-1")}>
+        {children}
+      </div>
     </div>
   );
 }
