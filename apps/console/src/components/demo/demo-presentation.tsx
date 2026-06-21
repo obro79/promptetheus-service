@@ -76,9 +76,9 @@ const agentTracks = [
     key: "browser",
     label: "Browser Agent",
     icon: Waypoints,
-    failVideo: "/assets/demo-agents/browser-fail.webm",
+    failVideo: "/assets/demo-agents/browser-fail-trimmed.mp4",
     passVideo: "/assets/demo-agents/browser-pass.webm",
-    installVideo: undefined,
+    installVideo: "/assets/demo-agents/voice-agent-installation.mp4",
     failed: "Books the wrong time slot and claims the task is complete.",
     install:
       "Add the Promptetheus decorator before the browser agent entrypoint.",
@@ -108,7 +108,7 @@ const agentTracks = [
     icon: MessageSquare,
     failVideo: "/assets/demo-agents/chat-agent-failed.webm",
     passVideo: "/assets/demo-agents/chat-agent-successful.webm",
-    installVideo: undefined,
+    installVideo: "/assets/demo-agents/voice-agent-installation.mp4",
     failed:
       "Repeats stale advice and loops the customer back to the wrong step.",
     install:
@@ -220,6 +220,10 @@ type DemoCard = {
   video?: string;
   /** When false, the recording plays with sound (voice agent). Defaults to muted. */
   muted?: boolean;
+  /** Optional video scale for recordings that need a wider framed view. */
+  mediaScale?: number;
+  /** Optional video fit override for wider recordings inside the vertical frame. */
+  mediaFit?: "cover" | "contain";
   /** Trace lines that animate into Promptetheus beneath the media (Observe step). */
   logs?: DemoLogLine[];
   tone: Tone;
@@ -266,6 +270,8 @@ const SECTIONS: DemoSection[] = [
       icon: agent.icon,
       caption: agent.install,
       video: agent.installVideo,
+      mediaScale: 0.85,
+      mediaFit: "contain",
       tone: "install",
     })),
   },
@@ -323,8 +329,6 @@ const SECTIONS: DemoSection[] = [
 
 // ─── Presentation ─────────────────────────────────────────────────────────────
 
-const STEP_MS = 10000;
-
 export function DemoPresentation() {
   const [active, setActive] = React.useState(0);
   const total = SECTIONS.length;
@@ -345,15 +349,6 @@ export function DemoPresentation() {
     return () => window.removeEventListener("keydown", onKey);
   }, [active, goTo]);
 
-  // Auto-advance every STEP_MS, looping. Resets whenever `active` changes, so
-  // manual navigation restarts the countdown from the current step.
-  React.useEffect(() => {
-    const id = window.setTimeout(() => {
-      setActive((current) => (current + 1) % total);
-    }, STEP_MS);
-    return () => window.clearTimeout(id);
-  }, [active, total]);
-
   const section = SECTIONS[active];
 
   return (
@@ -373,7 +368,6 @@ export function DemoPresentation() {
           </h2>
         </div>
         <div className="flex items-center gap-3">
-          <CountdownRing stepKey={active} />
           <div className="flex items-center gap-1.5">
             <NavButton
               direction="prev"
@@ -437,70 +431,6 @@ export function DemoPresentation() {
 }
 
 // ─── Pieces ───────────────────────────────────────────────────────────────────
-
-/** Small radial countdown — the stroke fills its circumference over `duration`,
- *  restarting each time `stepKey` changes. No numeric readout. */
-function CountdownRing({
-  stepKey,
-  duration = STEP_MS,
-  size = 22,
-  stroke = 2.5,
-}: {
-  stepKey: number;
-  duration?: number;
-  size?: number;
-  stroke?: number;
-}) {
-  const radius = (size - stroke) / 2;
-  const circ = 2 * Math.PI * radius;
-  const [run, setRun] = React.useState(false);
-
-  React.useEffect(() => {
-    setRun(false);
-    let inner = 0;
-    const outer = requestAnimationFrame(() => {
-      inner = requestAnimationFrame(() => setRun(true));
-    });
-    return () => {
-      cancelAnimationFrame(outer);
-      cancelAnimationFrame(inner);
-    };
-  }, [stepKey]);
-
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox={`0 0 ${size} ${size}`}
-      className="-rotate-90"
-      role="img"
-      aria-label="Time until next step"
-    >
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        strokeWidth={stroke}
-        className="stroke-border"
-      />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        strokeWidth={stroke}
-        strokeLinecap="round"
-        className="stroke-accent"
-        style={{
-          strokeDasharray: circ,
-          strokeDashoffset: run ? 0 : circ,
-          transition: run ? `stroke-dashoffset ${duration}ms linear` : "none",
-        }}
-      />
-    </svg>
-  );
-}
 
 function NavButton({
   direction,
@@ -609,6 +539,8 @@ function AgentMediaCard({
   const tone = TONES[card.tone];
   const AgentIcon = card.icon;
   const muted = card.muted ?? true;
+  const mediaScale = card.mediaScale ?? 1;
+  const mediaFit = card.mediaFit ?? "cover";
   const videoRef = React.useRef<HTMLVideoElement>(null);
 
   // React doesn't reliably reflect the `muted` prop onto the DOM property, so
@@ -637,17 +569,23 @@ function AgentMediaCard({
         )}
       >
         {card.video ? (
-          <video
-            ref={videoRef}
-            className="absolute inset-0 size-full object-cover"
-            src={card.video}
-            autoPlay
-            muted={muted}
-            loop
-            playsInline
-            preload="auto"
-            aria-label={`${card.agent} recording`}
-          />
+          <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+            <video
+              ref={videoRef}
+              className={cn(
+                "size-full",
+                mediaFit === "contain" ? "object-contain" : "object-cover",
+              )}
+              src={card.video}
+              autoPlay
+              muted={muted}
+              loop
+              playsInline
+              preload="auto"
+              aria-label={`${card.agent} recording`}
+              style={{ transform: `scale(${mediaScale})` }}
+            />
+          </div>
         ) : (
           <div
             role="img"
@@ -690,11 +628,8 @@ function AgentMediaCard({
  *  entries array, so the Observe step keeps cycling rather than restarting. */
 const tickerProgress = new WeakMap<DemoLogLine[], number>();
 
-/** A slow vertical ticker of trace lines streaming into Promptetheus beneath the
- *  Observe recordings. One entry is shown at a time; every ~5s the next entry
- *  scrolls up into view (no stacking). Each agent cycles its own distinct set,
- *  and `error` entries — verbatim from the /logs page — are highlighted. The
- *  `offsetMs` stagger keeps the three cards from ticking in lockstep. */
+/** A slow terminal-style ticker of trace lines streaming into Promptetheus
+ *  beneath the Observe recordings. One fixed-height entry is shown at a time. */
 function ErrorLogTicker({
   entries,
   offsetMs = 0,
@@ -702,9 +637,8 @@ function ErrorLogTicker({
   entries: DemoLogLine[];
   offsetMs?: number;
 }) {
-  // Remember each agent's place in its rotation across remounts (the deck
-  // auto-advances and remounts every step), so the rotation keeps progressing
-  // through the different entries instead of restarting at the first one.
+  // Remember each agent's place in its rotation across remounts, so the stream
+  // keeps progressing through different entries instead of restarting.
   const [index, setIndex] = React.useState(
     () => tickerProgress.get(entries) ?? 0,
   );
@@ -730,66 +664,57 @@ function ErrorLogTicker({
   const isError = entry.tone === "error";
 
   return (
-    <div
-      className={cn(
-        "overflow-hidden shadow-sm ring-1 transition-colors",
-        SURFACE,
-        isError ? "ring-destructive/40" : "ring-transparent",
-      )}
-    >
-      <div className="flex items-center justify-between gap-2 border-b border-border/60 bg-elevated/50 px-3 py-2">
+    <div className="h-44 w-full overflow-hidden rounded-lg border border-border/70 bg-zinc-950 font-mono shadow-sm ring-1 ring-black/10">
+      <div className="flex h-11 items-center justify-between gap-2 border-b border-white/10 bg-zinc-900 px-3">
         <div className="flex items-center gap-2">
-          <Radio
-            className="size-3.5 animate-pulse text-yellow-500"
-            aria-hidden
-          />
-          <span className="mono text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground">
-            Streaming into Promptetheus
+          <span className="flex items-center gap-1.5" aria-hidden>
+            <span className="size-2.5 rounded-full bg-red-400/90" />
+            <span className="size-2.5 rounded-full bg-yellow-400/90" />
+            <span className="size-2.5 rounded-full bg-emerald-400/90" />
+          </span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-300">
+            promptetheus stream
           </span>
         </div>
-        <span className="mono text-[10px] font-medium tabular-nums text-muted-foreground">
+        <span className="text-[10px] font-medium tabular-nums text-zinc-500">
           {index + 1}/{entries.length}
         </span>
       </div>
 
-      {/* Single-entry viewport — each new entry scrolls up into place. */}
-      <div
-        className={cn(
-          "relative min-h-[4.25rem] overflow-hidden border-l-2 px-3 py-2.5 transition-colors",
-          isError
-            ? "border-l-destructive bg-destructive/[0.08]"
-            : "border-l-transparent",
-        )}
-      >
-        <div key={index} className="flex animate-ticker-up items-start gap-2.5">
+      <div className="h-[8.25rem] overflow-hidden px-3 py-3">
+        <div key={index} className="animate-ticker-up">
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em]">
+            <span className="text-zinc-500">$</span>
+            <span className={isError ? "text-red-300" : "text-emerald-300"}>
+              event.recv
+            </span>
+            <span className="text-zinc-600">--type</span>
+            <span className={isError ? "text-red-300" : "text-zinc-300"}>
+              {entry.type}
+            </span>
+          </div>
+          <div className="mt-3 flex items-start gap-2.5">
           {isError ? (
             <TriangleAlert
-              className="mt-0.5 size-4 shrink-0 text-destructive"
+              className="mt-0.5 size-4 shrink-0 text-red-400"
               aria-hidden
             />
           ) : (
             <span
               aria-hidden
-              className="mt-1.5 size-2 shrink-0 rounded-full bg-muted-foreground/50"
+              className="mt-2 size-2 shrink-0 rounded-full bg-emerald-400/80"
             />
           )}
-          <div className="min-w-0 flex-1">
-            <span
-              className={cn(
-                "mono text-[11px] font-semibold uppercase tracking-wide",
-                isError ? "text-destructive" : "text-muted-foreground/80",
-              )}
-            >
-              {entry.type}
-            </span>
+            <div className="min-w-0 flex-1">
             <p
               className={cn(
-                "mono mt-0.5 text-[13px] leading-5",
-                isError ? "font-medium text-destructive" : "text-foreground/80",
+                "text-[12px] leading-5",
+                isError ? "font-medium text-red-300" : "text-zinc-300",
               )}
             >
               {entry.text}
             </p>
+            </div>
           </div>
         </div>
       </div>
