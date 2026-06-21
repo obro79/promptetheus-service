@@ -1010,6 +1010,53 @@ function LatencyBadge({ ms }: { ms: number }) {
   );
 }
 
+export function LogSessionTraceView({ run }: { run: LogRun }) {
+  const [selectedSeq, setSelectedSeq] = React.useState<number | null>(() => {
+    return firstFailedEvent(run)?.seq ?? null;
+  });
+  const [expanded, setExpanded] = React.useState<Set<string>>(() => {
+    return allExpandable(buildTraceTree(run.events));
+  });
+  const [detailTab, setDetailTab] = React.useState<"run" | "feedback" | "metadata">("run");
+  const [isExpanded, setIsExpanded] = React.useState(false);
+
+  const traceTree = React.useMemo(() => buildTraceTree(run.events), [run.events]);
+  const visibleTrace = React.useMemo(
+    () => flattenTraceTree(traceTree, expanded),
+    [expanded, traceTree],
+  );
+  const selectedEvent = React.useMemo(
+    () => run.events.find((event) => event.seq === selectedSeq) ?? firstFailedEvent(run),
+    [run, selectedSeq],
+  );
+
+  React.useEffect(() => {
+    const initialEvent = firstFailedEvent(run);
+    setSelectedSeq(initialEvent?.seq ?? null);
+    setExpanded(allExpandable(buildTraceTree(run.events)));
+    setDetailTab("run");
+  }, [run, run.events]);
+
+  return (
+    <TraceDebugger
+      run={run}
+      traceTree={traceTree}
+      visibleTrace={visibleTrace}
+      expanded={expanded}
+      onExpandedChange={setExpanded}
+      selectedEvent={selectedEvent}
+      onEventSelect={(event) => {
+        setSelectedSeq(event.seq);
+        setDetailTab("run");
+      }}
+      detailTab={detailTab}
+      onDetailTabChange={setDetailTab}
+      isExpanded={isExpanded}
+      onExpandToggle={() => setIsExpanded((value) => !value)}
+    />
+  );
+}
+
 function TraceDebugger({
   run,
   traceTree,
