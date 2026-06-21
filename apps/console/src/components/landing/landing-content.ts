@@ -20,7 +20,6 @@ export const landingHero = {
   title: "When agents fail in production, know why",
   body:
     "Promptetheus records messy agent runs, detects likely failures, replays the exact bad step, and packages a verified fix path for the coding agent.",
-  proofSteps: ["Capture the run", "Replay the failure", "Ship the fix"],
   primaryCta: { label: "See the demo", href: "/demo" },
   secondaryCta: { label: "Open console", href: "/incidents" },
 } as const;
@@ -132,10 +131,6 @@ export const landingAgents: Array<{
   kind: "browser" | "chat" | "voice";
   assetLabel: string;
   title: string;
-  task: string;
-  failure: string;
-  evidence: string;
-  fixAction: string;
   videoSrc?: string;
   posterSrc?: string;
 }> = [
@@ -144,30 +139,18 @@ export const landingAgents: Array<{
     assetLabel:
       "Animated browser-agent replay showing a wrong click, ignored warning, and pinned evidence cards",
     title: "Browser agents",
-    task: "Complete a checkout or booking flow",
-    failure: "Wrong click after an ignored UI warning",
-    evidence: "DOM state, screenshot, cursor path, warning text",
-    fixAction: "Replay the critical step and hand the UI-state mismatch to the fix agent",
   },
   {
     kind: "chat",
     assetLabel:
       "Animated chat-agent replay showing conversation drift, matching sessions, and turn evidence",
     title: "Chat agents",
-    task: "Resolve a customer support issue",
-    failure: "Conversation drift and repeated stale advice",
-    evidence: "User turn, agent turn, cluster count, unresolved outcome",
-    fixAction: "Replay the bad turn and package the prompt/tool context that caused the loop",
   },
   {
     kind: "voice",
     assetLabel:
       "Animated voice-agent trace showing waveform, transcript, silence, and failed handoff evidence",
     title: "Voice agents",
-    task: "Handle a live escalation",
-    failure: "Missed handoff after silence and escalation language",
-    evidence: "Transcript segment, silence duration, tool handoff result, latency",
-    fixAction: "Pin the transcript and failed handoff as a regression target",
   },
 ];
 

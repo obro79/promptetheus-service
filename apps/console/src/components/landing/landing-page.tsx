@@ -87,12 +87,23 @@ export function LandingPage({ stats }: { stats: LandingStats }) {
         id="proof"
         className="bg-canvas"
         density="compact"
-        containerClassName="grid gap-8 lg:grid-cols-[0.8fr_1.7fr] lg:items-start"
+        containerClassName="landing-use-case-container grid gap-10"
       >
         <SectionHeader
-          className="max-w-md"
+          align="center"
           title={landingSections.proof.title}
         />
+
+        <div id="incident-loop" className="grid gap-10">
+          <SectionHeader
+            align="center"
+            body={landingSections.incidentLoop.body}
+            title={landingSections.incidentLoop.title}
+          />
+
+          <HomeIncidentLoop />
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-3">
           {landingProofCards.map((card) => (
             <LandingCard key={card.label} as="article" className="min-h-[260px]">
@@ -104,20 +115,6 @@ export function LandingPage({ stats }: { stats: LandingStats }) {
             </LandingCard>
           ))}
         </div>
-      </LandingSection>
-
-      <LandingSection
-        id="incident-loop"
-        tone="band"
-        containerClassName="landing-use-case-container grid gap-10"
-      >
-        <SectionHeader
-          align="center"
-          body={landingSections.incidentLoop.body}
-          title={landingSections.incidentLoop.title}
-        />
-
-        <HomeIncidentLoop />
       </LandingSection>
 
       <LandingSection
@@ -198,7 +195,6 @@ function LandingHero() {
             </Link>
           </Button>
         </div>
-        <HeroProofStrip />
       </div>
     </section>
   );
@@ -236,19 +232,6 @@ function LandingHeroNav() {
   );
 }
 
-function HeroProofStrip() {
-  return (
-    <div className="landing-hero-proof-strip" aria-label="Promptetheus workflow">
-      {landingHero.proofSteps.map((step, index) => (
-        <div key={step} className="landing-hero-proof-step">
-          <span>{String(index + 1).padStart(2, "0")}</span>
-          <p>{step}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function HomeAgentCard({
   agent,
 }: {
@@ -262,27 +245,6 @@ function HomeAgentCard({
 
       <div className="flex flex-1 flex-col p-3 pb-0">
         <AgentVisualSlot agent={agent} />
-      </div>
-
-      <div className="landing-agent-card-task px-4 py-3">
-        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/75">
-          Production task
-        </p>
-        <p className="mt-1 text-sm leading-snug text-muted-foreground">{agent.task}</p>
-        <dl className="landing-agent-evidence-list">
-          <div>
-            <dt>Failure</dt>
-            <dd>{agent.failure}</dd>
-          </div>
-          <div>
-            <dt>Evidence</dt>
-            <dd>{agent.evidence}</dd>
-          </div>
-          <div>
-            <dt>Fix path</dt>
-            <dd>{agent.fixAction}</dd>
-          </div>
-        </dl>
       </div>
     </article>
   );
