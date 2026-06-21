@@ -462,11 +462,15 @@ export function FixDispatchDag({
       <div
         className={cn(
           "rounded-xl border bg-panel/70 p-3",
-          isProminent ? "border-accent/25 bg-accent/[0.04] p-4" : "border-border",
+          isProminent ? "border-border bg-panel/80 p-4" : "border-border",
         )}
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
+            <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+              <Network className="size-3" aria-hidden="true" />
+              Powered by Orkes AgentSpan
+            </span>
             <div className="flex flex-wrap items-center gap-2">
               {isProminent ? (
                 <span className="inline-flex size-8 items-center justify-center rounded-lg border border-accent/25 bg-accent-muted text-accent">
