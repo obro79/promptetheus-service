@@ -270,7 +270,7 @@ def test_live_sdk_agent_writes_supabase_and_mcp_reads_back() -> None:
         assert incidents
         incident_id = incidents[0]["id"]
 
-        mcp_client = PromptetheusClient(base_url=api_url, console_token=console_token)
+        mcp_client = PromptetheusClient(base_url=api_url, api_key=api_key)
         try:
             timeline = mcp_tools.get_trace_events(mcp_client, trace_id)
             assert [event["type"] for event in timeline["events"]] == EXPECTED_TYPES

@@ -249,14 +249,60 @@ def test_invalid_credential_is_401(client: testclient.TestClient) -> None:
     assert client.get("/api/sessions", headers=bad).status_code == 401
 
 
-def test_api_key_principal_cannot_call_console_read_routes(
+def test_api_key_principal_can_read_own_project_routes(
     client: testclient.TestClient,
 ) -> None:
     session_id = _create_trace(client)
+    appended = client.post(
+        f"/api/traces/{session_id}/events",
+        json={"events": [_event(seq=1, idempotency_key="api-key-read")]},
+        headers=KEY_AUTH,
+    )
+    assert appended.status_code == 200
 
-    assert client.get("/api/sessions", headers=KEY_AUTH).status_code == 403
-    assert client.get(f"/api/traces/{session_id}/events", headers=KEY_AUTH).status_code == 403
+    sessions = client.get("/api/sessions", headers=KEY_AUTH)
+    assert sessions.status_code == 200
+    assert [session["id"] for session in sessions.json()["sessions"]] == [session_id]
+
+    events = client.get(f"/api/traces/{session_id}/events", headers=KEY_AUTH)
+    assert events.status_code == 200
+    assert [event["seq"] for event in events.json()["events"]] == [1]
+
+    analysis = client.get(f"/api/traces/{session_id}/analysis", headers=KEY_AUTH)
+    assert analysis.status_code == 200
+    assert analysis.json()["analysis"] is None
+
+    # Analysis execution is still a console workflow, not an API-key read.
     assert client.post(f"/api/traces/{session_id}/analyze", headers=KEY_AUTH).status_code == 403
+
+
+def test_api_key_project_reads_are_project_scoped(
+    client: testclient.TestClient,
+) -> None:
+    session_id = _create_trace(client, trace_id="trace_project_a")
+    client.post(
+        f"/api/traces/{session_id}/events",
+        json={"events": [_event(seq=1, idempotency_key="project-a")]},
+        headers=KEY_AUTH,
+    )
+    client.app.state.auth.register_project(
+        project_id="proj_other", workspace_id="ws_dev", api_key="pt_other_project_key"
+    )
+    other_auth = {"Authorization": "Bearer pt_other_project_key"}
+    other_trace = client.post(
+        "/api/traces",
+        json={"id": "trace_project_b", "user_goal": "Other project"},
+        headers=other_auth,
+    )
+    assert other_trace.status_code == 201
+
+    own_sessions = client.get("/api/sessions", headers=KEY_AUTH).json()["sessions"]
+    other_sessions = client.get("/api/sessions", headers=other_auth).json()["sessions"]
+    assert [session["id"] for session in own_sessions] == ["trace_project_a"]
+    assert [session["id"] for session in other_sessions] == ["trace_project_b"]
+
+    assert client.get(f"/api/traces/{session_id}/events", headers=other_auth).status_code == 404
+    assert client.get("/api/traces/trace_project_b/events", headers=KEY_AUTH).status_code == 404
 
 
 def test_api_key_principal_cannot_trigger_console_incident_workflows(
@@ -740,6 +786,57 @@ def test_get_single_incident(client: testclient.TestClient) -> None:
     # Missing credential -> 401; unknown id -> 404.
     assert client.get(f"/api/incidents/{incident_id}").status_code == 401
     assert client.get("/api/incidents/nope", headers=CONSOLE_AUTH).status_code == 404
+
+
+def test_api_key_can_read_own_project_incident_context(
+    client: testclient.TestClient,
+) -> None:
+    incident_id = _make_incident(client)
+
+    listed = client.get("/api/incidents", headers=KEY_AUTH)
+    assert listed.status_code == 200
+    incidents = listed.json()["incidents"]
+    assert incident_id in {incident["id"] for incident in incidents}
+    assert {incident["project_id"] for incident in incidents} == {"proj_dev"}
+
+    incident = client.get(f"/api/incidents/{incident_id}", headers=KEY_AUTH)
+    assert incident.status_code == 200
+    assert incident.json()["incident"]["id"] == incident_id
+
+    context = client.get(f"/api/incidents/{incident_id}/context", headers=KEY_AUTH)
+    assert context.status_code == 200
+    assert context.json()["context"]["incident"]["id"] == incident_id
+
+
+def test_api_key_incident_reads_are_project_scoped(
+    client: testclient.TestClient,
+) -> None:
+    own_incident_id = _make_incident(client)
+    client.app.state.auth.register_project(
+        project_id="proj_other", workspace_id="ws_dev", api_key="pt_other_project_key"
+    )
+    other_incident = client.app.state.store.upsert_incident(
+        {
+            "id": "incident_other_project",
+            "workspace_id": "ws_dev",
+            "project_id": "proj_other",
+            "label": "other_project_failure",
+            "title": "Other project failure",
+            "severity": "medium",
+            "status": "new",
+            "representative_session_id": "trace_other",
+        }
+    )
+    other_auth = {"Authorization": "Bearer pt_other_project_key"}
+
+    own_list = client.get("/api/incidents", headers=KEY_AUTH).json()["incidents"]
+    other_list = client.get("/api/incidents", headers=other_auth).json()["incidents"]
+    assert own_incident_id in {incident["id"] for incident in own_list}
+    assert {incident["project_id"] for incident in own_list} == {"proj_dev"}
+    assert [incident["id"] for incident in other_list] == [other_incident["id"]]
+
+    assert client.get(f"/api/incidents/{own_incident_id}", headers=other_auth).status_code == 404
+    assert client.get(f"/api/incidents/{other_incident['id']}", headers=KEY_AUTH).status_code == 404
 
 
 def test_get_single_incident_cross_workspace_is_404(

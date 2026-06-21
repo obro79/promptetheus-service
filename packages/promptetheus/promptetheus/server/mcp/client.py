@@ -3,14 +3,15 @@
 The MCP server is a thin client of the FastAPI gateway, not a second backend.
 This module wraps the small slice of the locked API the incident-context tools
 need, authenticating with a console/Supabase-session bearer token and returning
-parsed JSON. It never re-implements workspace scoping or redaction — FastAPI
+parsed JSON. It never re-implements workspace/project scoping or redaction — FastAPI
 owns both.
 
 Configuration comes from the environment:
 
 - ``PROMPTETHEUS_API_URL`` — gateway base URL (default ``http://localhost:4318``).
-- ``PROMPTETHEUS_CONSOLE_TOKEN`` — local dev console token. Hosted deployments
-  should provide a Supabase access token for the target workspace.
+- ``PROMPTETHEUS_API_KEY`` — project API key. This is enough for project-scoped
+  MCP reads.
+- ``PROMPTETHEUS_CONSOLE_TOKEN`` — optional console token for owner-only tools.
 
 httpx is imported lazily inside the client so importing this module (or the
 package) never requires the optional ``mcp`` extra to be installed.
@@ -42,9 +43,9 @@ class PromptetheusClient:
         base_url: Gateway base URL. Defaults to ``PROMPTETHEUS_API_URL`` or
             ``http://localhost:4318``. Ignored when http_client is supplied.
         console_token: Console bearer token. Defaults to
-            ``PROMPTETHEUS_CONSOLE_TOKEN``. In tests with an injected
-            ``http_client``, falls back to the deterministic local dev token.
-        api_key: Deprecated compatibility alias. Use ``console_token`` instead.
+            ``PROMPTETHEUS_CONSOLE_TOKEN``. Use this for owner-only tools.
+        api_key: Project API key. Defaults to ``PROMPTETHEUS_API_KEY``. This is
+            enough for project-scoped MCP read tools.
         http_client: Optional pre-built synchronous httpx-style client. Tests
             inject a Starlette ``TestClient`` (itself a sync httpx client wired to
             an in-process FastAPI app); production builds its own.
@@ -69,18 +70,15 @@ class PromptetheusClient:
             if console_token is not None
             else os.environ.get("PROMPTETHEUS_CONSOLE_TOKEN")
         )
+        if resolved_token is None:
+            resolved_token = api_key or os.environ.get("PROMPTETHEUS_API_KEY")
         if resolved_token is None and http_client is not None:
             resolved_token = DEV_CONSOLE_TOKEN
-        if resolved_token is None and api_key is not None:
-            # Legacy callers used api_key for every MCP request. Keep accepting
-            # it as a last-resort token, but hosted incident tools now require a
-            # console principal at the FastAPI layer.
-            resolved_token = api_key
         if not resolved_token:
             raise RuntimeError(
-                "PROMPTETHEUS_CONSOLE_TOKEN is required to start the "
-                "Promptetheus MCP server. Set it to a console/Supabase access "
-                "token for the workspace you want the agent to read."
+                "PROMPTETHEUS_API_KEY is required to start the Promptetheus MCP "
+                "server for project-scoped reads. Set PROMPTETHEUS_CONSOLE_TOKEN "
+                "only when owner-only tools are needed."
             )
         self._console_token = resolved_token
         self._timeout = timeout

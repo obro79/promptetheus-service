@@ -580,8 +580,18 @@ def create_app(
             raise _HTTPError(404, "trace not found")
         return session
 
-    def _require_runtime_session(session_id: str, ctx: AuthContext) -> dict[str, Any]:
+    def _require_session_read(session_id: str, ctx: AuthContext) -> dict[str, Any]:
         session = _require_session_in_workspace(session_id, ctx)
+        if (
+            ctx.kind == "api_key"
+            and ctx.project_id is not None
+            and session.get("project_id") != ctx.project_id
+        ):
+            raise _HTTPError(404, "trace not found")
+        return session
+
+    def _require_runtime_session(session_id: str, ctx: AuthContext) -> dict[str, Any]:
+        session = _require_session_read(session_id, ctx)
         if (
             ctx.project_id is not None
             and session.get("project_id") is not None
@@ -606,6 +616,16 @@ def create_app(
         if incident is None:
             raise _HTTPError(404, "incident not found")
         if incident.get("workspace_id") != ctx.workspace_id and not ctx.is_server:
+            raise _HTTPError(404, "incident not found")
+        return incident
+
+    def _require_incident_read(incident_id: str, ctx: AuthContext) -> dict[str, Any]:
+        incident = _require_incident_in_workspace(incident_id, ctx)
+        if (
+            ctx.kind == "api_key"
+            and ctx.project_id is not None
+            and incident.get("project_id") != ctx.project_id
+        ):
             raise _HTTPError(404, "incident not found")
         return incident
 
@@ -1096,22 +1116,25 @@ def create_app(
     @app.get("/api/sessions")
     async def list_sessions(request: Request) -> dict[str, Any]:
         ctx = _authenticate(request)
-        _require_principal(ctx, ("console",))
-        sessions = app.state.store.list_sessions(workspace_id=ctx.workspace_id)
+        _require_principal(ctx, ("api_key", "console"))
+        sessions = app.state.store.list_sessions(
+            workspace_id=ctx.workspace_id,
+            project_id=ctx.project_id if ctx.kind == "api_key" else None,
+        )
         return {"sessions": sessions}
 
     @app.get("/api/traces/{id}/events")
     async def read_events(id: str, request: Request) -> dict[str, Any]:
         ctx = _authenticate(request)
-        _require_principal(ctx, ("console",))
-        _require_session_in_workspace(id, ctx)
+        _require_principal(ctx, ("api_key", "console"))
+        _require_session_read(id, ctx)
         return {"events": app.state.store.get_events(id)}
 
     @app.get("/api/traces/{id}/analysis")
     async def read_analysis(id: str, request: Request) -> dict[str, Any]:
         ctx = _authenticate(request)
-        _require_principal(ctx, ("console",))
-        _require_session_in_workspace(id, ctx)
+        _require_principal(ctx, ("api_key", "console"))
+        _require_session_read(id, ctx)
         return {"analysis": app.state.store.get_analysis(id)}
 
     @app.get("/api/projects")
@@ -1329,8 +1352,14 @@ def create_app(
     @app.get("/api/incidents")
     async def list_incidents(request: Request) -> dict[str, Any]:
         ctx = _authenticate(request)
-        _require_principal(ctx, ("console",))
+        _require_principal(ctx, ("api_key", "console"))
         incidents = app.state.store.list_incidents(workspace_id=ctx.workspace_id)
+        if ctx.kind == "api_key" and ctx.project_id is not None:
+            incidents = [
+                incident
+                for incident in incidents
+                if incident.get("project_id") == ctx.project_id
+            ]
         query = request.query_params.get("q")
         if query:
             incidents = [
@@ -1343,15 +1372,15 @@ def create_app(
     @app.get("/api/incidents/{id}")
     async def get_incident_route(id: str, request: Request) -> dict[str, Any]:
         ctx = _authenticate(request)
-        _require_principal(ctx, ("console",))
-        incident = _require_incident_in_workspace(id, ctx)
+        _require_principal(ctx, ("api_key", "console"))
+        incident = _require_incident_read(id, ctx)
         return {"incident": incident}
 
     @app.get("/api/incidents/{id}/context")
     async def get_incident_context_route(id: str, request: Request) -> dict[str, Any]:
         ctx = _authenticate(request)
-        _require_principal(ctx, ("console",))
-        incident = _require_incident_in_workspace(id, ctx)
+        _require_principal(ctx, ("api_key", "console"))
+        incident = _require_incident_read(id, ctx)
         context = build_incident_context(app.state.store, incident)
         return {"context": context}
 

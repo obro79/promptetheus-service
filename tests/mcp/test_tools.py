@@ -119,9 +119,7 @@ def wired() -> Iterator[tuple[PromptetheusClient, InMemoryStore, str]]:
     # A Starlette TestClient is a sync httpx client wired to the in-process app;
     # injecting it drives every tool over the real request path without a server.
     http_client = testclient.TestClient(app)
-    client = PromptetheusClient(
-        console_token="pt_console_token", http_client=http_client
-    )
+    client = PromptetheusClient(api_key="pt_dev_key", http_client=http_client)
     try:
         yield client, store, incident_id
     finally:
@@ -241,7 +239,11 @@ def test_link_pr_to_incident_writes_through_and_audits(
     client, store, incident_id = wired
     pr_url = "https://github.com/acme/repo/pull/7"
 
-    result = tools.link_pr_to_incident(client, incident_id, pr_url)
+    console_client = PromptetheusClient(
+        console_token="pt_console_token",
+        http_client=testclient.TestClient(create_app(store=store)),
+    )
+    result = tools.link_pr_to_incident(console_client, incident_id, pr_url)
     assert result["pr_url"] == pr_url
 
     # The write landed on the canonical store...

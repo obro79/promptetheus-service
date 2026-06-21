@@ -50,5 +50,16 @@ export PROMPTETHEUS_API_KEY=pt_dev_key
 
 Use `/self-host.json` for the same sessions/events snapshot as JSON.
 
+## MCP credentials
+
+The Promptetheus MCP server can read project-scoped sessions, trace events,
+analysis, and incident context with the same project API key used by the SDK:
+
+```bash
+export PROMPTETHEUS_API_KEY=pt_live_...
+```
+
+Set `PROMPTETHEUS_CONSOLE_TOKEN` only for owner-only console workflows.
+
 Start with [AGENTS.md](AGENTS.md) for repo-specific build guidance and
 [docs/README.md](docs/README.md) for the documentation index.

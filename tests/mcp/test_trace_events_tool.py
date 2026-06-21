@@ -77,7 +77,7 @@ def test_get_trace_events_redacts_raw_payloads() -> None:
     assert SECRET_PASSWORD in raw
 
     client = PromptetheusClient(
-        console_token="pt_console_token", http_client=testclient.TestClient(app)
+        api_key="pt_dev_key", http_client=testclient.TestClient(app)
     )
     try:
         timeline = tools.get_trace_events(client, trace_id)
