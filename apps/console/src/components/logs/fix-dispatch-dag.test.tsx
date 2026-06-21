@@ -349,23 +349,23 @@ describe("FixDispatchDag", () => {
     render(<FixDispatchDag autoDemo layout="prominent" run={run()} />);
 
     expect(screen.getByText("Dispatch running")).toBeInTheDocument();
-    expect(screen.getByText("3s demo loop")).toBeInTheDocument();
+    expect(screen.getByText("30s demo loop")).toBeInTheDocument();
     expect(within(screen.getByLabelText("Fix DAG proof")).getByText("Read selected run")).toBeInTheDocument();
 
     await act(async () => {
-      vi.advanceTimersByTime(3000);
+      vi.advanceTimersByTime(6000);
     });
 
     expect(within(screen.getByLabelText("Fix DAG proof")).getByText("Plan fix from incident")).toBeInTheDocument();
 
     await act(async () => {
-      vi.advanceTimersByTime(3000);
+      vi.advanceTimersByTime(6000);
     });
 
     expect(within(screen.getByLabelText("Fix DAG proof")).getByText("Dispatch fix agent")).toBeInTheDocument();
 
     await act(async () => {
-      vi.advanceTimersByTime(9000);
+      vi.advanceTimersByTime(18000);
     });
 
     expect(screen.getByText("Merge-ready PR path")).toBeInTheDocument();
@@ -382,7 +382,7 @@ describe("FixDispatchDag", () => {
 
     await act(async () => {
       await Promise.resolve();
-      vi.advanceTimersByTime(2200);
+      vi.advanceTimersByTime(30000);
     });
 
     expect(dispatchHeal).toHaveBeenCalledWith(incident.id, expect.objectContaining({ incident }));
@@ -422,7 +422,7 @@ describe("FixDispatchDag", () => {
 
     await act(async () => {
       await Promise.resolve();
-      vi.advanceTimersByTime(2200);
+      vi.advanceTimersByTime(30000);
     });
 
     expect(dispatchHeal).toHaveBeenCalledWith(incident.id, expect.objectContaining({ incident }));
@@ -505,7 +505,7 @@ describe("FixDispatchDag", () => {
 
     await act(async () => {
       await Promise.resolve();
-      vi.advanceTimersByTime(2200);
+      vi.advanceTimersByTime(30000);
     });
 
     expect(screen.getByText("Waiting for Devin PR")).toBeInTheDocument();
@@ -546,7 +546,7 @@ describe("FixDispatchDag", () => {
 
     await act(async () => {
       await Promise.resolve();
-      vi.advanceTimersByTime(2200);
+      vi.advanceTimersByTime(30000);
     });
 
     expect(screen.getByText("Demo dispatch complete")).toBeInTheDocument();
@@ -562,7 +562,7 @@ describe("FixDispatchDag", () => {
 
     await act(async () => {
       await Promise.resolve();
-      vi.advanceTimersByTime(2200);
+      vi.advanceTimersByTime(30000);
     });
 
     expect(screen.getByText("Dispatch failed")).toBeInTheDocument();
@@ -602,7 +602,7 @@ describe("FixDispatchDag", () => {
 
     await act(async () => {
       await Promise.resolve();
-      vi.advanceTimersByTime(2200);
+      vi.advanceTimersByTime(30000);
     });
 
     const proof = within(screen.getByLabelText("Fix DAG proof"));
