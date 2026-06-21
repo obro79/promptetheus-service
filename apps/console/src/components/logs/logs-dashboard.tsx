@@ -24,6 +24,7 @@ import {
   ListFilter,
   Loader2,
   MessageSquare,
+  Network,
   PanelRight,
   PlayCircle,
   Power,
@@ -48,6 +49,7 @@ import {
   ClaudeMark,
   DevinMark,
 } from "@/components/common/brand-marks";
+import { MemoryStage } from "@/components/demo/demo-presentation";
 import { JsonViewer } from "@/components/common/json-viewer";
 import { LabelTag } from "@/components/common/label-tag";
 import { StatusPill } from "@/components/common/status-pill";
@@ -124,6 +126,7 @@ type LogSection =
   | "runs"
   | "evaluations"
   | "logs"
+  | "memory"
   | "actions"
   | "settings";
 
@@ -136,6 +139,7 @@ const NAV_ITEMS: Array<{
   { value: "runs", label: "Runs / Traces", Icon: Waypoints },
   { value: "evaluations", label: "Evaluations", Icon: FlaskConical },
   { value: "logs", label: "Logs", Icon: ScrollText },
+  { value: "memory", label: "Memory", Icon: Network },
   { value: "actions", label: "Actions", Icon: GitPullRequest },
   { value: "settings", label: "Settings", Icon: Settings2 },
 ];
@@ -605,6 +609,8 @@ export function LogsDashboard({
           />
         ) : section === "evaluations" ? (
           <EvaluationsPanel agents={agents} runs={runs} />
+        ) : section === "memory" ? (
+          <MemoryPanel />
         ) : section === "actions" ? (
           <ActionsPanel incidents={incidents} onOpenRun={openRun} />
         ) : (
@@ -1070,6 +1076,34 @@ function AgentStat({
         {value}
       </dd>
     </div>
+  );
+}
+
+// ─── Memory (Redis fix-memory) ───────────────────────────────────────────────
+
+/**
+ * Redis fix-memory section: the Vector Set cluster map + heal-loop ribbon +
+ * the context packet handed to Devin. Reuses the demo deck's MemoryStage so the
+ * /demo and /logs views stay in sync.
+ */
+function MemoryPanel() {
+  return (
+    <section className={cn("p-4 sm:p-5", SURFACE)}>
+      <div className="flex items-center gap-2">
+        <span className="inline-flex size-8 items-center justify-center rounded-lg border border-accent/25 bg-accent-muted text-accent">
+          <Network className="size-3.5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-foreground">Redis fix memory</h2>
+          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+            Verified fixes are embedded into a Redis 8 Vector Set. VSIM clusters a new
+            incident with past failures and packs the nearest fixes into the context
+            packet handed to Devin.
+          </p>
+        </div>
+      </div>
+      <MemoryStage />
+    </section>
   );
 }
 
