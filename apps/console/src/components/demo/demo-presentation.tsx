@@ -76,6 +76,8 @@ const agentTracks = [
     key: "browser",
     label: "Browser Agent",
     icon: Waypoints,
+    failVideo: "/assets/demo-agents/browser-fail.webm",
+    passVideo: "/assets/demo-agents/browser-pass.webm",
     failed: "Books the wrong time slot and claims the task is complete.",
     install:
       "Add the Promptetheus decorator before the browser agent entrypoint.",
@@ -88,6 +90,8 @@ const agentTracks = [
     key: "voice",
     label: "Voice Agent",
     icon: Radio,
+    failVideo: "/assets/demo-agents/voice-fail.webm",
+    passVideo: "/assets/demo-agents/voice-pass.webm",
     failed: "Misses the escalation handoff after silence and user frustration.",
     install:
       "Wrap the voice agent so transcript, silence, and handoff events are captured.",
@@ -100,6 +104,8 @@ const agentTracks = [
     key: "chat",
     label: "Chat Agent",
     icon: MessageSquare,
+    failVideo: "/assets/demo-agents/chat-agent-failed.webm",
+    passVideo: "/assets/demo-agents/chat-agent-successful.webm",
     failed:
       "Repeats stale advice and loops the customer back to the wrong step.",
     install:
@@ -240,7 +246,7 @@ const SECTIONS: DemoSection[] = [
       agent: agent.label,
       icon: agent.icon,
       caption: agent.failed,
-      video: `/assets/demo-agents/${agent.key}-fail.webm`,
+      video: agent.failVideo,
       muted: agent.key !== "voice",
       tone: "failed",
     })),
@@ -272,7 +278,7 @@ const SECTIONS: DemoSection[] = [
       icon: agent.icon,
       caption: agent.streaming,
       // Same recording as the Fail step — the failure still happens on rerun.
-      video: `/assets/demo-agents/${agent.key}-fail.webm`,
+      video: agent.failVideo,
       muted: agent.key !== "voice",
       logs: OBSERVE_LOGS[agent.key],
       tone: "streaming",
@@ -304,7 +310,7 @@ const SECTIONS: DemoSection[] = [
       agent: agent.label,
       icon: agent.icon,
       caption: agent.passed,
-      video: `/assets/demo-agents/${agent.key}-pass.webm`,
+      video: agent.passVideo,
       muted: agent.key !== "voice",
       tone: "passed",
     })),
