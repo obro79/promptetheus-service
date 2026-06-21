@@ -1,4 +1,4 @@
-import { Activity, Gauge, ListTree, Timer } from "lucide-react";
+import { ListTree } from "lucide-react";
 
 import { LogsDashboard } from "@/components/logs/logs-dashboard";
 import {
@@ -6,8 +6,6 @@ import {
   ConsolePageContent,
   ConsolePageHeader,
   ConsoleEyebrow,
-  MetricReadout,
-  SignalChip,
 } from "@/components/common/console-primitives";
 import {
   getAnalysis,
@@ -35,35 +33,18 @@ export default function LogsPage() {
     analysesBySession[session.id] = getAnalysis(session.id);
   }
 
-  const failed = sessions.filter(
-    (s) => s.status === "failed" || s.status === "error",
-  ).length;
-  const passed = sessions.filter((s) => s.status === "passed").length;
-
   return (
     <ConsolePage>
-      <ConsolePageHeader>
+      <ConsolePageHeader narrow>
         <div className="min-w-0">
           <ConsoleEyebrow icon={<ListTree className="size-3.5" strokeWidth={1.8} aria-hidden />}>
             Trace logs
           </ConsoleEyebrow>
-          <h1 className="landing-display-lg max-w-4xl">Agent run logs</h1>
-          <p className="mt-5 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Search, filter, and inspect instrumented runs with waterfall traces
-            and event-level payloads. Use this view when you need LangSmith-style
-            log exploration without leaving the console.
+          <h1 className="text-2xl font-serif tracking-tight text-foreground">Agent run logs</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Search, filter, and inspect runs with waterfall traces and event payloads.
           </p>
-          <div className="mt-6 flex flex-wrap items-center gap-2.5 text-[11px] font-medium text-muted-foreground">
-            <SignalChip Icon={Activity} label="Live trace streaming" />
-            <SignalChip Icon={Gauge} label="Failure signals attached" />
-            <SignalChip Icon={Timer} label="Latency percentiles" />
-          </div>
         </div>
-        <dl className="grid w-full grid-cols-3 gap-3 lg:w-auto">
-          <MetricReadout label="Total" value={sessions.length} />
-          <MetricReadout label="Failed" value={failed} tone="warning" />
-          <MetricReadout label="Passed" value={passed} tone="signal" />
-        </dl>
       </ConsolePageHeader>
 
       <ConsolePageContent>
