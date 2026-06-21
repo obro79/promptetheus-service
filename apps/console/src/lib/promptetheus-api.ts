@@ -1,4 +1,4 @@
-import type { HealReport, Project, Workspace } from "./types";
+import type { EvalScoreboard, HealReport, Project, Workspace } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_PROMPTETHEUS_API_URL;
 const ENV_CONSOLE_TOKEN = process.env.NEXT_PUBLIC_PROMPTETHEUS_CONSOLE_TOKEN;
@@ -153,6 +153,16 @@ export async function healIncident(
     method: "POST",
     body: JSON.stringify(maxAttempts ? { max_attempts: maxAttempts } : {}),
   });
+}
+
+/** Live eval scoreboard (GET /api/evals/scoreboard). Returns null when the API
+ *  is not configured — callers fall back to the mock `getEvalScoreboard()`. */
+export async function fetchEvalScoreboard(): Promise<EvalScoreboard | null> {
+  const result = await apiFetch<{ scoreboard: EvalScoreboard }>(
+    "/api/evals/scoreboard",
+    { method: "GET" },
+  );
+  return result ? result.scoreboard : null;
 }
 
 export async function updateProjectSettings(

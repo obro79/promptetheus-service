@@ -10,6 +10,7 @@ import {
   Check,
   ChevronsUpDown,
   FlaskConical,
+  Gauge,
   ListTree,
   Settings,
   type LucideIcon,
@@ -36,6 +37,7 @@ interface NavItem {
 const PRIMARY_NAV: NavItem[] = [
   { label: "Incidents", href: "/incidents", Icon: AlertTriangle },
   { label: "Sessions", href: "/sessions", Icon: ListTree },
+  { label: "Evals", href: "/evals", Icon: Gauge },
   { label: "Agents", href: "/agents", Icon: Bot },
 ];
 

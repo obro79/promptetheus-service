@@ -157,7 +157,53 @@ export interface HealAttempt {
     after_fail?: number;
     [key: string]: unknown;
   } | null;
+  eval: EvalReport | null;
   passed: boolean;
+}
+
+/** One eval case scored before vs after the fix (server.evals). */
+export interface EvalCaseResult {
+  case_id: string;
+  assertion: string;
+  before_passed: boolean;
+  after_passed: boolean;
+  confidence: number;
+  reason: string;
+}
+
+/** Aggregate eval verdict for one heal attempt. */
+export interface EvalReport {
+  passed: boolean;
+  meaningful: boolean;
+  fallback: boolean;
+  before_fail: number;
+  after_fail: number;
+  note: string | null;
+  cases: EvalCaseResult[];
+}
+
+/** One incident's decisive eval outcome (GET /api/evals/scoreboard). */
+export interface EvalScoreboardRow {
+  incident_id: string;
+  label: string;
+  before_passed: boolean;
+  after_passed: boolean;
+  confidence: number;
+  attempts: number;
+  fallback: boolean;
+  passed: boolean;
+  reason: string | null;
+}
+
+/** Workspace-level eval rollup + per-incident rows. */
+export interface EvalScoreboard {
+  total: number;
+  passed: number;
+  pass_rate: number;
+  flips: number;
+  avg_confidence: number;
+  fallback_count: number;
+  rows: EvalScoreboardRow[];
 }
 
 /** A PR (real or fallback preview) attached to a verified heal. */

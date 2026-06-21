@@ -107,6 +107,9 @@ def _audit_attempt(
                         "after_fail": record.get("regression", {}).get("after_fail"),
                         "before_fail": record.get("regression", {}).get("before_fail"),
                     },
+                    # Persist the eval verdict so the console scoreboard can
+                    # aggregate fix quality across heals (GET /api/evals/scoreboard).
+                    "eval": record.get("eval"),
                 },
             }
         )

@@ -933,6 +933,83 @@ def create_app(
         )
         return {"regression_run": run, "fallback": True}
 
+    # -- evals scoreboard -------------------------------------------------------
+
+    @app.get("/api/evals/scoreboard")
+    async def eval_scoreboard(request: Request) -> dict[str, Any]:
+        """Aggregate the LLM-as-judge eval verdicts across heals.
+
+        Reads the persisted `heal_attempt` audit rows (which carry each
+        attempt's eval verdict) and folds them into a per-incident scoreboard:
+        the decisive (last) attempt's before/after pass, judge confidence, and
+        whether the gate passed — plus workspace-level rollups. This is the read
+        the console eval scoreboard renders; the same eval scores are emitted to
+        Sentry in parallel for production observability.
+        """
+
+        ctx = _authenticate(request)
+        _require_principal(ctx, ("console",))
+
+        audits = app.state.store.list_audit(workspace_id=ctx.workspace_id)
+        latest: dict[str, dict[str, Any]] = {}
+        attempts_by_incident: dict[str, int] = {}
+        for entry in audits:
+            if entry.get("action") != "heal_attempt":
+                continue
+            meta = entry.get("metadata") or {}
+            report = meta.get("eval")
+            incident_id = entry.get("incident_id")
+            if incident_id is None or not isinstance(report, dict):
+                continue
+            if not report.get("meaningful"):
+                continue
+            attempts_by_incident[incident_id] = attempts_by_incident.get(incident_id, 0) + 1
+            latest[incident_id] = report  # append-ordered audits -> last wins
+
+        labels: dict[str, str] = {}
+        for incident in app.state.store.list_incidents(workspace_id=ctx.workspace_id):
+            iid = incident.get("id")
+            if iid is not None:
+                labels[iid] = incident.get("label") or incident.get("title") or iid
+
+        rows: list[dict[str, Any]] = []
+        for incident_id, report in latest.items():
+            cases = report.get("cases") or []
+            case = cases[0] if isinstance(cases, list) and cases else {}
+            rows.append(
+                {
+                    "incident_id": incident_id,
+                    "label": labels.get(incident_id, incident_id),
+                    "before_passed": bool(case.get("before_passed", False)),
+                    "after_passed": bool(case.get("after_passed", True)),
+                    "confidence": float(case.get("confidence") or 0.0),
+                    "attempts": attempts_by_incident.get(incident_id, 1),
+                    "fallback": bool(report.get("fallback")),
+                    "passed": bool(report.get("passed")),
+                    "reason": case.get("reason"),
+                }
+            )
+        rows.sort(key=lambda row: row["incident_id"])
+
+        total = len(rows)
+        passed = sum(1 for row in rows if row["passed"])
+        flips = sum(1 for row in rows if not row["before_passed"] and row["after_passed"])
+        fallback_count = sum(1 for row in rows if row["fallback"])
+        avg_confidence = (
+            sum(row["confidence"] for row in rows) / total if total else 0.0
+        )
+        return {
+            "scoreboard": {
+                "total": total,
+                "passed": passed,
+                "pass_rate": (passed / total) if total else 0.0,
+                "flips": flips,
+                "avg_confidence": avg_confidence,
+                "fallback_count": fallback_count,
+                "rows": rows,
+            }
+        }
+
     # -- internal jobs ----------------------------------------------------------
 
     @app.post("/internal/retention/run")

@@ -73,15 +73,19 @@ def _summarize_documents(docs: list[Any]) -> str:
         return str(docs)[:2000]
 
 
-def _render_assertion(user_goal: str | None, mismatches: list[str]) -> str:
+def _render_assertion(
+    user_goal: str | None, mismatches: list[str], root_cause: str | None
+) -> str:
     goal = (user_goal or "the user's stated goal").strip()
     lines = [
-        f"The agent's final answer must satisfy: {goal}",
-        "It must be consistent with the retrieved evidence and must not "
-        "contradict it.",
+        f"The agent's final answer/action must satisfy: {goal}",
+        "It must be consistent with the retrieved evidence and the user's goal, "
+        "and must not contradict them.",
     ]
     if mismatches:
         lines.append("The original failure was: " + "; ".join(str(m) for m in mismatches))
+    elif root_cause:
+        lines.append(f"The detected root cause was: {root_cause}")
     return "\n".join(lines)
 
 
@@ -130,27 +134,35 @@ def derive_cases(bundle: dict[str, Any]) -> list[EvalCase]:
     if not isinstance(events, list) or not events:
         return []
 
-    goal_check = _failed_goal_check(events)
-    if goal_check is None:
-        return []
-
-    mismatches = _payload(goal_check).get("mismatches")
-    mismatches = [str(m) for m in mismatches] if isinstance(mismatches, list) else []
-
     agent_messages = _events_of(events, "agent_message")
     before_output = _payload(agent_messages[-1]).get("content") if agent_messages else ""
     before_output = str(before_output or "")
+    if not before_output:
+        # No answer/action to evaluate -> nothing meaningful to score.
+        return []
 
-    docs = _collect_documents(events)
+    # Prefer the failed goal_check's mismatches (strongest assertion source), but
+    # the bundle's event window often excludes the terminal goal_check, so fall
+    # back to the analysis root cause / user goal, which are always in the bundle.
+    goal_check = _failed_goal_check(events)
+    mismatches = _payload(goal_check).get("mismatches") if goal_check else None
+    mismatches = [str(m) for m in mismatches] if isinstance(mismatches, list) else []
+
+    root_cause = bundle.get("root_cause")
+    root_cause = str(root_cause) if isinstance(root_cause, str) and root_cause.strip() else None
     user_goal = bundle.get("user_goal")
 
+    if not (mismatches or root_cause or (isinstance(user_goal, str) and user_goal.strip())):
+        return []
+
+    docs = _collect_documents(events)
     incident = bundle.get("incident") if isinstance(bundle.get("incident"), dict) else {}
     incident_id = str(incident.get("id") or bundle.get("representative_session_id") or "incident")
 
     return [
         EvalCase(
             case_id=f"{incident_id}:goal_check",
-            assertion=_render_assertion(user_goal, mismatches),
+            assertion=_render_assertion(user_goal, mismatches, root_cause),
             context=_render_context(user_goal, docs),
             before_output=before_output,
             after_output=_resolve_after_output(bundle, user_goal, docs),
