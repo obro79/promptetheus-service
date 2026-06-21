@@ -1321,7 +1321,10 @@ function RunsTable({
   }
 
   return (
-    <div className={cn("max-h-[42dvh] min-h-[340px] overflow-auto", SURFACE)}>
+    <div
+      className={cn("max-h-[42dvh] min-h-[340px] overflow-auto", SURFACE)}
+      aria-label="Runs list"
+    >
       <Table>
         <TableHeader className="sticky top-0 z-10 bg-muted/60">
           <TableRow className="hover:bg-transparent">

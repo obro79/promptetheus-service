@@ -170,32 +170,32 @@ afterEach(() => {
 });
 
 describe("LogsDashboard", () => {
-  it("shows agent nav and runs table without inline trace by default", () => {
+  it("shows logs navigation, runs table, and trace debugger by default", () => {
     renderDashboard();
 
-    expect(screen.getByLabelText("Agent navigation")).toBeInTheDocument();
+    expect(screen.getByLabelText("Logs sections")).toBeInTheDocument();
     expect(screen.getByLabelText("Runs list")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Trace waterfall")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Run inspector")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Trace waterfall")).toBeInTheDocument();
+    expect(screen.getByLabelText("Run inspector")).toBeInTheDocument();
   });
 
-  it("filters run rows with status pills and opens trace overlay on run click", () => {
+  it("filters run rows with status pills and updates the selected trace", () => {
     renderDashboard();
+    fireEvent.click(screen.getByRole("button", { name: "Failed only" }));
 
     const runsList = screen.getByLabelText("Runs list");
 
     expect(within(runsList).getAllByText("Book a demo at 2pm").length).toBeGreaterThan(0);
     expect(within(runsList).getAllByText("Answer order status").length).toBeGreaterThan(0);
-    expect(screen.queryByLabelText("Trace waterfall")).not.toBeInTheDocument();
 
-    fireEvent.click(within(runsList).getByRole("button", { name: "Passed (1)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Passed" }));
 
     expect(within(runsList).queryByText("Book a demo at 2pm")).not.toBeInTheDocument();
     expect(within(runsList).getAllByText("Answer order status").length).toBeGreaterThan(0);
 
-    openRunTrace("Answer order status");
+    fireEvent.click(within(runsList).getByRole("button", { name: "Inspect run ses_passed" }));
 
-    expect(screen.getByLabelText("Expanded trace view")).toBeInTheDocument();
+    expect(screen.getByLabelText("Trace waterfall")).toBeInTheDocument();
     expect(screen.getAllByText("Order shipped").length).toBeGreaterThan(0);
   });
 
@@ -211,20 +211,15 @@ describe("LogsDashboard", () => {
     expect(within(trace).getByText("browser.click")).toBeInTheDocument();
   });
 
-  it("shows exit full view control after opening a run", async () => {
+  it("shows section navigation and trace controls", () => {
     renderDashboard();
 
-    const agentNav = screen.getByLabelText("Agent navigation");
-    expect(within(agentNav).getAllByRole("button", { name: /All agents/i })[0]).toHaveAttribute(
-      "aria-pressed",
-      "true",
+    expect(screen.getByRole("button", { name: "Agents" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Runs / Traces" })).toHaveAttribute(
+      "aria-current",
+      "page",
     );
-
-    expect(screen.queryByRole("button", { name: /Exit full view/i })).not.toBeInTheDocument();
-
-    openRunTrace("Book a demo at 2pm");
-
-    expect(screen.getByRole("button", { name: /Exit full view/i })).toBeInTheDocument();
+    expect(screen.getByLabelText("Expand trace tree")).toBeInTheDocument();
   });
 
   it("shows the promoted fix dispatch DAG above the runs list with proof receipts", () => {
@@ -243,14 +238,10 @@ describe("LogsDashboard", () => {
   it("auto-selects a failed run when selecting an agent without opening trace overlay", () => {
     renderDashboard();
 
-    const agentNav = screen.getByLabelText("Agent navigation");
-    const logsProjectBtn = within(agentNav)
-      .getAllByRole("button")
-      .find((btn) => btn.textContent?.includes("Logs Project"))!;
-    fireEvent.click(logsProjectBtn);
+    fireEvent.click(screen.getByLabelText("Logs Project"));
 
     expect(screen.getAllByText("Book a demo at 2pm").length).toBeGreaterThan(0);
-    expect(screen.queryByLabelText("Trace waterfall")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Trace waterfall")).toBeInTheDocument();
   });
 
   it("filters runs to a selected agent and hides runs from other agents", () => {
@@ -291,28 +282,25 @@ describe("LogsDashboard", () => {
         analysesBySession={analysesBySession}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: "Failed only" }));
 
     const runsList = screen.getByLabelText("Runs list");
     expect(within(runsList).getAllByText("Other agent task").length).toBeGreaterThan(0);
 
-    const agentNav = screen.getByLabelText("Agent navigation");
-    const logsProjectBtn = within(agentNav)
-      .getAllByRole("button")
-      .find((btn) => btn.textContent?.includes("Logs Project"))!;
-    fireEvent.click(logsProjectBtn);
+    fireEvent.click(screen.getByLabelText("Logs Project"));
 
     expect(within(runsList).queryByText("Other agent task")).not.toBeInTheDocument();
   });
 
   it("hydrates selection from URL search params and opens trace overlay", () => {
     mockSearchParams.set("agent", "prj_logs");
-    mockSearchParams.set("session", "ses_passed");
-    mockSearchParams.set("seq", "1");
+    mockSearchParams.set("session", "ses_failed");
+    mockSearchParams.set("seq", "2");
 
     renderDashboard();
 
-    expect(screen.getByLabelText("Expanded trace view")).toBeInTheDocument();
-    expect(screen.getAllByText("Answer order status").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Order shipped").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Trace waterfall")).toBeInTheDocument();
+    expect(screen.getAllByText("Book a demo at 2pm").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Selected 2am").length).toBeGreaterThan(0);
   });
 });
