@@ -73,16 +73,7 @@ and regression replay results.
 State 0 is a real hosted-service MVP: FastAPI is the trace write gateway, Supabase is canonical
 storage, and the Next.js console renders replay, incidents, docs, settings, logs, and the demo.
 
-```mermaid
-flowchart LR
-    Agent["Agent runtime or SDK"] -->|"events + artifacts"| API["FastAPI ingestion (:4318)"]
-    API -->|"structured trace state"| DB[("Supabase Postgres")]
-    API -->|"private replay artifacts"| Storage["Supabase Storage"]
-    API -->|"analysis + fix + regression"| Services["Analysis / Fix Agent / GitHub / Regression"]
-    DB --> Console["Next.js console (:3000)"]
-    Storage --> Console
-    API -->|"workspace-filtered SSE"| Console
-```
+![Promptetheus architecture diagram](docs/assets/diagrams/promptetheus-architecture-diagram.png)
 
 Load-bearing rules:
 
