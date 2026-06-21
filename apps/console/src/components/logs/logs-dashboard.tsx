@@ -4,24 +4,33 @@ import * as React from "react";
 import {
   Activity,
   AlertCircle,
+  AlertTriangle,
+  Bell,
   Bot,
+  Bug,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   CircleDot,
   Columns3,
+  Eye,
   FileJson,
   Filter,
+  FlaskConical,
   Gauge,
   ListFilter,
   MessageSquare,
   PanelRight,
+  PlayCircle,
   RotateCcw,
+  ScrollText,
   Search,
+  Settings2,
   Sparkles,
   Tags,
   Terminal,
   Timer,
+  Waypoints,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -55,6 +64,7 @@ import type {
   TraceSession,
 } from "@/lib/types";
 import { cn, fmtDuration, fmtRelative, pct, shortId } from "@/lib/utils";
+import { buildAgents, type AgentRow } from "./agents-model";
 import {
   DEFAULT_COLUMNS,
   buildLogRuns,
@@ -79,6 +89,28 @@ interface LogsDashboardProps {
   eventsBySession: Record<string, TraceEvent[]>;
   analysesBySession: Record<string, AnalysisResult | undefined>;
 }
+
+type LogSection =
+  | "agents"
+  | "runs"
+  | "evaluations"
+  | "logs"
+  | "alerts"
+  | "settings";
+
+const NAV_ITEMS: Array<{
+  value: LogSection;
+  label: string;
+  Icon: LucideIcon;
+  hint: string;
+}> = [
+  { value: "agents", label: "Agents", Icon: Bot, hint: "Fleet overview" },
+  { value: "runs", label: "Runs / Traces", Icon: Waypoints, hint: "Trace explorer" },
+  { value: "evaluations", label: "Evaluations", Icon: FlaskConical, hint: "Quality scores" },
+  { value: "logs", label: "Logs", Icon: ScrollText, hint: "Raw run stream" },
+  { value: "alerts", label: "Alerts", Icon: Bell, hint: "Triggers & webhooks" },
+  { value: "settings", label: "Settings", Icon: Settings2, hint: "Project config" },
+];
 
 const STATUS_FILTERS: Array<{ value: LogFilters["status"]; label: string }> = [
   { value: "all", label: "All" },
@@ -149,6 +181,11 @@ function costEstimate(tokens: number): string {
   return `$${((tokens / 1000) * 0.0015).toFixed(4)}`;
 }
 
+function fmtMoney(value: number): string {
+  if (!value) return "$0.00";
+  return value < 0.01 ? `$${value.toFixed(4)}` : `$${value.toFixed(2)}`;
+}
+
 function eventLatency(event: TraceEvent): number {
   const payload = event.payload as Record<string, unknown>;
   return Number(payload.latency_ms ?? payload.duration_ms ?? event.t_offset_ms ?? 0);
@@ -194,6 +231,7 @@ export function LogsDashboard({
     () => uniqueSorted(runs.map((run) => run.session.environment)),
     [runs],
   );
+  const [section, setSection] = React.useState<LogSection>("agents");
   const [query, setQuery] = React.useState("");
   const [status, setStatus] = React.useState<LogFilters["status"]>("all");
   const [failedOnly, setFailedOnly] = React.useState(true);
@@ -230,6 +268,7 @@ export function LogsDashboard({
     [filters, runs, sortDirection, sortKey],
   );
   const metrics = React.useMemo(() => deriveLogMetrics(filteredRuns), [filteredRuns]);
+  const agents = React.useMemo(() => buildAgents(runs), [runs]);
   const selectedRun = React.useMemo(
     () => runs.find((run) => run.session.id === selectedRunId) ?? filteredRuns[0] ?? runs[0],
     [filteredRuns, runs, selectedRunId],
@@ -289,82 +328,645 @@ export function LogsDashboard({
     setSelectedTags([]);
   };
 
+  const openRun = (run: LogRun) => {
+    setSelectedRunId(run.session.id);
+    setSection("runs");
+  };
+
+  return (
+    <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-7">
+      <LogsNav active={section} onChange={setSection} />
+
+      <div className="min-w-0 flex-1">
+        {section === "runs" ? (
+          <div className="flex flex-col gap-3">
+            <LogFiltersBar
+              query={query}
+              onQueryChange={setQuery}
+              status={status}
+              onStatusChange={setStatus}
+              failedOnly={failedOnly}
+              onFailedOnlyChange={setFailedOnly}
+              timeRange={timeRange}
+              onTimeRangeChange={setTimeRange}
+              visibleColumns={visibleColumns}
+              onVisibleColumnsChange={setVisibleColumns}
+              resultCount={filteredRuns.length}
+              hasFilters={
+                Boolean(query) ||
+                status !== "all" ||
+                failedOnly ||
+                timeRange !== "7d" ||
+                hasSidebarFilters
+              }
+              onClear={clearAllFilters}
+            />
+
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
+              <div className="flex min-w-0 flex-col gap-3">
+                <RunsTable
+                  runs={filteredRuns}
+                  selectedRunId={selectedRun?.session.id}
+                  showColumn={showColumn}
+                  sortKey={sortKey}
+                  sortDirection={sortDirection}
+                  onSort={onSort}
+                  onSelect={(run) => setSelectedRunId(run.session.id)}
+                />
+
+                {selectedRun ? (
+                  <TraceDebugger
+                    run={selectedRun}
+                    traceTree={traceTree}
+                    visibleTrace={visibleTrace}
+                    expanded={expanded}
+                    onExpandedChange={setExpanded}
+                    selectedEvent={selectedEvent}
+                    onEventSelect={(event) => {
+                      setSelectedSeq(event.seq);
+                      setDetailTab("run");
+                    }}
+                    detailTab={detailTab}
+                    onDetailTabChange={setDetailTab}
+                  />
+                ) : (
+                  <div className="flex min-h-[320px] items-center justify-center rounded-2xl bg-panel/60 p-6 text-sm text-muted-foreground ring-1 ring-border/40">
+                    No runs match the current filters.
+                  </div>
+                )}
+              </div>
+
+              <FilterRail
+                metrics={metrics}
+                projects={projects}
+                selectedProjects={selectedProjects}
+                onProjectToggle={(projectId) =>
+                  setSelectedProjects((values) => toggleValue(values, projectId))
+                }
+                environments={environments}
+                selectedEnvironments={selectedEnvironments}
+                onEnvironmentToggle={(environment) =>
+                  setSelectedEnvironments((values) => toggleValue(values, environment))
+                }
+                tags={allTags}
+                selectedTags={selectedTags}
+                onTagToggle={(tag) => setSelectedTags((values) => toggleValue(values, tag))}
+                onClearFilters={clearAllFilters}
+              />
+            </div>
+          </div>
+        ) : section === "agents" ? (
+          <AgentsPanel agents={agents} onOpenRun={openRun} />
+        ) : section === "logs" ? (
+          <LogsPanel
+            query={query}
+            onQueryChange={setQuery}
+            status={status}
+            onStatusChange={setStatus}
+            runs={filteredRuns}
+            onOpenRun={openRun}
+          />
+        ) : section === "evaluations" ? (
+          <EmptyPanel
+            Icon={FlaskConical}
+            title="No evaluations yet"
+            description="Offline and online eval scores will land here — compare agent versions, benchmark datasets, and catch regressions before users do."
+          />
+        ) : section === "alerts" ? (
+          <EmptyPanel
+            Icon={Bell}
+            title="No alerts configured"
+            description="Set thresholds on error rate, latency, and cost to route failures to webhooks or PagerDuty the moment they happen."
+          />
+        ) : (
+          <EmptyPanel
+            Icon={Settings2}
+            title="Project settings"
+            description="API keys, retention, connected repo, and instrumentation setup for this project will live here."
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LogsNav({
+  active,
+  onChange,
+}: {
+  active: LogSection;
+  onChange: (section: LogSection) => void;
+}) {
+  return (
+    <nav
+      aria-label="Logs sections"
+      className="flex shrink-0 gap-1 overflow-x-auto pb-1 lg:sticky lg:top-24 lg:w-[212px] lg:flex-col lg:overflow-visible lg:pb-0"
+    >
+      {NAV_ITEMS.map((item) => {
+        const isActive = item.value === active;
+        const Icon = item.Icon;
+        return (
+          <button
+            key={item.value}
+            type="button"
+            onClick={() => onChange(item.value)}
+            aria-current={isActive ? "page" : undefined}
+            className={cn(
+              "group flex min-h-11 shrink-0 items-center gap-3 rounded-xl px-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+              isActive
+                ? "bg-accent/[0.08] text-accent"
+                : "text-muted-foreground hover:bg-elevated/60 hover:text-foreground",
+            )}
+          >
+            <Icon
+              className={cn(
+                "size-4 shrink-0 transition-colors",
+                isActive ? "text-accent" : "text-muted-foreground/65 group-hover:text-foreground",
+              )}
+              strokeWidth={1.8}
+            />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-medium leading-tight">{item.label}</span>
+              <span className="hidden truncate text-[11px] text-muted-foreground/70 lg:block">
+                {item.hint}
+              </span>
+            </span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+// ─── Agents (default view) ────────────────────────────────────────────────────
+
+/** Shared grid template so the column header and each row align exactly. */
+const AGENT_GRID =
+  "md:grid md:grid-cols-[minmax(0,1fr)_104px_124px_104px_84px_80px_72px_24px] md:items-center md:gap-4";
+
+function AgentsPanel({
+  agents,
+  onOpenRun,
+}: {
+  agents: AgentRow[];
+  onOpenRun: (run: LogRun) => void;
+}) {
+  const [expandedId, setExpandedId] = React.useState<string | null>(agents[0]?.id ?? null);
+  const totalRuns = agents.reduce((sum, agent) => sum + agent.runCount, 0);
+
+  if (agents.length === 0) {
+    return (
+      <EmptyPanel
+        Icon={Bot}
+        title="No agents yet"
+        description="Once you instrument an agent and start sending traces, each agent and version will appear here with live health stats."
+      />
+    );
+  }
+
+  return (
+    <section className="overflow-hidden rounded-2xl bg-panel/70 ring-1 ring-border/35">
+      <header className="flex items-center justify-between gap-3 px-5 py-4">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Agents</h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {agents.length} agents · {totalRuns} runs
+          </p>
+        </div>
+        <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span className="size-1.5 rounded-full bg-success" />
+          live
+        </span>
+      </header>
+
+      <div
+        className={cn(
+          "hidden border-t border-border/40 px-5 py-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground",
+          AGENT_GRID,
+        )}
+      >
+        <span>Agent</span>
+        <span>Status</span>
+        <span>Last run</span>
+        <span className="text-right">Avg latency</span>
+        <span className="text-right">Success</span>
+        <span className="text-right">Cost</span>
+        <span className="text-right">Version</span>
+        <span />
+      </div>
+
+      <ul className="divide-y divide-border/35 border-t border-border/40">
+        {agents.map((agent) => (
+          <AgentListItem
+            key={agent.id}
+            agent={agent}
+            expanded={agent.id === expandedId}
+            onToggle={() =>
+              setExpandedId((current) => (current === agent.id ? null : agent.id))
+            }
+            onOpenRun={onOpenRun}
+          />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function AgentListItem({
+  agent,
+  expanded,
+  onToggle,
+  onOpenRun,
+}: {
+  agent: AgentRow;
+  expanded: boolean;
+  onToggle: () => void;
+  onOpenRun: (run: LogRun) => void;
+}) {
+  const lowSuccess = agent.successRate < 0.9;
+  return (
+    <li className={cn(expanded && "bg-elevated/30")}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className={cn(
+          "w-full px-5 py-3.5 text-left transition-colors hover:bg-elevated/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50",
+          AGENT_GRID,
+        )}
+      >
+        {/* Name */}
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+            <Bot className="size-4" strokeWidth={1.8} />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-medium text-foreground">
+              {agent.name}
+            </span>
+            <span className="block truncate text-[11px] text-muted-foreground">
+              {agent.runCount} runs · {agent.failedCount} failed
+            </span>
+          </span>
+        </span>
+
+        {/* Mobile stat strip */}
+        <span className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground md:hidden">
+          <StatusPill status={agent.status} />
+          <span className="mono">{fmtDuration(agent.avgLatencyMs)}</span>
+          <span className={cn("mono", lowSuccess && "text-warning")}>{pct(agent.successRate)}</span>
+          <span className="mono">{fmtMoney(agent.totalCost)}</span>
+          <span className="mono">v{agent.version}</span>
+        </span>
+
+        {/* Desktop columns */}
+        <span className="hidden md:block">
+          <StatusPill status={agent.status} />
+        </span>
+        <span className="mono hidden text-[12px] text-muted-foreground md:block">
+          {fmtRelative(agent.lastRunAt)}
+        </span>
+        <span className="mono hidden text-right text-[12px] tabular-nums text-foreground md:block">
+          {fmtDuration(agent.avgLatencyMs)}
+        </span>
+        <span
+          className={cn(
+            "mono hidden text-right text-[12px] tabular-nums md:block",
+            lowSuccess ? "text-warning" : "text-success",
+          )}
+        >
+          {pct(agent.successRate)}
+        </span>
+        <span className="mono hidden text-right text-[12px] tabular-nums text-muted-foreground md:block">
+          {fmtMoney(agent.totalCost)}
+        </span>
+        <span className="hidden justify-end md:flex">
+          <span className="mono rounded-md bg-elevated px-1.5 py-0.5 text-[10px] text-muted-foreground">
+            v{agent.version}
+          </span>
+        </span>
+        <span className="hidden justify-end md:flex">
+          <ChevronRight
+            className={cn(
+              "size-4 text-muted-foreground/55 transition-transform",
+              expanded && "rotate-90",
+            )}
+          />
+        </span>
+      </button>
+
+      {expanded ? <AgentDrawer agent={agent} onOpenRun={onOpenRun} /> : null}
+    </li>
+  );
+}
+
+/** Inline, non-modal drawer that visually nests under the agent row. */
+function AgentDrawer({
+  agent,
+  onOpenRun,
+}: {
+  agent: AgentRow;
+  onOpenRun: (run: LogRun) => void;
+}) {
+  const latest = agent.runs[0];
+  const failed = agent.runs.find((run) => Boolean(run.errorPreview)) ?? undefined;
+  const recent = agent.runs.slice(0, 5);
+  const previewEvents = (latest?.events ?? []).slice(0, 6);
+
+  return (
+    <div className="px-3 pb-4 pl-5 md:pl-16">
+      <div className="rounded-xl border-l-2 border-accent/40 bg-canvas/60 p-4">
+        <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
+          {/* Left: overview + recent runs */}
+          <div className="flex flex-col gap-4">
+            <div>
+              <SectionLabel>Overview</SectionLabel>
+              <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <AgentStat label="Runs" value={String(agent.runCount)} />
+                <AgentStat
+                  label="Success"
+                  value={pct(agent.successRate)}
+                  tone={agent.successRate < 0.9 ? "warning" : undefined}
+                />
+                <AgentStat label="Avg latency" value={fmtDuration(agent.avgLatencyMs)} />
+                <AgentStat label="Failures" value={String(agent.failedCount)} />
+                <AgentStat label="Tokens" value={numberFormat(agent.totalTokens)} />
+                <AgentStat label="Cost" value={fmtMoney(agent.totalCost)} />
+              </dl>
+            </div>
+
+            <div>
+              <SectionLabel>Recent runs</SectionLabel>
+              <ul className="mt-2 overflow-hidden rounded-lg ring-1 ring-border/40">
+                {recent.map((run) => (
+                  <li key={run.session.id}>
+                    <button
+                      type="button"
+                      onClick={() => onOpenRun(run)}
+                      className="flex w-full items-center gap-3 border-b border-border/30 bg-panel/60 px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-elevated/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
+                    >
+                      <StatusPill status={run.session.status} />
+                      <span className="block min-w-0 flex-1 truncate text-[13px] text-foreground">
+                        {run.session.user_goal ?? run.session.id}
+                      </span>
+                      <span className="mono hidden shrink-0 text-[11px] text-muted-foreground sm:block">
+                        {fmtDuration(run.latencyMs)}
+                      </span>
+                      <span className="mono hidden shrink-0 text-[11px] text-muted-foreground md:block">
+                        {fmtRelative(run.session.started_at)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Right: trace preview + error + actions */}
+          <div className="flex flex-col gap-4">
+            <div>
+              <SectionLabel>Latest trace</SectionLabel>
+              <ol className="mt-2 space-y-0.5 rounded-lg bg-panel/60 p-2 ring-1 ring-border/40">
+                {previewEvents.length === 0 ? (
+                  <li className="px-2 py-3 text-[12px] text-muted-foreground">
+                    No trace events recorded.
+                  </li>
+                ) : (
+                  previewEvents.map((event) => {
+                    const Icon = EVENT_ICON[event.type] ?? FileJson;
+                    const isError =
+                      event.type === "error" ||
+                      (event.type === "goal_check" &&
+                        (event.payload as { passed?: boolean }).passed === false);
+                    return (
+                      <li
+                        key={event.seq}
+                        className="flex items-center gap-2.5 rounded-md px-2 py-1.5"
+                      >
+                        <Icon
+                          className={cn(
+                            "size-3.5 shrink-0",
+                            isError
+                              ? "text-warning"
+                              : event.type === "llm_call"
+                                ? "text-accent"
+                                : "text-muted-foreground",
+                          )}
+                          strokeWidth={1.8}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">
+                          {eventTitle(event)}
+                        </span>
+                        <span className="mono shrink-0 text-[10px] text-muted-foreground">
+                          {fmtDuration(eventLatency(event))}
+                        </span>
+                      </li>
+                    );
+                  })
+                )}
+              </ol>
+            </div>
+
+            {failed?.errorPreview ? (
+              <div>
+                <SectionLabel>Error preview</SectionLabel>
+                <div className="mt-2 flex items-start gap-2 rounded-lg bg-warning/[0.07] p-3 ring-1 ring-warning/20">
+                  <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" strokeWidth={1.8} />
+                  <p className="mono min-w-0 text-[11px] leading-5 text-warning/90 line-clamp-3">
+                    {failed.errorPreview}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="mt-auto flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => latest && onOpenRun(latest)}
+                disabled={!latest}
+              >
+                <Eye className="size-3.5" />
+                View full trace
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => latest && onOpenRun(latest)}
+                disabled={!latest}
+              >
+                <PlayCircle className="size-3.5" />
+                Replay run
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onOpenRun(failed ?? latest)}
+                disabled={!latest}
+              >
+                <Bug className="size-3.5" />
+                Debug
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+      {children}
+    </p>
+  );
+}
+
+function AgentStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "warning";
+}) {
+  return (
+    <div className="rounded-lg bg-panel/70 px-3 py-2 ring-1 ring-border/35">
+      <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dd
+        className={cn(
+          "mono mt-1 truncate text-sm font-semibold tabular-nums text-foreground",
+          tone === "warning" && "text-warning",
+        )}
+      >
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+// ─── Logs (flat, scannable run stream) ────────────────────────────────────────
+
+function LogsPanel({
+  query,
+  onQueryChange,
+  status,
+  onStatusChange,
+  runs,
+  onOpenRun,
+}: {
+  query: string;
+  onQueryChange: (value: string) => void;
+  status: LogFilters["status"];
+  onStatusChange: (value: LogFilters["status"]) => void;
+  runs: LogRun[];
+  onOpenRun: (run: LogRun) => void;
+}) {
   return (
     <div className="flex flex-col gap-3">
-      <LogFiltersBar
-        query={query}
-        onQueryChange={setQuery}
-        status={status}
-        onStatusChange={setStatus}
-        failedOnly={failedOnly}
-        onFailedOnlyChange={setFailedOnly}
-        timeRange={timeRange}
-        onTimeRangeChange={setTimeRange}
-        visibleColumns={visibleColumns}
-        onVisibleColumnsChange={setVisibleColumns}
-        resultCount={filteredRuns.length}
-        hasFilters={
-          Boolean(query) ||
-          status !== "all" ||
-          failedOnly ||
-          timeRange !== "7d" ||
-          hasSidebarFilters
-        }
-        onClear={clearAllFilters}
-      />
-
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="flex min-w-0 flex-col gap-3">
-          <RunsTable
-            runs={filteredRuns}
-            selectedRunId={selectedRun?.session.id}
-            showColumn={showColumn}
-            sortKey={sortKey}
-            sortDirection={sortDirection}
-            onSort={onSort}
-            onSelect={(run) => setSelectedRunId(run.session.id)}
+      <div className="flex flex-col gap-2 overflow-hidden rounded-2xl bg-panel/70 p-2 ring-1 ring-border/35 sm:flex-row sm:items-center">
+        <label className="relative min-w-0 flex-1">
+          <span className="sr-only">Search logs</span>
+          <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder="Search runs, inputs, outputs, errors…"
+            className="h-10 w-full rounded-xl bg-transparent pl-10 pr-3 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:bg-elevated/40"
           />
-
-          {selectedRun ? (
-            <TraceDebugger
-              run={selectedRun}
-              traceTree={traceTree}
-              visibleTrace={visibleTrace}
-              expanded={expanded}
-              onExpandedChange={setExpanded}
-              selectedEvent={selectedEvent}
-              onEventSelect={(event) => {
-                setSelectedSeq(event.seq);
-                setDetailTab("run");
-              }}
-              detailTab={detailTab}
-              onDetailTabChange={setDetailTab}
-            />
-          ) : (
-            <div className="landing-framed-surface flex min-h-[320px] items-center justify-center p-6 text-sm text-muted-foreground">
-              No runs match the current filters.
-            </div>
-          )}
+        </label>
+        <div className="flex flex-wrap items-center gap-1 px-1">
+          {STATUS_FILTERS.map((filter) => {
+            const active = status === filter.value;
+            return (
+              <button
+                key={filter.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => onStatusChange(filter.value)}
+                className={cn(
+                  "inline-flex min-h-8 items-center rounded-full px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                  active
+                    ? "bg-accent/10 text-accent"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
         </div>
-
-        <FilterRail
-          metrics={metrics}
-          projects={projects}
-          selectedProjects={selectedProjects}
-          onProjectToggle={(projectId) =>
-            setSelectedProjects((values) => toggleValue(values, projectId))
-          }
-          environments={environments}
-          selectedEnvironments={selectedEnvironments}
-          onEnvironmentToggle={(environment) =>
-            setSelectedEnvironments((values) => toggleValue(values, environment))
-          }
-          tags={allTags}
-          selectedTags={selectedTags}
-          onTagToggle={(tag) => setSelectedTags((values) => toggleValue(values, tag))}
-          onClearFilters={clearAllFilters}
-        />
       </div>
+
+      <div className="overflow-hidden rounded-2xl bg-panel/70 ring-1 ring-border/35">
+        {runs.length === 0 ? (
+          <p className="px-5 py-10 text-center text-sm text-muted-foreground">
+            No runs match the current filters.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border/35">
+            {runs.map((run) => (
+              <li key={run.session.id}>
+                <button
+                  type="button"
+                  onClick={() => onOpenRun(run)}
+                  className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-elevated/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
+                >
+                  <StatusPill status={run.session.status} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] text-foreground">
+                      {run.session.user_goal ?? run.session.id}
+                    </span>
+                    {run.errorPreview ? (
+                      <span className="mono block truncate text-[11px] text-warning/90">
+                        {run.errorPreview}
+                      </span>
+                    ) : (
+                      <span className="mono block truncate text-[11px] text-muted-foreground">
+                        {shortId(run.session.id, 18)} · {run.session.environment ?? "unknown"}
+                      </span>
+                    )}
+                  </span>
+                  <span className="mono hidden shrink-0 text-[11px] text-muted-foreground lg:block">
+                    {numberFormat(run.totalTokens)} tok
+                  </span>
+                  <span className="mono hidden shrink-0 text-[11px] text-muted-foreground sm:block">
+                    {fmtDuration(run.latencyMs)}
+                  </span>
+                  <span className="mono hidden shrink-0 text-[11px] text-muted-foreground md:block">
+                    {fmtRelative(run.session.started_at)}
+                  </span>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground/45" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EmptyPanel({
+  Icon,
+  title,
+  description,
+}: {
+  Icon: LucideIcon;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex min-h-[440px] flex-col items-center justify-center rounded-2xl bg-panel/55 px-6 text-center ring-1 ring-border/35">
+      <span className="flex size-12 items-center justify-center rounded-2xl bg-elevated/70 text-muted-foreground">
+        <Icon className="size-5" strokeWidth={1.8} />
+      </span>
+      <h2 className="mt-4 text-base font-semibold text-foreground">{title}</h2>
+      <p className="mt-1.5 max-w-sm text-sm leading-6 text-muted-foreground">{description}</p>
     </div>
   );
 }

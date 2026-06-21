@@ -45,13 +45,13 @@ export default function LogsPage() {
       <ConsolePageHeader className="logs-header-spacious">
         <div className="min-w-0">
           <ConsoleEyebrow icon={<ListTree className="size-3.5" strokeWidth={1.8} aria-hidden />}>
-            Trace logs
+            Observability
           </ConsoleEyebrow>
-          <h1 className="landing-display-lg max-w-4xl">Agent run logs</h1>
+          <h1 className="landing-display-lg max-w-4xl">Agent observability</h1>
           <p className="mt-5 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Search, filter, and inspect instrumented runs with waterfall traces
-            and event-level payloads. Use this view when you need LangSmith-style
-            log exploration without leaving the console.
+            Monitor every agent, drill into runs and waterfall traces, and surface
+            failure signals — so engineers can debug agent failures and understand
+            performance in seconds.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-2.5 text-[11px] font-medium text-muted-foreground">
             <SignalChip Icon={Activity} label="Live trace streaming" />
