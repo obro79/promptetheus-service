@@ -123,6 +123,7 @@ def _attempt_event(attempt: int, fix: Any, record: dict[str, Any]) -> dict[str, 
         or getattr(fix, "summary", None),
         "critique": record.get("critique"),
         "regression": record.get("regression"),
+        "eval": record.get("eval"),
         "passed": record.get("passed"),
     }
 

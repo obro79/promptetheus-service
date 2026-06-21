@@ -12,6 +12,12 @@ A fix is only allowed to open a PR when it passes BOTH gates:
    `after_fail == 0`. State-0 regression is a deterministic fallback that always
    passes, so the critique is the load-bearing gate today; both halves are wired
    identically so the regression gate becomes real when live replay lands.
+3. **Eval suite** (`server.evals`) — an LLM-as-judge before/after check derived
+   from the failing trace: the fix passes only when the agent's *before* output
+   fails the violated assertion and the *after* output satisfies it. This is the
+   real regression signal; it degrades to the deterministic before-fail/
+   after-pass record when no judge is available, and is non-blocking when the
+   bundle carries no failing trace. Its scores are pushed to Sentry.
 
 This is also the irony guard: our fixer must not confidently ship a wrong fix —
 the same failure class Promptetheus exists to catch.
@@ -26,6 +32,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from promptetheus.server.evals import run_eval_suite
+from promptetheus.server.observability import telemetry
 from promptetheus.server.regression.runner import run_regression
 
 _MODEL = os.environ.get("PROMPTETHEUS_FIX_AGENT_MODEL", "claude-opus-4-8")
@@ -112,17 +120,24 @@ def verify(
     *,
     pr_url: str | None = None,
 ) -> dict[str, Any]:
-    """Run both gates. `passed` requires critique approval AND a clean regression."""
+    """Run all gates. `passed` requires critique approval, a clean regression,
+    and a clean eval suite (the eval is non-blocking when there is no failing
+    trace to evaluate, and falls back to deterministic when no judge exists)."""
 
     critique = critique_fix(bundle, fix_result)
     regression = run_regression(store, incident, pr_url=pr_url)
     regression_passed = int(regression.get("after_fail", 1)) == 0
-    passed = critique.approved and regression_passed
+
+    eval_report = run_eval_suite(bundle, fix_result)
+    telemetry.record_eval(incident, eval_report)
+
+    passed = critique.approved and regression_passed and eval_report.passed
     return {
         "passed": passed,
         "critique": critique.as_dict(),
         "regression": regression,
         "regression_passed": regression_passed,
+        "eval": eval_report.as_dict(),
     }
 
 

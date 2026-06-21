@@ -49,6 +49,12 @@ mcp = [
     "mcp>=1.0",
     "httpx>=0.27",
 ]
+# Optional Sentry AI agent monitoring: gen_ai spans + the eval-score scoreboard
+# for the heal loop. Lazy-imported in server.observability.telemetry and a no-op
+# when absent or no DSN is configured, so the loop never depends on it.
+observability = [
+    "sentry-sdk>=2.0",
+]
 dev = [
     "fastapi>=0.110",
     "cryptography>=42",
