@@ -160,13 +160,16 @@ function LandingHero() {
   return (
     <section className="relative isolate min-h-[42rem] overflow-hidden bg-[hsl(var(--hero-sky-top))] pb-20 text-white sm:min-h-[46rem] sm:pb-24">
       <div className="cluely-hero-backdrop pointer-events-none absolute inset-0" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,hsl(203_91%_55%/0.08)_0%,transparent_38%,hsl(55_95%_93%/0.1)_100%)]" />
+      <div className="landing-hero-readable-scrim pointer-events-none absolute inset-0" />
       <LandingHeroNav />
-      <div className="relative z-30 mx-auto flex max-w-6xl flex-col items-center px-4 pt-24 text-center sm:px-6 sm:pt-28 lg:pt-32">
-        <h1 className="max-w-6xl font-display text-[4.4rem] font-normal leading-[0.82] tracking-normal text-white drop-shadow-[0_2px_16px_hsl(205_86%_31%/0.16)] sm:text-[6.4rem] lg:text-[7.8rem]">
+      <div className="relative z-30 mx-auto flex max-w-6xl flex-col items-center px-4 pt-20 text-center sm:px-6 sm:pt-24 lg:pt-28">
+        <p className="landing-hero-category">
+          {landingHero.category}
+        </p>
+        <h1 className="mt-5 max-w-6xl font-display text-[3.75rem] font-normal leading-[0.88] tracking-normal text-white drop-shadow-[0_3px_18px_hsl(213_82%_18%/0.34)] sm:text-[5.8rem] sm:leading-[0.84] lg:text-[7rem]">
           {landingHero.title}
         </h1>
-        <p className="mt-9 max-w-3xl text-balance text-xl font-semibold leading-8 text-white/90 drop-shadow-[0_1px_8px_hsl(205_86%_31%/0.18)] sm:text-2xl">
+        <p className="mt-8 max-w-3xl text-balance text-lg font-semibold leading-8 text-white drop-shadow-[0_2px_12px_hsl(213_82%_18%/0.32)] sm:text-2xl">
           {landingHero.body}
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -192,6 +195,7 @@ function LandingHero() {
             </Link>
           </Button>
         </div>
+        <HeroProofStrip />
       </div>
     </section>
   );
@@ -199,8 +203,19 @@ function LandingHero() {
 
 function LandingHeroNav() {
   return (
-    <header className="relative z-40 mx-auto flex h-20 max-w-6xl items-center gap-8 px-5 text-white sm:px-8">
-      <nav className="hidden items-center gap-7 text-lg font-semibold text-white/90 md:flex">
+    <header className="relative z-40 mx-auto flex h-20 max-w-6xl items-center gap-4 px-5 text-white sm:px-8">
+      <Link
+        href="/"
+        className="flex min-h-11 min-w-0 items-center gap-2 rounded-full pr-2 text-white transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+      >
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/20 text-sm font-bold shadow-[0_8px_30px_hsl(213_82%_18%/0.22)] backdrop-blur">
+          P
+        </span>
+        <span className="truncate text-base font-semibold drop-shadow-[0_1px_8px_hsl(213_82%_18%/0.28)] sm:text-lg">
+          Promptetheus
+        </span>
+      </Link>
+      <nav className="ml-auto hidden items-center gap-7 text-base font-semibold text-white/90 lg:flex">
         {landingNavItems.map((item) => (
           <Link key={item.href} href={item.href} className="transition-colors hover:text-white">
             {item.label}
@@ -209,12 +224,25 @@ function LandingHeroNav() {
       </nav>
       <Button
         asChild
-        className="ml-auto min-h-11 border-white/35 bg-white/16 px-5 text-white hover:bg-white/24"
+        className="ml-auto min-h-11 shrink-0 border-white/30 bg-white/20 px-5 text-white shadow-[0_10px_30px_hsl(213_82%_18%/0.16)] hover:bg-white/25 lg:ml-0"
         variant="outline"
       >
-        <Link href="/demo">See demo</Link>
+        <Link href="/demo">{landingHero.primaryCta.label}</Link>
       </Button>
     </header>
+  );
+}
+
+function HeroProofStrip() {
+  return (
+    <div className="landing-hero-proof-strip" aria-label="Promptetheus workflow">
+      {landingHero.proofSteps.map((step, index) => (
+        <div key={step} className="landing-hero-proof-step">
+          <span>{String(index + 1).padStart(2, "0")}</span>
+          <p>{step}</p>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -238,6 +266,20 @@ function HomeAgentCard({
           Production task
         </p>
         <p className="mt-1 text-sm leading-snug text-muted-foreground">{agent.task}</p>
+        <dl className="landing-agent-evidence-list">
+          <div>
+            <dt>Failure</dt>
+            <dd>{agent.failure}</dd>
+          </div>
+          <div>
+            <dt>Evidence</dt>
+            <dd>{agent.evidence}</dd>
+          </div>
+          <div>
+            <dt>Fix path</dt>
+            <dd>{agent.fixAction}</dd>
+          </div>
+        </dl>
       </div>
     </article>
   );
@@ -376,6 +418,11 @@ function VoiceMiniScene() {
             }
           />
         ))}
+      </div>
+      <div className="landing-agent-mini-voice-evidence">
+        <span>Transcript evidence</span>
+        <strong>&quot;I need a human now&quot;</strong>
+        <p>handoff failed · 2.1s silence · escalation pinned</p>
       </div>
     </div>
   );

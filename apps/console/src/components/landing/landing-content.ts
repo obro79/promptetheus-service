@@ -15,17 +15,24 @@ export const landingNavItems = [
 ] as const;
 
 export const landingHero = {
+  category: "Incident response for AI agents",
   title: "When agents fail in production, know why",
   body:
     "Promptetheus records messy agent runs, detects likely failures, replays the exact bad step, and packages a verified fix path for the coding agent.",
-  primaryCta: { label: "See the demo", href: "/demo" },
+  primaryCta: { label: "Watch demo", href: "/demo" },
   secondaryCta: { label: "Open console", href: "/incidents" },
+  proofSteps: [
+    "Logs table",
+    "Trace replay",
+    "Fix bundle",
+    "Regression check",
+  ],
 } as const;
 
 export const landingSections = {
   agents: {
     eyebrow: "Agent coverage",
-    title: "Every workflow fails through evidence",
+    title: "Debug every agent workflow with trace evidence",
     body:
       "Browser, chat, and voice agents look different in production, but their failures still reduce to observable moments: actions, turns, transcripts, tools, state, artifacts, and outcomes.",
   },
@@ -47,8 +54,8 @@ export const landingSections = {
   },
   finalCta: {
     eyebrow: "Demo gate",
-    title: "Show the failure, explain it, patch it, and prove it will not regress.",
-    primaryCta: { label: "Run the demo", href: "/demo" },
+    title: "Replay the failed step, generate the fix brief, and prove the regression is closed.",
+    primaryCta: { label: "Watch demo", href: "/demo" },
     secondaryCta: { label: "Read API docs", href: "/docs" },
   },
 } as const;
