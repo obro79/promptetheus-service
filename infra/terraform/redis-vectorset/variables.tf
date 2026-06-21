@@ -50,3 +50,21 @@ variable "redis_image" {
   type        = string
   default     = "redis:8"
 }
+
+variable "key_name" {
+  description = "Name of an existing EC2 key pair to enable SSH login. Empty means no key pair (SSH-by-key disabled)."
+  type        = string
+  default     = ""
+}
+
+variable "ssh_allowed_cidrs" {
+  description = "CIDR blocks allowed to reach SSH on 22. Empty means no SSH ingress rule is created."
+  type        = list(string)
+  default     = []
+}
+
+variable "enable_ssm" {
+  description = "Attach an IAM instance profile so AWS Systems Manager Session Manager works (keyless shell, no open SSH port). Requires IAM create permissions to apply."
+  type        = bool
+  default     = false
+}

@@ -34,6 +34,20 @@ terraform import aws_instance.redis      i-00f1dc69aaaf02bbe
 terraform plan   # should show no destructive changes (user_data/ami are ignored)
 ```
 
+## Shell / SSH access
+The instance has no key pair by default. Two ways to get a shell:
+
+- **SSH (key-based):** set `key_name` to an existing EC2 key pair and `ssh_allowed_cidrs`
+  to your admin IP, then `terraform apply` and `terraform output ssh_command`
+  (`ssh -i <key>.pem ec2-user@<ip>`). Note: adding a key pair to an *already-running*
+  instance forces a replacement, so set this before first apply (or plan to recreate).
+- **SSM Session Manager (keyless, no open port — recommended):** set `enable_ssm = true`.
+  This attaches an instance profile with `AmazonSSMManagedInstanceCore`; then
+  `aws ssm start-session --target <instance_id>` with no SSH port open at all.
+  Applying this requires IAM create permissions (role + instance profile); the
+  `devin-iac` user as scoped (`AmazonEC2FullAccess` + `AmazonSSMReadOnlyAccess`) cannot
+  create the role — broaden to include IAM, or create the role out-of-band.
+
 ## Security notes
 - `allowed_cidrs` must be as tight as possible. Prefer running the FastAPI service in
   this VPC and allowing its security group (swap the `cidr_blocks` ingress for a

@@ -18,6 +18,11 @@ output "security_group_id" {
   value       = aws_security_group.redis.id
 }
 
+output "ssh_command" {
+  description = "SSH command (only meaningful when key_name + ssh_allowed_cidrs are set)."
+  value       = var.key_name != "" && var.associate_public_ip ? "ssh -i <path-to-${var.key_name}.pem> ec2-user@${aws_instance.redis.public_ip}" : "n/a (set key_name + ssh_allowed_cidrs, or use SSM: aws ssm start-session --target ${aws_instance.redis.id})"
+}
+
 output "redis_url" {
   description = "Connection string for PROMPTETHEUS REDIS_URL. The password is URL-encoded so special characters (@, +, /) parse correctly."
   value       = "redis://default:${urlencode(var.redis_password)}@${var.associate_public_ip ? aws_instance.redis.public_ip : aws_instance.redis.private_ip}:6379/0"

@@ -16,3 +16,10 @@ allowed_cidrs = ["YOUR.APP.IP.ADDR/32"]
 # subnet_id           = "subnet-xxxxxxxx"
 # associate_public_ip = true
 # root_volume_size    = 20
+
+# SSH access (key-based). key_name must be an existing EC2 key pair.
+# key_name          = "my-keypair"
+# ssh_allowed_cidrs = ["YOUR.ADMIN.IP/32"]
+
+# Keyless shell via SSM Session Manager (no open SSH port). Needs IAM create perms to apply.
+# enable_ssm = true

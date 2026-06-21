@@ -45,6 +45,17 @@ resource "aws_security_group" "redis" {
     cidr_blocks = var.allowed_cidrs
   }
 
+  dynamic "ingress" {
+    for_each = length(var.ssh_allowed_cidrs) > 0 ? [1] : []
+    content {
+      description = "SSH"
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = var.ssh_allowed_cidrs
+    }
+  }
+
   egress {
     description = "All outbound"
     from_port   = 0
@@ -58,6 +69,33 @@ resource "aws_security_group" "redis" {
   }
 }
 
+# Optional: IAM instance profile for SSM Session Manager (keyless shell, no open SSH).
+resource "aws_iam_role" "ssm" {
+  count = var.enable_ssm ? 1 : 0
+  name  = "${var.name}-ssm-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ssm" {
+  count      = var.enable_ssm ? 1 : 0
+  role       = aws_iam_role.ssm[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "ssm" {
+  count = var.enable_ssm ? 1 : 0
+  name  = "${var.name}-ssm-profile"
+  role  = aws_iam_role.ssm[0].name
+}
+
 resource "aws_instance" "redis" {
   ami                         = data.aws_ssm_parameter.al2023.value
   instance_type               = var.instance_type
@@ -65,6 +103,8 @@ resource "aws_instance" "redis" {
   vpc_security_group_ids      = [aws_security_group.redis.id]
   associate_public_ip_address = var.associate_public_ip
   user_data                   = local.user_data
+  key_name                    = var.key_name != "" ? var.key_name : null
+  iam_instance_profile        = var.enable_ssm ? aws_iam_instance_profile.ssm[0].name : null
 
   root_block_device {
     volume_size = var.root_volume_size
