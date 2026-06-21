@@ -64,10 +64,15 @@ interface AgentWorkOrder {
   appendContent: (request: AgentDispatchRequest) => string;
 }
 
-const TARGET_OWNER = "obro79";
-const TARGET_REPO = "demo-agents";
-const TARGET_REPO_SLUG = `${TARGET_OWNER}/${TARGET_REPO}`;
-const TARGET_BASE_BRANCH = "main";
+// Target repo for demo PRs. Override with env to point at a repo your token can
+// write to: GITHUB_TARGET_OWNER/GITHUB_TARGET_REPO (or GITHUB_TARGET_REPO as a
+// full "owner/repo" slug). A 404 from the GitHub API here means the token can't
+// see the repo — usually wrong owner/repo or missing write access.
+const TARGET_REPO_SLUG =
+  process.env.GITHUB_TARGET_REPO && process.env.GITHUB_TARGET_REPO.includes("/")
+    ? process.env.GITHUB_TARGET_REPO
+    : `${process.env.GITHUB_TARGET_OWNER ?? "obro79"}/${process.env.GITHUB_TARGET_REPO ?? "demo-agents"}`;
+const TARGET_BASE_BRANCH = process.env.GITHUB_TARGET_BASE_BRANCH ?? "main";
 const GITHUB_API_URL = process.env.GITHUB_API_URL ?? "https://api.github.com";
 
 const WORK_ORDERS: AgentWorkOrder[] = [
