@@ -602,6 +602,7 @@ export function FixDispatchDag({
 
       {fullscreen ? (
         <FixDagFullscreen
+          agentDispatch={agentDispatch}
           buttonLabel={buttonLabel}
           evidence={evidence}
           onClose={() => setFullscreen(false)}
@@ -617,7 +618,6 @@ export function FixDispatchDag({
   );
 }
 
-<<<<<<< HEAD
 /**
  * One row of the nested "under the hood" tree. Renders an arbitrarily deep tree
  * with file-explorer style branch connectors (the parent `ul` draws the vertical
@@ -844,6 +844,7 @@ function buildStageChildren(
  * in a drawer that pops open from the right.
  */
 function FixDagFullscreen({
+  agentDispatch,
   buttonLabel,
   evidence,
   onClose,
@@ -854,6 +855,7 @@ function FixDagFullscreen({
   selectedNodeId,
   onSelectNode,
 }: {
+  agentDispatch: AgentPrDispatchResult | null;
   buttonLabel: string;
   evidence: FixDagEvidence;
   onClose: () => void;
@@ -994,7 +996,7 @@ function FixDagFullscreen({
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
-              <ProofPanel evidence={evidence} />
+              <ProofPanel agentDispatch={agentDispatch} evidence={evidence} />
             </div>
           </div>
         </aside>
@@ -1105,8 +1107,6 @@ function FixDagStageLayer({
   );
 }
 
-function ProofPanel({ evidence }: { evidence: FixDagEvidence }) {
-=======
 async function defaultDispatchHeal(incidentId: string): Promise<HealReport | null> {
   return healIncident(incidentId);
 }
@@ -1126,6 +1126,7 @@ function agentDispatchToHealReport(
   return {
     attempts: result.pullRequests.length,
     incident_id: incidentId,
+    warm_start: null,
     orchestrator: "maintainerOS",
     pr: primary
       ? {
@@ -1174,7 +1175,6 @@ function ProofPanel({
   agentDispatch: AgentPrDispatchResult | null;
   evidence: FixDagEvidence;
 }) {
->>>>>>> 835bc23d0eeb0ab252730c59568177928684a2dd
   return (
     <aside className="landing-framed-surface overflow-hidden" aria-label="Fix DAG proof">
       <div className="border-b border-border/70 bg-panel/65 p-3">

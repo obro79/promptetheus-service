@@ -15,15 +15,11 @@ import {
   Columns3,
   ExternalLink,
   Eye,
-  ExternalLink,
   FileJson,
   Filter,
   FlaskConical,
   Gauge,
-<<<<<<< HEAD
   GitMerge,
-=======
->>>>>>> 835bc23d0eeb0ab252730c59568177928684a2dd
   GitPullRequest,
   ListFilter,
   Loader2,
@@ -432,63 +428,23 @@ export function LogsDashboard({
               onClear={clearAllFilters}
             />
 
-<<<<<<< HEAD
             <div className="flex min-w-0 flex-col gap-5">
               {/* The pipeline runs full width to the edge of the pane. */}
               {selectedRun ? (
-                <FixDispatchDag autoDemo prominent run={selectedRun} />
-              ) : null}
-=======
-            <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
-              <div className="flex min-w-0 flex-col gap-3">
-                {selectedRun ? (
-                  <>
-                    <TestPullRequestPanel
-                      disabled={!selectedRun.incident}
-                      onRun={runClosedTestPr}
-                      state={testPrState}
-                    />
-                    <FixDispatchDag
-                      dispatchHeal={dispatchAgentPrs}
-                      dispatchLabel="Dispatch agent PRs"
-                      prominent
-                      run={selectedRun}
-                    />
-                  </>
-                ) : null}
-
-                <RunsTable
-                  runs={filteredRuns}
-                  selectedRunId={selectedRun?.session.id}
-                  showColumn={showColumn}
-                  sortKey={sortKey}
-                  sortDirection={sortDirection}
-                  onSort={onSort}
-                  onSelect={(run) => setSelectedRunId(run.session.id)}
-                />
-
-                {selectedRun ? (
-                  <TraceDebugger
-                    run={selectedRun}
-                    traceTree={traceTree}
-                    visibleTrace={visibleTrace}
-                    expanded={expanded}
-                    onExpandedChange={setExpanded}
-                    selectedEvent={selectedEvent}
-                    onEventSelect={(event) => {
-                      setSelectedSeq(event.seq);
-                      setDetailTab("run");
-                    }}
-                    detailTab={detailTab}
-                    onDetailTabChange={setDetailTab}
+                <>
+                  <TestPullRequestPanel
+                    disabled={!selectedRun.incident}
+                    onRun={runClosedTestPr}
+                    state={testPrState}
                   />
-                ) : (
-                  <div className={cn("flex min-h-[320px] items-center justify-center p-6 text-sm text-muted-foreground", SURFACE)}>
-                    No runs match the current filters.
-                  </div>
-                )}
-              </div>
->>>>>>> 835bc23d0eeb0ab252730c59568177928684a2dd
+                  <FixDispatchDag
+                    dispatchHeal={dispatchAgentPrs}
+                    dispatchLabel="Dispatch agent PRs"
+                    prominent
+                    run={selectedRun}
+                  />
+                </>
+              ) : null}
 
               {/* Filtered metrics + filter shortcuts sit under the pipeline as a
                   compact strip so the pipeline above can use the full width. */}
