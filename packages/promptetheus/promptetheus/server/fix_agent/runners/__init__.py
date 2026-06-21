@@ -9,7 +9,16 @@ from promptetheus.server.models import FixAgentResult
 
 
 class IncidentRunner(Protocol):
-    def run(self, incident_bundle: dict[str, Any]) -> FixAgentResult: ...
+    # The heal loop (loop.diagnose_step) always calls run() with the optional
+    # prior_critique/warm_start kwargs. Runners that ignore similar-fix context
+    # (deterministic, codex) accept them via **_.
+    def run(
+        self,
+        incident_bundle: dict[str, Any],
+        *,
+        prior_critique: Any = None,
+        warm_start: Any = None,
+    ) -> FixAgentResult: ...
 
 
 def fix_agent_fallback_forced() -> bool:

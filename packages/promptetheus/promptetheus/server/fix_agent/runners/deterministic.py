@@ -18,7 +18,9 @@ class DeterministicRunner:
     def __init__(self, allowed_paths: list[str] | None = None) -> None:
         self._inner = FixAgentRunner(allowed_paths=allowed_paths)
 
-    def run(self, incident_bundle: dict[str, Any]) -> FixAgentResult:
+    def run(self, incident_bundle: dict[str, Any], **_: Any) -> FixAgentResult:
+        # Accept and ignore the loop's prior_critique/warm_start kwargs; the
+        # deterministic runner does not use similar-fix context.
         result = self._inner.run(incident_bundle)
         diff = result.diff or ""
         changed = _changed_paths(diff)
