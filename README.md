@@ -26,8 +26,6 @@ turns the incident into a fix path plus regression evidence.
 [Architecture](docs/architecture/technical-architecture.md) ·
 [Demo plan](docs/demo-plan.md)
 
-![Promptetheus guided demo loop](docs/assets/readme/hero-demo-loop.gif)
-
 ## The Loop
 
 Promptetheus is not just a log viewer. It is the failure-to-fix loop for agent systems:
