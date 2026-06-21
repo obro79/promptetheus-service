@@ -162,6 +162,30 @@ export async function healIncident(
   });
 }
 
+/**
+ * Read a JSON body defensively. When the endpoint answers with HTML — e.g. an
+ * auth redirect to the sign-in page, or a 404/500 framework error page — surface
+ * a real status-coded error instead of a cryptic `Unexpected token '<'`.
+ */
+async function readJsonOrThrow<T>(response: Response, label: string): Promise<T> {
+  const text = await response.text();
+  let body: unknown;
+  try {
+    body = text ? JSON.parse(text) : {};
+  } catch {
+    const detail =
+      response.status === 401 || response.status === 403
+        ? "authentication required — sign in to the console first"
+        : `expected JSON but got ${response.headers.get("content-type") ?? "an HTML response"}`;
+    throw new Error(`${label} ${response.status}: ${detail}`);
+  }
+  if (!response.ok) {
+    const maybeError = (body as { error?: string }).error;
+    throw new Error(maybeError || `${label} ${response.status}`);
+  }
+  return body as T;
+}
+
 export async function dispatchLogsAgentPrs(input: {
   agentName?: string | null;
   incidentId: string;
@@ -178,11 +202,7 @@ export async function dispatchLogsAgentPrs(input: {
     },
     method: "POST",
   });
-  const body = (await response.json()) as AgentPrDispatchResult | { error?: string };
-  if (!response.ok) {
-    throw new Error("error" in body && body.error ? body.error : `Agent dispatch ${response.status}`);
-  }
-  return body as AgentPrDispatchResult;
+  return readJsonOrThrow<AgentPrDispatchResult>(response, "Agent dispatch");
 }
 
 export async function createClosedLogsTestPr(input: {
@@ -201,11 +221,7 @@ export async function createClosedLogsTestPr(input: {
     },
     method: "POST",
   });
-  const body = (await response.json()) as ClosedTestPullRequestResult | { error?: string };
-  if (!response.ok) {
-    throw new Error("error" in body && body.error ? body.error : `Test PR ${response.status}`);
-  }
-  return body as ClosedTestPullRequestResult;
+  return readJsonOrThrow<ClosedTestPullRequestResult>(response, "Test PR");
 }
 
 /** Live eval scoreboard (GET /api/evals/scoreboard). Returns null when the API
