@@ -330,8 +330,6 @@ const SECTIONS: DemoSection[] = [
 
 // ─── Presentation ─────────────────────────────────────────────────────────────
 
-const STEP_MS = 10000;
-
 /** Recordings play a touch slower than real time so the failures are easier to
  *  follow. Spacebar toggles play/pause across every video on the page. */
 const PLAYBACK_RATE = 0.75;
@@ -369,17 +367,6 @@ export function DemoPresentation() {
     return () => window.removeEventListener("keydown", onKey);
   }, [active, goTo]);
 
-  // Auto-advance every STEP_MS, looping. Resets whenever `active` changes, so
-  // manual navigation restarts the countdown from the current step. Stops while
-  // paused so a held frame stays on screen.
-  React.useEffect(() => {
-    if (paused) return;
-    const id = window.setTimeout(() => {
-      setActive((current) => (current + 1) % total);
-    }, STEP_MS);
-    return () => window.clearTimeout(id);
-  }, [active, total, paused]);
-
   const section = SECTIONS[active];
 
   return (
@@ -389,7 +376,7 @@ export function DemoPresentation() {
       className="scroll-mt-8"
     >
       {/* Section heading */}
-      <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-8 flex flex-col gap-5">
         <div>
           <p className="mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground/70">
             The self-heal loop
@@ -397,22 +384,6 @@ export function DemoPresentation() {
           <h2 className="mt-2 text-2xl font-semibold text-foreground sm:text-[1.7rem]">
             Five passes, one click at a time
           </h2>
-        </div>
-        <div className="flex items-center gap-3">
-          <CountdownRing stepKey={active} paused={paused} />
-          <div className="flex items-center gap-1.5">
-            <PlayPauseButton paused={paused} onClick={() => setPaused((value) => !value)} />
-            <NavButton
-              direction="prev"
-              disabled={active === 0}
-              onClick={() => goTo(active - 1)}
-            />
-            <NavButton
-              direction="next"
-              disabled={active === total - 1}
-              onClick={() => goTo(active + 1)}
-            />
-          </div>
         </div>
       </div>
 
@@ -457,6 +428,22 @@ export function DemoPresentation() {
               </div>
             ))}
           </div>
+
+          <div className="mt-8 flex justify-end">
+            <div className="flex items-center gap-1.5 rounded-xl border border-border/70 bg-panel/80 p-1.5 shadow-sm">
+              <PlayPauseButton paused={paused} onClick={() => setPaused((value) => !value)} />
+              <NavButton
+                direction="prev"
+                disabled={active === 0}
+                onClick={() => goTo(active - 1)}
+              />
+              <NavButton
+                direction="next"
+                disabled={active === total - 1}
+                onClick={() => goTo(active + 1)}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -464,73 +451,6 @@ export function DemoPresentation() {
 }
 
 // ─── Pieces ───────────────────────────────────────────────────────────────────
-
-/** Small radial countdown — the stroke fills its circumference over `duration`,
- *  restarting each time `stepKey` changes. Holds empty while paused. */
-function CountdownRing({
-  stepKey,
-  paused = false,
-  duration = STEP_MS,
-  size = 22,
-  stroke = 2.5,
-}: {
-  stepKey: number;
-  paused?: boolean;
-  duration?: number;
-  size?: number;
-  stroke?: number;
-}) {
-  const radius = (size - stroke) / 2;
-  const circ = 2 * Math.PI * radius;
-  const [run, setRun] = React.useState(false);
-
-  React.useEffect(() => {
-    setRun(false);
-    if (paused) return;
-    let inner = 0;
-    const outer = requestAnimationFrame(() => {
-      inner = requestAnimationFrame(() => setRun(true));
-    });
-    return () => {
-      cancelAnimationFrame(outer);
-      cancelAnimationFrame(inner);
-    };
-  }, [stepKey, paused]);
-
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox={`0 0 ${size} ${size}`}
-      className="-rotate-90"
-      role="img"
-      aria-label="Time until next step"
-    >
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        strokeWidth={stroke}
-        className="stroke-border"
-      />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        strokeWidth={stroke}
-        strokeLinecap="round"
-        className="stroke-accent"
-        style={{
-          strokeDasharray: circ,
-          strokeDashoffset: run ? 0 : circ,
-          transition: run ? `stroke-dashoffset ${duration}ms linear` : "none",
-        }}
-      />
-    </svg>
-  );
-}
 
 /** Play/pause toggle for every video on the page. Mirrors the spacebar shortcut
  *  and reflects the current paused state. */
@@ -543,7 +463,7 @@ function PlayPauseButton({ paused, onClick }: { paused: boolean; onClick: () => 
       aria-label={paused ? "Play videos (space)" : "Pause videos (space)"}
       title={paused ? "Play (Space)" : "Pause (Space)"}
       className={cn(
-        "flex size-9 items-center justify-center rounded-md border border-border/70 bg-panel text-foreground transition-colors",
+        "flex size-10 items-center justify-center rounded-lg border border-border/70 bg-panel text-foreground transition-colors",
         "hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
       )}
     >
@@ -569,7 +489,7 @@ function NavButton({
       disabled={disabled}
       aria-label={direction === "prev" ? "Previous step" : "Next step"}
       className={cn(
-        "flex size-9 items-center justify-center rounded-md border border-border/70 bg-panel text-foreground transition-colors",
+        "flex size-10 items-center justify-center rounded-lg border border-border/70 bg-panel text-foreground transition-colors",
         "hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-panel",
       )}
