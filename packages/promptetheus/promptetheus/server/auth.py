@@ -263,35 +263,6 @@ class AuthRegistry:
                 )
         return None
 
-    def resolve_console_user_id(self, authorization: str | None) -> str | None:
-        """Resolve a console credential to a user id without requiring membership.
-
-        This is intentionally narrower than ``resolve``. It exists for first-run
-        onboarding, where a Supabase Auth user has a valid JWT but no
-        ``workspace_member`` row yet.
-        """
-
-        token = _bearer(authorization)
-        if not token:
-            return None
-
-        if self._auth_mode == "dev":
-            membership = self._console_tokens.get(token)
-            return membership.user_id if membership is not None else None
-
-        if not self._supabase_jwt_secret:
-            return None
-        try:
-            payload = _decode_supabase_jwt(
-                token,
-                secret=self._supabase_jwt_secret,
-                audience=self._supabase_jwt_audience,
-            )
-        except ValueError:
-            return None
-        user_id = payload.get("sub")
-        return user_id if isinstance(user_id, str) and user_id else None
-
     def _resolve_supabase_console(
         self, token: str, workspace_id: str | None
     ) -> WorkspaceMembership | None:
