@@ -21,4 +21,5 @@ playwright-report/
 *.tsbuildinfo
 .DS_Store
 *.webm
+!apps/console/public/assets/demo-agents/*.webm
 .gstack/

@@ -1,4 +1,4 @@
-import { ListTree } from "lucide-react";
+import { Activity, Gauge, ListTree, Timer } from "lucide-react";
 
 import { LogsDashboard } from "@/components/logs/logs-dashboard";
 import {
@@ -6,6 +6,7 @@ import {
   ConsolePageContent,
   ConsolePageHeader,
   ConsoleEyebrow,
+  SignalChip,
 } from "@/components/common/console-primitives";
 import {
   getAnalysis,
@@ -35,15 +36,23 @@ export default function LogsPage() {
 
   return (
     <ConsolePage>
-      <ConsolePageHeader narrow>
+      <ConsolePageHeader className="logs-header-spacious">
         <div className="min-w-0">
           <ConsoleEyebrow icon={<ListTree className="size-3.5" strokeWidth={1.8} aria-hidden />}>
-            Trace logs
+            Observability
           </ConsoleEyebrow>
-          <h1 className="text-2xl font-serif tracking-tight text-foreground">Agent run logs</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Search, filter, and inspect runs with waterfall traces and event payloads.
+          <h1 className="landing-display-lg max-w-4xl text-[2.1rem] leading-[1.05] sm:text-[2.4rem]">
+            Agent observability
+          </h1>
+          <p className="mt-2.5 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Monitor every agent, drill into runs and waterfall traces, and surface
+            failure signals to debug agent failures in seconds.
           </p>
+          <div className="mt-4 flex flex-wrap items-center gap-2.5 text-[11px] font-medium text-muted-foreground">
+            <SignalChip Icon={Activity} label="Live trace streaming" />
+            <SignalChip Icon={Gauge} label="Failure signals attached" />
+            <SignalChip Icon={Timer} label="Latency percentiles" />
+          </div>
         </div>
       </ConsolePageHeader>
 

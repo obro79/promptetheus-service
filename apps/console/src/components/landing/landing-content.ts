@@ -11,13 +11,16 @@ export const landingNavItems = [
   { label: "Agents", href: "#agents" },
   { label: "Incident loop", href: "#incident-loop" },
   { label: "Proof", href: "#proof" },
+  { label: "Pricing", href: "#pricing" },
   { label: "Docs", href: "/docs" },
 ] as const;
 
 export const landingHero = {
+  category: "Incident response for AI agents",
   title: "When agents fail in production, know why",
   body:
     "Promptetheus records messy agent runs, detects likely failures, replays the exact bad step, and packages a verified fix path for the coding agent.",
+  proofSteps: ["Capture the run", "Replay the failure", "Ship the fix"],
   primaryCta: { label: "See the demo", href: "/demo" },
   secondaryCta: { label: "Open console", href: "/incidents" },
 } as const;
@@ -45,6 +48,12 @@ export const landingSections = {
     body:
       "The console turns live traces into a compact case file: failure volume, critical replay, evidence, fix bundle, and regression status.",
   },
+  pricing: {
+    eyebrow: "Pricing",
+    title: "Start with the incident loop you need now",
+    body:
+      "Static starter pricing for teams instrumenting AI agents in production. Stripe billing can come later without changing the landing page shape.",
+  },
   finalCta: {
     eyebrow: "Demo gate",
     title: "Show the failure, explain it, patch it, and prove it will not regress.",
@@ -68,6 +77,54 @@ export const landingProofCards = [
     value: "1",
     label: "incident loop",
     body: "Observe, detect, replay, attribute, patch, and prevent without switching tools.",
+  },
+] as const;
+
+export const landingPricingTiers = [
+  {
+    name: "Starter",
+    price: "$0",
+    period: "/mo",
+    description: "For trying Promptetheus locally and proving the trace-to-fix loop.",
+    features: [
+      "Local demo workflow",
+      "Sample agent incidents",
+      "Replay-first case file",
+      "API docs and setup path",
+    ],
+    cta: { label: "See the demo", href: "/demo" },
+    highlighted: false,
+    badge: null,
+  },
+  {
+    name: "Team",
+    price: "$99",
+    period: "/mo",
+    description: "For production teams watching real browser, chat, and voice agents.",
+    features: [
+      "Live incident console",
+      "Failure clustering and replay",
+      "Fix-agent bundle handoff",
+      "Regression queue visibility",
+    ],
+    cta: { label: "Open console", href: "/incidents" },
+    highlighted: true,
+    badge: "Recommended",
+  },
+  {
+    name: "Enterprise",
+    price: "Custom",
+    period: "",
+    description: "For larger teams that need workspace controls, security, and support.",
+    features: [
+      "Custom retention planning",
+      "Private deployment path",
+      "Security review support",
+      "Dedicated rollout guidance",
+    ],
+    cta: { label: "Run the demo", href: "/demo" },
+    highlighted: false,
+    badge: null,
   },
 ] as const;
 

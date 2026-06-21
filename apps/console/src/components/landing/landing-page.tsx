@@ -21,6 +21,7 @@ import {
   landingMetricTiles,
   landingNavItems,
   landingProofCards,
+  landingPricingTiers,
   landingSections,
   streamWorkflowEvents,
 } from "@/components/landing/landing-content";
@@ -131,6 +132,8 @@ export function LandingPage({ stats }: { stats: LandingStats }) {
 
         <CaseFilePreview stats={stats} />
       </LandingSection>
+
+      <PricingSection />
 
       <LandingSection className="text-center" containerClassName="flex flex-col items-center">
         <LandingCard size="hero" className="landing-cta-card max-w-5xl">
@@ -393,8 +396,6 @@ function ChatMiniScene() {
   );
 }
 
-const voiceWaveHeights = [36, 62, 44, 78, 54, 88, 48, 70, 40] as const;
-
 function VoiceMiniScene() {
   return (
     <div
@@ -402,22 +403,30 @@ function VoiceMiniScene() {
       aria-hidden="true"
     >
       <div className="landing-voice-core landing-agent-mini-voice-core">
-        <span className="landing-voice-ring landing-voice-ring-one" />
-        <span className="landing-voice-ring landing-voice-ring-two" />
-        <span className="landing-voice-avatar" aria-hidden="true" />
-      </div>
-      <div className="landing-waveform landing-agent-mini-voice-waveform">
-        {voiceWaveHeights.map((height, index) => (
-          <span
-            key={`${height}-${index}`}
-            style={
-              {
-                "--wave-height": `${height}%`,
-                "--wave-index": index,
-              } as CSSProperties
-            }
-          />
-        ))}
+        <div
+          className="landing-demo-voice-orb"
+          aria-label="Animated voice orb"
+        >
+          <span className="landing-demo-voice-orb-glow" />
+          <span className="landing-demo-voice-orb-ring landing-demo-voice-orb-ring-one" />
+          <span className="landing-demo-voice-orb-ring landing-demo-voice-orb-ring-two" />
+          <span className="landing-demo-voice-orb-shell" />
+          <span className="landing-demo-voice-orb-core" />
+          <span className="landing-demo-voice-orb-shine" />
+          <span className="landing-demo-voice-activity landing-demo-voice-bars" aria-hidden="true">
+            {[0.5, 0.84, 1, 0.72, 0.92, 0.62, 0.78].map((height, barIndex) => (
+              <i
+                key={barIndex}
+                style={
+                  {
+                    "--bar-height": `${height * 28}px`,
+                    "--bar-delay": `${barIndex * 70}ms`,
+                  } as CSSProperties
+                }
+              />
+            ))}
+          </span>
+        </div>
       </div>
       <div className="landing-agent-mini-voice-evidence">
         <span>Transcript evidence</span>
@@ -549,6 +558,78 @@ function IncidentTraceStreamPanel() {
 
 function CaseFilePreview({ stats }: { stats: LandingStats }) {
   return <HeroMockup stats={stats} />;
+}
+
+function PricingSection() {
+  return (
+    <LandingSection
+      id="pricing"
+      tone="band"
+      containerClassName="landing-use-case-container grid gap-10"
+    >
+      <SectionHeader
+        align="center"
+        body={landingSections.pricing.body}
+        eyebrow={landingSections.pricing.eyebrow}
+        title={landingSections.pricing.title}
+      />
+
+      <div className="grid gap-4 md:grid-cols-3 md:items-stretch">
+        {landingPricingTiers.map((tier) => (
+          <LandingCard
+            key={tier.name}
+            as="article"
+            className={cn(
+              "relative flex h-full flex-col overflow-hidden border-border/80 bg-panel/90 p-6 shadow-[0_22px_64px_hsl(var(--shadow-color)/0.12)]",
+              tier.highlighted &&
+                "border-accent/45 bg-[linear-gradient(180deg,hsl(var(--panel))_0%,hsl(var(--accent-muted)/0.72)_100%)] shadow-glow",
+            )}
+          >
+            {tier.badge ? (
+              <span className="mb-5 w-fit rounded-full border border-accent/25 bg-accent-muted px-3 py-1 text-xs font-semibold text-accent">
+                {tier.badge}
+              </span>
+            ) : (
+              <span className="mb-5 h-7" aria-hidden="true" />
+            )}
+            <div>
+              <h3 className="text-xl font-semibold text-foreground">{tier.name}</h3>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{tier.description}</p>
+              <div className="mt-8 flex min-h-16 items-end gap-2">
+                <span className="font-display text-[3.5rem] leading-none text-foreground">
+                  {tier.price}
+                </span>
+                {tier.period ? (
+                  <span className="pb-2 text-sm font-medium text-muted-foreground">
+                    {tier.period}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+
+            <ul className="mt-8 flex flex-1 flex-col gap-3 text-sm leading-6 text-muted-foreground">
+              {tier.features.map((feature) => (
+                <li key={feature} className="flex gap-3">
+                  <CheckCircle2 className="mt-1 size-4 shrink-0 text-success" aria-hidden="true" />
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
+
+            <Button
+              asChild
+              className="mt-8 min-h-11 w-full"
+              variant={tier.highlighted ? "default" : "outline"}
+            >
+              <Link href={tier.cta.href} aria-label={`${tier.cta.label} for ${tier.name}`}>
+                {tier.cta.label}
+              </Link>
+            </Button>
+          </LandingCard>
+        ))}
+      </div>
+    </LandingSection>
+  );
 }
 
 function LandingNav() {
