@@ -55,6 +55,7 @@ from promptetheus.server.fix_agent.runner import (
 )
 from promptetheus.server.fix_agent.runners import get_runner
 from promptetheus.server.fix_agent.orchestrator import run_loop
+from promptetheus.server.observability import telemetry
 from promptetheus.server.github import (
     GitHubConfig,
     create_pull_request,
@@ -126,6 +127,10 @@ def create_app(
         The configured FastAPI application. app.state.store,
         app.state.auth, and app.state.hub expose the wired components.
     """
+
+    # Wire Sentry once (no-op without SENTRY_DSN / sentry-sdk). Done before the
+    # app is built so the heal-loop transactions and eval spans have a client.
+    telemetry.init_sentry()
 
     app = FastAPI(title="Promptetheus API", version="0.0.1")
     app.add_middleware(
