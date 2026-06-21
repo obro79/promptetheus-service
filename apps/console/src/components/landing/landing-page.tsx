@@ -393,8 +393,6 @@ function ChatMiniScene() {
   );
 }
 
-const voiceWaveHeights = [36, 62, 44, 78, 54, 88, 48, 70, 40] as const;
-
 function VoiceMiniScene() {
   return (
     <div
@@ -402,22 +400,30 @@ function VoiceMiniScene() {
       aria-hidden="true"
     >
       <div className="landing-voice-core landing-agent-mini-voice-core">
-        <span className="landing-voice-ring landing-voice-ring-one" />
-        <span className="landing-voice-ring landing-voice-ring-two" />
-        <span className="landing-voice-avatar" aria-hidden="true" />
-      </div>
-      <div className="landing-waveform landing-agent-mini-voice-waveform">
-        {voiceWaveHeights.map((height, index) => (
-          <span
-            key={`${height}-${index}`}
-            style={
-              {
-                "--wave-height": `${height}%`,
-                "--wave-index": index,
-              } as CSSProperties
-            }
-          />
-        ))}
+        <div
+          className="landing-demo-voice-orb"
+          aria-label="Animated voice orb"
+        >
+          <span className="landing-demo-voice-orb-glow" />
+          <span className="landing-demo-voice-orb-ring landing-demo-voice-orb-ring-one" />
+          <span className="landing-demo-voice-orb-ring landing-demo-voice-orb-ring-two" />
+          <span className="landing-demo-voice-orb-shell" />
+          <span className="landing-demo-voice-orb-core" />
+          <span className="landing-demo-voice-orb-shine" />
+          <span className="landing-demo-voice-activity landing-demo-voice-bars" aria-hidden="true">
+            {[0.5, 0.84, 1, 0.72, 0.92, 0.62, 0.78].map((height, barIndex) => (
+              <i
+                key={barIndex}
+                style={
+                  {
+                    "--bar-height": `${height * 28}px`,
+                    "--bar-delay": `${barIndex * 70}ms`,
+                  } as CSSProperties
+                }
+              />
+            ))}
+          </span>
+        </div>
       </div>
       <div className="landing-agent-mini-voice-evidence">
         <span>Transcript evidence</span>
