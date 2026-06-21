@@ -671,8 +671,13 @@ function AgentDrawer({
   const previewEvents = (latest?.events ?? []).slice(0, 6);
 
   return (
-    <div className="px-3 pb-4 pl-5 md:pl-16">
-      <div className="rounded-md border border-border/60 bg-muted/30 p-4">
+    <div className="relative px-3 pb-4 pl-5 md:pl-16">
+      {/* Branch connector: stem drops from the agent icon, elbows into the card. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-[36px] top-0 hidden h-[26px] w-[28px] rounded-bl-[11px] border-b border-l border-border-strong/45 md:block"
+      />
+      <div className="relative rounded-md border border-border/60 bg-muted/30 p-4">
         <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
           {/* Left: overview + recent runs */}
           <div className="flex flex-col gap-4">

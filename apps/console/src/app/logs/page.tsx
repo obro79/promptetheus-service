@@ -6,7 +6,6 @@ import {
   ConsolePageContent,
   ConsolePageHeader,
   ConsoleEyebrow,
-  MetricReadout,
   SignalChip,
 } from "@/components/common/console-primitives";
 import {
@@ -35,11 +34,6 @@ export default function LogsPage() {
     analysesBySession[session.id] = getAnalysis(session.id);
   }
 
-  const failed = sessions.filter(
-    (s) => s.status === "failed" || s.status === "error",
-  ).length;
-  const passed = sessions.filter((s) => s.status === "passed").length;
-
   return (
     <ConsolePage>
       <ConsolePageHeader className="logs-header-spacious">
@@ -60,14 +54,7 @@ export default function LogsPage() {
             <SignalChip Icon={Timer} label="Latency percentiles" />
           </div>
         </div>
-        <dl className="grid w-full grid-cols-3 gap-3 lg:w-auto">
-          <MetricReadout label="Total" value={sessions.length} />
-          <MetricReadout label="Failed" value={failed} tone="warning" />
-          <MetricReadout label="Passed" value={passed} tone="signal" />
-        </dl>
       </ConsolePageHeader>
-
-      <div aria-hidden className="logs-header-arc" />
 
       <ConsolePageContent>
         <LogsDashboard

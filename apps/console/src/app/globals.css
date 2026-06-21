@@ -365,23 +365,6 @@
     gap: 1.5rem;
   }
 
-  /* Concave-up white gradient sweeping the header into the next section.
-     The radial center sits at top-center with a transparent core, so white
-     dips lowest in the middle and rises at the edges (a ∪ arc). */
-  .logs-header-arc {
-    position: relative;
-    z-index: 1;
-    height: 4rem;
-    margin-top: -1.75rem;
-    pointer-events: none;
-    background: radial-gradient(
-      135% 130% at 50% 0%,
-      hsl(0 0% 100% / 0) 0 56%,
-      hsl(0 0% 100% / 0.85) 74%,
-      hsl(0 0% 100%) 100%
-    );
-  }
-
   .landing-hero-content {
     display: flex;
     flex-direction: column;
