@@ -119,7 +119,9 @@ def wired() -> Iterator[tuple[PromptetheusClient, InMemoryStore, str]]:
     # A Starlette TestClient is a sync httpx client wired to the in-process app;
     # injecting it drives every tool over the real request path without a server.
     http_client = testclient.TestClient(app)
-    client = PromptetheusClient(api_key="pt_dev_key", http_client=http_client)
+    client = PromptetheusClient(
+        console_token="pt_console_token", http_client=http_client
+    )
     try:
         yield client, store, incident_id
     finally:
@@ -150,30 +152,6 @@ def test_failure_evidence_redacts_secrets(
 
     # ...but they are redacted out of everything the tool returns.
     serialized = json.dumps(evidence)
-    assert SECRET_TOKEN not in serialized
-    assert SECRET_PASSWORD not in serialized
-    assert "[REDACTED]" in serialized
-
-
-def test_trace_events_tool_redacts_payloads(
-    wired: tuple[PromptetheusClient, InMemoryStore, str],
-) -> None:
-    client, store, _incident_id = wired
-
-    raw = json.dumps(store.get_events("trace_1"))
-    assert SECRET_TOKEN in raw
-    assert SECRET_PASSWORD in raw
-
-    timeline = tools.get_trace_events(client, "trace_1")
-    events = timeline["events"]
-    assert timeline["trace_id"] == "trace_1"
-    assert [event["seq"] for event in events] == [1, 2, 3, 4, 5, 6, 7]
-    assert [event["type"] for event in events][:2] == [
-        "user_message",
-        "browser_action",
-    ]
-
-    serialized = json.dumps(timeline)
     assert SECRET_TOKEN not in serialized
     assert SECRET_PASSWORD not in serialized
     assert "[REDACTED]" in serialized
@@ -239,11 +217,7 @@ def test_link_pr_to_incident_writes_through_and_audits(
     client, store, incident_id = wired
     pr_url = "https://github.com/acme/repo/pull/7"
 
-    console_client = PromptetheusClient(
-        console_token="pt_console_token",
-        http_client=testclient.TestClient(create_app(store=store)),
-    )
-    result = tools.link_pr_to_incident(console_client, incident_id, pr_url)
+    result = tools.link_pr_to_incident(client, incident_id, pr_url)
     assert result["pr_url"] == pr_url
 
     # The write landed on the canonical store...

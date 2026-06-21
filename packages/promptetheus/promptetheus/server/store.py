@@ -67,21 +67,6 @@ class Store(Protocol):
         self, *, user_id: str, workspace_id: str | None = None
     ) -> dict[str, Any] | None: ...
     def upsert_workspace_member(self, membership: dict[str, Any]) -> dict[str, Any]: ...
-    def ensure_workspace_project_for_user(
-        self,
-        *,
-        user_id: str,
-        workspace_name: str,
-        project_name: str,
-        api_key_hash: str,
-        api_key_preview: str,
-    ) -> dict[str, Any]: ...
-
-    # agents -----------------------------------------------------------------
-    def list_agents(
-        self, *, workspace_id: str, project_id: str | None = None
-    ) -> list[dict[str, Any]]: ...
-    def create_agent(self, agent: dict[str, Any]) -> dict[str, Any]: ...
 
     # events -----------------------------------------------------------------
     def append_event(self, session_id: str, event: dict[str, Any]) -> AppendResult: ...
@@ -139,9 +124,7 @@ class InMemoryStore:
             str, dict[int, str]
         ] = {}  # session_id -> {seq: idem_key}
         self._artifacts: dict[str, dict[str, Any]] = {}
-        self._workspaces: dict[str, dict[str, Any]] = {}
         self._projects: dict[str, dict[str, Any]] = {}
-        self._agents: dict[str, dict[str, Any]] = {}
         self._memberships: dict[tuple[str, str], dict[str, Any]] = {}
         self._analysis: dict[str, dict[str, Any]] = {}
         self._incidents: dict[str, dict[str, Any]] = {}
@@ -152,11 +135,6 @@ class InMemoryStore:
 
     def _bootstrap_dev_tenant(self) -> None:
         now = _iso_now()
-        self._workspaces["ws_dev"] = {
-            "id": "ws_dev",
-            "name": "Dev Workspace",
-            "created_at": now,
-        }
         self._projects["proj_dev"] = {
             "id": "proj_dev",
             "workspace_id": "ws_dev",
@@ -277,123 +255,6 @@ class InMemoryStore:
         key = (str(row["user_id"]), str(row["workspace_id"]))
         with self._lock:
             self._memberships[key] = row
-            return dict(row)
-
-    def ensure_workspace_project_for_user(
-        self,
-        *,
-        user_id: str,
-        workspace_name: str,
-        project_name: str,
-        api_key_hash: str,
-        api_key_preview: str,
-    ) -> dict[str, Any]:
-        now = _iso_now()
-        with self._lock:
-            membership = self.find_workspace_membership(user_id=user_id)
-            created_workspace = membership is None
-            if membership is None:
-                workspace_id = self._next_id("ws")
-                workspace = {
-                    "id": workspace_id,
-                    "name": workspace_name,
-                    "created_at": now,
-                }
-                membership = {
-                    "workspace_id": workspace_id,
-                    "user_id": user_id,
-                    "role": "owner",
-                    "created_at": now,
-                }
-                self._workspaces[workspace_id] = workspace
-                self._memberships[(user_id, workspace_id)] = membership
-            else:
-                workspace_id = str(membership["workspace_id"])
-                workspace = self._workspaces.setdefault(
-                    workspace_id,
-                    {
-                        "id": workspace_id,
-                        "name": str(membership.get("workspace_name") or workspace_id),
-                        "created_at": str(membership.get("created_at") or now),
-                    },
-                )
-
-            projects = [
-                row
-                for row in self._projects.values()
-                if row.get("workspace_id") == workspace_id
-            ]
-            projects.sort(key=lambda row: str(row.get("created_at") or row.get("id")))
-            created_project = not projects
-            api_key_created = False
-
-            if projects:
-                project = projects[0]
-                if not project.get("api_key_hash"):
-                    project["api_key_hash"] = api_key_hash
-                    project["api_key_preview"] = api_key_preview
-                    project["api_key_rotated_at"] = now
-                    api_key_created = True
-            else:
-                project_id = self._next_id("proj")
-                project = {
-                    "id": project_id,
-                    "workspace_id": workspace_id,
-                    "name": project_name,
-                    "api_key_hash": api_key_hash,
-                    "api_key_preview": api_key_preview,
-                    "api_key_rotated_at": now,
-                    "retention_days": 30,
-                    "created_at": now,
-                }
-                self._projects[project_id] = project
-                api_key_created = True
-
-            return {
-                "workspace": dict(workspace),
-                "membership": dict(membership),
-                "project": _project_public(project),
-                "created_workspace": created_workspace,
-                "created_project": created_project,
-                "api_key_created": api_key_created,
-            }
-
-    # agents -----------------------------------------------------------------
-    def list_agents(
-        self, *, workspace_id: str, project_id: str | None = None
-    ) -> list[dict[str, Any]]:
-        with self._lock:
-            rows = []
-            for row in self._agents.values():
-                if row.get("workspace_id") != workspace_id:
-                    continue
-                if project_id is not None and row.get("project_id") != project_id:
-                    continue
-                rows.append(dict(row))
-        rows.sort(key=lambda row: str(row.get("name") or row.get("id")))
-        return rows
-
-    def create_agent(self, agent: dict[str, Any]) -> dict[str, Any]:
-        workspace_id = str(agent["workspace_id"])
-        project_id = agent.get("project_id")
-        name = str(agent["name"])
-        with self._lock:
-            for row in self._agents.values():
-                if (
-                    row.get("workspace_id") == workspace_id
-                    and row.get("project_id") == project_id
-                    and row.get("name") == name
-                ):
-                    return dict(row)
-            agent_id = str(agent.get("id") or self._next_id("agent"))
-            row = {
-                "id": agent_id,
-                "workspace_id": workspace_id,
-                "project_id": project_id,
-                "name": name,
-                "created_at": _iso_now(),
-            }
-            self._agents[agent_id] = row
             return dict(row)
 
     def get_session(self, session_id: str) -> dict[str, Any] | None:
