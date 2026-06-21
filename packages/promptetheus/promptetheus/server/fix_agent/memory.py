@@ -1,16 +1,22 @@
 """Redis-backed fix memory + live heal timeline.
 
-Two capabilities, both **degrade to safe no-ops without `REDIS_URL`** so the loop
-is unaffected when Redis is absent (tests, local dev):
+Three capabilities, all of which **degrade to safe no-ops without `REDIS_URL`** so
+the loop is unaffected when Redis is absent (tests, local dev):
 
 1. **Fix memory** — verified incident->fix pairs are stored with an embedding of
-   their root cause. Before each Claude call the loop queries for a similar past
-   fix and passes it as a warm-start, so the agent reuses known fixes and visibly
-   "learns over time" (the data-flywheel moat read-only tools can't have).
+   their root cause. Before each fix-agent call the loop queries for similar past
+   fixes and passes them as warm-start context, so the agent reuses known fixes and
+   visibly "learns over time" (the data-flywheel moat read-only tools can't have).
    Embeddings use Voyage (`voyage-3`) when `VOYAGE_API_KEY` is set; otherwise a
    lexical token-overlap score keeps the feature working without an embedder.
 
-2. **Timeline** — each loop attempt is `XADD`ed to a Redis Stream `heal:{id}` so
+2. **Vector similarity ("redis iris")** — when Redis 8 Vector Sets are available,
+   fixes are indexed with `VADD` and retrieved with `VSIM` (HNSW KNN over cosine
+   similarity) so similar incidents/sessions are clustered without an O(n) Python
+   scan. The plain per-id scan + lexical scoring remains the fallback when Vector
+   Sets, embeddings, or Redis itself are unavailable, so behavior never regresses.
+
+3. **Timeline** — each loop attempt is `XADD`ed to a Redis Stream `heal:{id}` so
    the console can render the heal loop live.
 
 Every function catches its own errors and returns a safe default — memory failures
@@ -28,11 +34,14 @@ from typing import Any
 _SIMILARITY_THRESHOLD = 0.78
 _LEXICAL_THRESHOLD = 0.5
 
+#: Default number of similar fixes to surface as advanced fix-agent context.
+_DEFAULT_SIMILAR_LIMIT = 3
+
 _client: Any = None
 _client_resolved = False
 
 
-def _redis():
+def _redis() -> Any:
     """Return a cached redis client, or None if unavailable. Never raises."""
 
     global _client, _client_resolved
@@ -44,7 +53,7 @@ def _redis():
         _client = None
         return None
     try:
-        import redis  # type: ignore
+        import redis
 
         client = redis.from_url(url, decode_responses=True)
         client.ping()
@@ -60,7 +69,7 @@ def _embed(text: str) -> list[float] | None:
     if not os.environ.get("VOYAGE_API_KEY"):
         return None
     try:
-        import voyageai  # type: ignore
+        import voyageai
 
         result = voyageai.Client().embed([text], model="voyage-3", input_type="document")
         return list(result.embeddings[0])
@@ -90,48 +99,151 @@ def _signature(bundle: dict[str, Any]) -> str:
     return f"{incident.get('label') or ''} {bundle.get('root_cause') or ''}".strip()
 
 
-def find_similar_fix(bundle: dict[str, Any]) -> dict[str, Any] | None:
-    """Best verified past fix for a similar incident, or None. Never raises."""
+def _vector_key(workspace: str) -> str:
+    return f"ptvec:{workspace}"
+
+
+def _vadd(client: Any, workspace: str, element: str, vec: list[float], attrs: dict[str, Any]) -> None:
+    """Index one embedding into the workspace Vector Set. Never raises."""
+
+    try:
+        args: list[Any] = ["VADD", _vector_key(workspace), "VALUES", str(len(vec))]
+        args.extend(str(x) for x in vec)
+        args.append(element)
+        args.extend(["SETATTR", json.dumps(attrs, default=str)])
+        client.execute_command(*args)
+    except Exception:
+        return
+
+
+def _vsim(client: Any, workspace: str, vec: list[float], count: int) -> list[tuple[str, float]]:
+    """KNN over the workspace Vector Set: [(element, similarity)]. Never raises."""
+
+    try:
+        args: list[Any] = ["VSIM", _vector_key(workspace), "VALUES", str(len(vec))]
+        args.extend(str(x) for x in vec)
+        args.extend(["WITHSCORES", "COUNT", str(count)])
+        raw = client.execute_command(*args)
+    except Exception:
+        return []
+    return _parse_vsim(raw)
+
+
+def _parse_vsim(raw: Any) -> list[tuple[str, float]]:
+    """Parse a VSIM ...WITHSCORES reply into [(element, score)]. Never raises."""
+
+    out: list[tuple[str, float]] = []
+    try:
+        if isinstance(raw, dict):
+            for element, score in raw.items():
+                out.append((str(element), float(score)))
+            return out
+        if isinstance(raw, (list, tuple)):
+            items = list(raw)
+            for i in range(0, len(items) - 1, 2):
+                out.append((str(items[i]), float(items[i + 1])))
+    except Exception:
+        return []
+    return out
+
+
+def _load_row(client: Any, workspace: str, fix_id: str) -> dict[str, Any] | None:
+    raw = client.get(f"ptfix:{workspace}:{fix_id}")
+    if not raw:
+        return None
+    try:
+        row = json.loads(raw)
+    except Exception:
+        return None
+    return row if isinstance(row, dict) else None
+
+
+def _as_match(row: dict[str, Any], score: float) -> dict[str, Any]:
+    return {
+        "from_incident_id": row.get("incident_id"),
+        "label": row.get("label"),
+        "diff": row.get("diff"),
+        "plan": row.get("plan"),
+        "score": round(score, 3),
+    }
+
+
+def _ranked_similar(bundle: dict[str, Any], limit: int) -> list[dict[str, Any]]:
+    """Rank verified past fixes by similarity to bundle's incident. Never raises.
+
+    Prefers a Redis Vector Set KNN query (`VSIM`) when an embedding is available;
+    falls back to an O(n) scan with cosine (embeddings) or lexical (no embedder)
+    scoring. Excludes the bundle's own incident and entries below the threshold.
+    """
 
     client = _redis()
     if client is None:
-        return None
+        return []
     try:
         incident = bundle.get("incident") or {}
         workspace = incident.get("workspace_id") or "ws"
-        ids = client.smembers(f"ptfix:ids:{workspace}")
-        if not ids:
-            return None
+        current_id = incident.get("id")
         sig = _signature(bundle)
         query_vec = _embed(sig)
-        best: dict[str, Any] | None = None
-        best_score = 0.0
+
+        scored: list[tuple[float, dict[str, Any]]] = []
+
+        # Vector path: KNN over the workspace Vector Set (Redis 8 "iris").
+        if query_vec:
+            for element, score in _vsim(client, workspace, query_vec, limit + 5):
+                if element == current_id:
+                    continue
+                row = _load_row(client, workspace, element)
+                if row is None:
+                    continue
+                if score >= _SIMILARITY_THRESHOLD:
+                    scored.append((score, row))
+            if scored:
+                scored.sort(key=lambda item: item[0], reverse=True)
+                return [_as_match(row, score) for score, row in scored[:limit]]
+
+        # Fallback: scan every stored fix and score it directly.
+        ids = client.smembers(f"ptfix:ids:{workspace}")
+        if not ids:
+            return []
         for fix_id in ids:
-            raw = client.get(f"ptfix:{workspace}:{fix_id}")
-            if not raw:
+            row = _load_row(client, workspace, fix_id)
+            if row is None or row.get("incident_id") == current_id:
                 continue
-            row = json.loads(raw)
-            if row.get("incident_id") == incident.get("id"):
-                continue  # don't warm-start from the same incident
             if query_vec and row.get("embedding"):
                 score = _cosine(query_vec, row["embedding"])
                 threshold = _SIMILARITY_THRESHOLD
             else:
                 score = _lexical(sig, row.get("signature", ""))
                 threshold = _LEXICAL_THRESHOLD
-            if score >= threshold and score > best_score:
-                best, best_score = row, score
-        if best is None:
-            return None
-        return {
-            "from_incident_id": best.get("incident_id"),
-            "label": best.get("label"),
-            "diff": best.get("diff"),
-            "plan": best.get("plan"),
-            "score": round(best_score, 3),
-        }
+            if score >= threshold:
+                scored.append((score, row))
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return [_as_match(row, score) for score, row in scored[:limit]]
     except Exception:
-        return None
+        return []
+
+
+def find_similar_fix(bundle: dict[str, Any]) -> dict[str, Any] | None:
+    """Best verified past fix for a similar incident, or None. Never raises."""
+
+    matches = _ranked_similar(bundle, 1)
+    return matches[0] if matches else None
+
+
+def find_similar_fixes(
+    bundle: dict[str, Any], limit: int = _DEFAULT_SIMILAR_LIMIT
+) -> list[dict[str, Any]]:
+    """Top-`limit` verified past fixes for similar incidents. Never raises.
+
+    Used to assemble advanced fix-agent context (e.g. the Devin runner) so the
+    agent can see several prior remediations of the same class of failure rather
+    than a single warm-start.
+    """
+
+    if limit < 1:
+        return []
+    return _ranked_similar(bundle, limit)
 
 
 def remember_fix(
@@ -146,6 +258,7 @@ def remember_fix(
         workspace = incident.get("workspace_id") or "ws"
         incident_id = str(incident.get("id") or "incident")
         sig = _signature(bundle)
+        embedding = _embed(sig)
         row = {
             "incident_id": incident_id,
             "label": incident.get("label"),
@@ -153,11 +266,20 @@ def remember_fix(
             "root_cause": bundle.get("root_cause"),
             "diff": getattr(fix_result, "diff", None),
             "plan": list(getattr(fix_result, "plan", []) or []),
-            "embedding": _embed(sig),
+            "embedding": embedding,
             "stored_at": time.time(),
         }
         client.set(f"ptfix:{workspace}:{incident_id}", json.dumps(row))
         client.sadd(f"ptfix:ids:{workspace}", incident_id)
+        # Index into the Vector Set for KNN retrieval when an embedder is present.
+        if embedding:
+            _vadd(
+                client,
+                workspace,
+                incident_id,
+                embedding,
+                {"label": incident.get("label"), "incident_id": incident_id},
+            )
     except Exception:
         return
 
@@ -197,4 +319,10 @@ def timeline_read(incident_id: str) -> list[dict[str, Any]]:
         return []
 
 
-__all__ = ["find_similar_fix", "remember_fix", "timeline_publish", "timeline_read"]
+__all__ = [
+    "find_similar_fix",
+    "find_similar_fixes",
+    "remember_fix",
+    "timeline_publish",
+    "timeline_read",
+]

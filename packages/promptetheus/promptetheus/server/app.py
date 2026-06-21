@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import FastAPI, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 
@@ -55,6 +56,7 @@ from promptetheus.server.fix_agent.runner import (
 )
 from promptetheus.server.fix_agent.runners import get_runner
 from promptetheus.server.fix_agent.orchestrator import run_loop
+from promptetheus.server.fix_agent.triggers import maybe_trigger_auto_heal
 from promptetheus.server.observability import telemetry
 from promptetheus.server.github import (
     GitHubConfig,
@@ -354,6 +356,7 @@ def create_app(
         )
 
         accepted = 0
+        accepted_events: list[dict[str, Any]] = []
         rejected: list[dict[str, Any]] = []
 
         for index, event in enumerate(events):
@@ -392,6 +395,12 @@ def create_app(
             if result.status == "accepted":
                 # Only publish first-seen events; duplicate replays are no-ops.
                 app.state.hub.publish(ctx.workspace_id, stored)
+                accepted_events.append(stored)
+
+        # Optional event trigger: when PROMPTETHEUS_AUTO_HEAL is on, a freshly
+        # ingested failure event auto-dispatches the analysis -> heal pipeline off
+        # the request path. No-op by default; never affects the ingestion result.
+        maybe_trigger_auto_heal(app.state.store, id, accepted_events)
 
         return JSONResponse(
             {"accepted": accepted, "rejected": rejected}, status_code=200
@@ -787,7 +796,9 @@ def create_app(
         bundle = build_incident_bundle(app.state.store, incident)
         runner = get_runner(allowed_paths=bundle.get("allowed_paths"))
         try:
-            fix_result = runner.run(bundle)
+            # Offloaded: a runner (e.g. Devin) may block on a long poll, which must
+            # not stall the event loop.
+            fix_result = await run_in_threadpool(runner.run, bundle)
         except ValueError as exc:
             raise _HTTPError(400, str(exc)) from exc
         except NotImplementedError as exc:
@@ -889,7 +900,11 @@ def create_app(
             raise _HTTPError(400, "max_attempts must be an integer")
 
         try:
-            report = run_loop(app.state.store, incident, max_attempts=max_attempts)
+            # Offloaded: the loop may drive a long-polling runner (e.g. Devin),
+            # which must not stall the event loop.
+            report = await run_in_threadpool(
+                run_loop, app.state.store, incident, max_attempts=max_attempts
+            )
         except ValueError as exc:
             raise _HTTPError(400, str(exc)) from exc
 
