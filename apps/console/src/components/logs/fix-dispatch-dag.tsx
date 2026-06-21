@@ -99,7 +99,7 @@ const NODE_POSITIONS: Record<FixDagNodeId, { x: number; y: number }> = {
   merge_github: { x: 936, y: 92 },
 };
 
-const CANVAS = { width: 1040, height: 268 };
+const CANVAS = { width: 1040, height: 300 };
 const NODE_WIDTH = 132;
 
 /** Y where the node row ends (center 92 + roughly half the node height). */
@@ -112,17 +112,34 @@ const BRANCH_Y = 200;
  * shows *where* the work happened — the agent deployment, Redis memory, the
  * Browserbase replay — with the real sponsor logos.
  */
-const INFRA_BRANCHES: Array<{
+type InfraBranchDef = {
   underNode: FixDagNodeId;
   Mark: (props: { className?: string }) => React.ReactElement;
   label: string;
   detail: string;
-}> = [
+};
+
+const INFRA_BRANCHES: InfraBranchDef[] = [
   { underNode: "read_logs", Mark: McpMark, label: "MCP", detail: "Supabase context" },
   { underNode: "plan_fix", Mark: DevinMark, label: "Devin", detail: "fix agent deployed" },
+  { underNode: "plan_fix", Mark: RedisMark, label: "Redis", detail: "VSIM recall" },
   { underNode: "dispatch_fix", Mark: RedisMark, label: "Redis", detail: "warm-start memory" },
   { underNode: "run_evals", Mark: BrowserbaseMark, label: "Browserbase", detail: "cloud replay" },
 ];
+
+/** INFRA_BRANCHES grouped by the node they hang under, preserving order, so a
+ *  single step can show more than one infrastructure chip (e.g. Plan fix runs
+ *  both Devin and a Redis VSIM recall). */
+const INFRA_BRANCH_GROUPS: Array<{ underNode: FixDagNodeId; branches: InfraBranchDef[] }> =
+  INFRA_BRANCHES.reduce<Array<{ underNode: FixDagNodeId; branches: InfraBranchDef[] }>>(
+    (groups, branch) => {
+      const existing = groups.find((group) => group.underNode === branch.underNode);
+      if (existing) existing.branches.push(branch);
+      else groups.push({ underNode: branch.underNode, branches: [branch] });
+      return groups;
+    },
+    [],
+  );
 
 /**
  * The roadmap each step occupies: its position in the pipeline (1–6) and a
@@ -694,16 +711,14 @@ export function FixDispatchDag({
               />
             ))}
 
-            {INFRA_BRANCHES.map((branch) => {
-              const node = projection.nodes.find((n) => n.id === branch.underNode);
+            {INFRA_BRANCH_GROUPS.map((group) => {
+              const node = projection.nodes.find((n) => n.id === group.underNode);
               const reached = node ? node.status !== "pending" : false;
               return (
-                <InfraBranch
-                  key={branch.label}
-                  x={NODE_POSITIONS[branch.underNode].x}
-                  Mark={branch.Mark}
-                  label={branch.label}
-                  detail={branch.detail}
+                <InfraBranchGroup
+                  key={group.underNode}
+                  x={NODE_POSITIONS[group.underNode].x}
+                  branches={group.branches}
                   reached={reached}
                 />
               );
@@ -879,7 +894,7 @@ function buildStageChildren(
   node: FixDagNode,
   run: LogRun,
   ctx: {
-    infra: (typeof INFRA_BRANCHES)[number] | null;
+    infra: InfraBranchDef[];
     prBranch: string | null;
     prFiles: string[];
     prUrl: string | null;
@@ -918,12 +933,12 @@ function buildStageChildren(
     }
   }
 
-  if (ctx.infra) {
+  for (const infra of ctx.infra) {
     items.push({
-      id: `${node.id}-infra`,
-      label: ctx.infra.label,
-      detail: ctx.infra.detail,
-      Mark: ctx.infra.Mark,
+      id: `${node.id}-infra-${infra.label}`,
+      label: infra.label,
+      detail: infra.detail,
+      Mark: infra.Mark,
       tone: "accent",
     });
   }
@@ -1261,7 +1276,7 @@ function FixDagFullscreen({
 
           <ol className="mx-auto flex max-w-4xl flex-col gap-3">
             {projection.nodes.map((node, index) => {
-              const infra = INFRA_BRANCHES.find((branch) => branch.underNode === node.id) ?? null;
+              const infra = INFRA_BRANCHES.filter((branch) => branch.underNode === node.id);
               const isPrStage = node.id === "open_pr" || node.id === "merge_github";
               const children = buildStageChildren(node, run, {
                 infra,
@@ -1810,17 +1825,13 @@ function evidenceToneClass(tone: FixDagEvidenceTone | undefined) {
  * A sponsor-infrastructure branch dropping from a DAG node down to a logo chip,
  * showing which service that step ran on. Dims until the step is reached.
  */
-function InfraBranch({
+function InfraBranchGroup({
   x,
-  Mark,
-  label,
-  detail,
+  branches,
   reached,
 }: {
   x: number;
-  Mark: (props: { className?: string }) => React.ReactElement;
-  label: string;
-  detail: string;
+  branches: InfraBranchDef[];
   reached: boolean;
 }) {
   return (
@@ -1833,24 +1844,26 @@ function InfraBranch({
       aria-hidden="true"
     >
       <span
-        className={cn(
-          "w-px",
-          reached ? "bg-accent/50" : "bg-border",
-        )}
+        className={cn("w-px", reached ? "bg-accent/50" : "bg-border")}
         style={{ height: BRANCH_Y - NODE_BOTTOM_Y - 4 }}
       />
-      <span
-        className={cn(
-          "flex items-center gap-1.5 whitespace-nowrap rounded-lg border bg-panel px-2 py-1 shadow-sm",
-          reached ? "border-accent/30" : "border-border/70",
-        )}
-      >
-        <Mark className="size-4 shrink-0" />
-        <span className="flex flex-col leading-none">
-          <span className="text-[10px] font-semibold text-foreground">{label}</span>
-          <span className="mt-0.5 text-[9px] text-muted-foreground">{detail}</span>
-        </span>
-      </span>
+      <div className="flex flex-col items-center gap-1">
+        {branches.map((branch) => (
+          <span
+            key={`${branch.label}-${branch.detail}`}
+            className={cn(
+              "flex items-center gap-1.5 whitespace-nowrap rounded-lg border bg-panel px-2 py-1 shadow-sm",
+              reached ? "border-accent/30" : "border-border/70",
+            )}
+          >
+            <branch.Mark className="size-4 shrink-0" />
+            <span className="flex flex-col leading-none">
+              <span className="text-[10px] font-semibold text-foreground">{branch.label}</span>
+              <span className="mt-0.5 text-[9px] text-muted-foreground">{branch.detail}</span>
+            </span>
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
