@@ -10,7 +10,7 @@ export function LabelTag({ label, className, ...props }: LabelTagProps) {
   return (
     <span
       className={cn(
-        "mono inline-flex items-center whitespace-nowrap rounded-md bg-elevated px-2 py-1 text-[11px] leading-none text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground",
+        "mono inline-flex items-center whitespace-nowrap rounded-full bg-elevated px-2.5 py-1 text-[11px] leading-none text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground",
         className,
       )}
       {...props}

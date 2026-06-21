@@ -148,8 +148,7 @@ export function SignalChip({ Icon, label, className }: SignalChipProps) {
 
 // ─── Console surface card ─────────────────────────────────────────────────────
 
-/** Generalized glassy surface card. Prefer the `surface` CSS class for inline
- *  usage; use this component when you also need rounded-2xl + padding. */
+/** Generalized console surface card — rounded to match landing/agent cards. */
 export function ConsoleSurface({
   children,
   className,

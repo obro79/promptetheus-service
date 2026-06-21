@@ -246,13 +246,16 @@
   }
 
   .instrument-panel {
-    background: hsl(var(--panel) / 0.72);
-    border: 1px solid hsl(var(--border) / 0.78);
-    border-radius: 1.1rem;
-    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.72);
+    background: hsl(var(--panel) / 0.76);
+    border: 1px solid hsl(var(--border) / 0.74);
+    border-radius: var(--landing-card-radius-sm);
+    box-shadow:
+      0 24px 70px hsl(var(--shadow-color) / 0.1),
+      inset 0 1px 0 hsl(0 0% 100% / 0.72);
     min-width: 0;
     min-height: 0;
-    backdrop-filter: blur(18px) saturate(135%);
+    overflow: hidden;
+    backdrop-filter: blur(22px) saturate(145%);
   }
 
   .instrument-header {
@@ -1063,29 +1066,31 @@
 
   .landing-framed-surface {
     position: relative;
-    overflow: visible;
-    border: 1px solid hsl(var(--border-strong) / 0.72);
-    border-radius: 0.12rem;
-    background: hsl(var(--panel) / 0.42);
-    box-shadow: none;
-    backdrop-filter: none;
+    overflow: hidden;
+    border: 1px solid hsl(var(--border) / 0.74);
+    border-radius: var(--landing-card-radius-sm);
+    background: hsl(var(--panel) / 0.76);
+    box-shadow: 0 24px 70px hsl(var(--shadow-color) / 0.12);
+    backdrop-filter: blur(22px) saturate(145%);
   }
 
-  .landing-framed-surface::before {
-    content: "";
-    pointer-events: none;
-    position: absolute;
-    inset: 0.65rem -0.65rem -0.65rem 0.65rem;
-    z-index: -1;
-    border: 1px solid hsl(var(--border-strong) / 0.34);
-    opacity: 0.55;
-    transition: opacity 180ms ease, transform 180ms ease;
+  .landing-framed-surface.surface-hover {
+    transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
   }
 
-  .landing-framed-surface:hover::before,
-  .landing-framed-surface:focus-within::before {
-    opacity: 0.85;
-    transform: translate(-0.12rem, -0.12rem);
+  .landing-framed-surface.surface-hover:hover,
+  .landing-framed-surface.surface-hover:focus-within {
+    background: hsl(var(--panel) / 0.92);
+    border-color: hsl(var(--accent) / 0.36);
+    box-shadow: 0 28px 80px hsl(var(--glow-accent) / 0.18);
+  }
+
+  .console-inset {
+    border-radius: 1rem;
+  }
+
+  .console-chip {
+    border-radius: 999px;
   }
 
   .landing-use-case-copy {
@@ -3819,7 +3824,7 @@
 
   .forensic-panes > .instrument-panel,
   .forensic-inspector-pane > .instrument-panel {
-    border-radius: 0.12rem;
+    border-radius: var(--landing-card-radius-sm);
   }
 
   .pane-divider {

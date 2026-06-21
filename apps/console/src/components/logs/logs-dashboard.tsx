@@ -10,11 +10,13 @@ import {
   ChevronRight,
   CircleDot,
   Columns3,
+  Expand,
   FileJson,
   Filter,
   Gauge,
   ListFilter,
   MessageSquare,
+  Minimize2,
   PanelRight,
   RotateCcw,
   Search,
@@ -63,7 +65,9 @@ import {
   eventTitle,
   filterLogRuns,
   flattenTraceTree,
+  groupRunsByAgent,
   sortLogRuns,
+  type AgentGroup,
   type LogColumn,
   type LogFilters,
   type LogRun,
@@ -186,6 +190,9 @@ export function LogsDashboard({
       }),
     [analysesBySession, eventsBySession, incidents, projects, sessions],
   );
+
+  const agentGroups = React.useMemo(() => groupRunsByAgent(runs, projects), [runs, projects]);
+
   const allTags = React.useMemo(
     () => uniqueSorted(runs.flatMap((run) => run.session.tags)),
     [runs],
@@ -194,11 +201,12 @@ export function LogsDashboard({
     () => uniqueSorted(runs.map((run) => run.session.environment)),
     [runs],
   );
+
+  const [selectedAgentId, setSelectedAgentId] = React.useState<string | null>(null);
   const [query, setQuery] = React.useState("");
   const [status, setStatus] = React.useState<LogFilters["status"]>("all");
   const [failedOnly, setFailedOnly] = React.useState(true);
   const [timeRange, setTimeRange] = React.useState<LogTimeRange>("7d");
-  const [selectedProjects, setSelectedProjects] = React.useState<string[]>([]);
   const [selectedEnvironments, setSelectedEnvironments] = React.useState<string[]>([]);
   const [selectedTags, setSelectedTags] = React.useState<string[]>([]);
   const [visibleColumns, setVisibleColumns] = React.useState<LogColumn[]>(DEFAULT_COLUMNS);
@@ -212,6 +220,7 @@ export function LogsDashboard({
   const [selectedSeq, setSelectedSeq] = React.useState<number | null>(null);
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [detailTab, setDetailTab] = React.useState<"run" | "feedback" | "metadata">("run");
+  const [traceExpanded, setTraceExpanded] = React.useState(false);
 
   const filters = React.useMemo<LogFilters>(
     () => ({
@@ -219,12 +228,13 @@ export function LogsDashboard({
       status,
       failedOnly,
       timeRange,
-      projects: selectedProjects,
+      projects: selectedAgentId ? [selectedAgentId] : [],
       environments: selectedEnvironments,
       tags: selectedTags,
     }),
-    [failedOnly, query, selectedEnvironments, selectedProjects, selectedTags, status, timeRange],
+    [failedOnly, query, selectedAgentId, selectedEnvironments, selectedTags, status, timeRange],
   );
+
   const filteredRuns = React.useMemo(
     () => sortLogRuns(filterLogRuns(runs, filters), sortKey, sortDirection),
     [filters, runs, sortDirection, sortKey],
@@ -250,7 +260,6 @@ export function LogsDashboard({
   );
 
   const hasSidebarFilters =
-    selectedProjects.length > 0 ||
     selectedEnvironments.length > 0 ||
     selectedTags.length > 0;
 
@@ -284,48 +293,102 @@ export function LogsDashboard({
     setQuery("");
     setStatus("all");
     setFailedOnly(false);
-    setSelectedProjects([]);
     setSelectedEnvironments([]);
     setSelectedTags([]);
   };
 
+  const traceDebuggerNode = selectedRun ? (
+    <TraceDebugger
+      run={selectedRun}
+      traceTree={traceTree}
+      visibleTrace={visibleTrace}
+      expanded={expanded}
+      onExpandedChange={setExpanded}
+      selectedEvent={selectedEvent}
+      onEventSelect={(event) => {
+        setSelectedSeq(event.seq);
+        setDetailTab("run");
+      }}
+      detailTab={detailTab}
+      onDetailTabChange={setDetailTab}
+      isExpanded={traceExpanded}
+      onExpandToggle={() => setTraceExpanded((v) => !v)}
+    />
+  ) : (
+    <div className="landing-framed-surface flex min-h-[320px] items-center justify-center p-6 text-sm text-muted-foreground">
+      No runs match the current filters.
+    </div>
+  );
+
   return (
-    <div className="flex flex-col gap-3">
-      <LogFiltersBar
-        query={query}
-        onQueryChange={setQuery}
-        status={status}
-        onStatusChange={setStatus}
-        failedOnly={failedOnly}
-        onFailedOnlyChange={setFailedOnly}
-        timeRange={timeRange}
-        onTimeRangeChange={setTimeRange}
-        visibleColumns={visibleColumns}
-        onVisibleColumnsChange={setVisibleColumns}
-        resultCount={filteredRuns.length}
-        hasFilters={
-          Boolean(query) ||
-          status !== "all" ||
-          failedOnly ||
-          timeRange !== "7d" ||
-          hasSidebarFilters
+    <div className="flex min-h-0 gap-3">
+      {/* Left rail: agent selector + filters + metrics */}
+      <AgentFilterRail
+        agentGroups={agentGroups}
+        selectedAgentId={selectedAgentId}
+        onAgentSelect={(id) => {
+          setSelectedAgentId(id);
+          setSelectedTags([]);
+          setSelectedEnvironments([]);
+        }}
+        metrics={metrics}
+        environments={environments}
+        selectedEnvironments={selectedEnvironments}
+        onEnvironmentToggle={(env) =>
+          setSelectedEnvironments((values) => toggleValue(values, env))
         }
-        onClear={clearAllFilters}
+        tags={allTags}
+        selectedTags={selectedTags}
+        onTagToggle={(tag) => setSelectedTags((values) => toggleValue(values, tag))}
+        onClearFilters={clearAllFilters}
       />
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="flex min-w-0 flex-col gap-3">
-          <RunsTable
-            runs={filteredRuns}
-            selectedRunId={selectedRun?.session.id}
-            showColumn={showColumn}
-            sortKey={sortKey}
-            sortDirection={sortDirection}
-            onSort={onSort}
-            onSelect={(run) => setSelectedRunId(run.session.id)}
-          />
+      {/* Center: filter bar + runs table + trace detail */}
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
+        <LogFiltersBar
+          query={query}
+          onQueryChange={setQuery}
+          status={status}
+          onStatusChange={setStatus}
+          failedOnly={failedOnly}
+          onFailedOnlyChange={setFailedOnly}
+          timeRange={timeRange}
+          onTimeRangeChange={setTimeRange}
+          visibleColumns={visibleColumns}
+          onVisibleColumnsChange={setVisibleColumns}
+          resultCount={filteredRuns.length}
+          hasFilters={
+            Boolean(query) ||
+            status !== "all" ||
+            failedOnly ||
+            timeRange !== "7d" ||
+            hasSidebarFilters
+          }
+          onClear={clearAllFilters}
+        />
 
-          {selectedRun ? (
+        <RunsTable
+          runs={filteredRuns}
+          selectedRunId={selectedRun?.session.id}
+          showColumn={showColumn}
+          sortKey={sortKey}
+          sortDirection={sortDirection}
+          onSort={onSort}
+          onSelect={(run) => setSelectedRunId(run.session.id)}
+        />
+
+        {traceDebuggerNode}
+      </div>
+
+      {/* Expanded trace overlay */}
+      {traceExpanded && selectedRun ? (
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-canvas/95 backdrop-blur-sm"
+          role="dialog"
+          aria-label="Expanded trace view"
+          aria-modal="true"
+        >
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
             <TraceDebugger
               run={selectedRun}
               traceTree={traceTree}
@@ -339,32 +402,12 @@ export function LogsDashboard({
               }}
               detailTab={detailTab}
               onDetailTabChange={setDetailTab}
+              isExpanded={traceExpanded}
+              onExpandToggle={() => setTraceExpanded(false)}
             />
-          ) : (
-            <div className="landing-framed-surface flex min-h-[320px] items-center justify-center p-6 text-sm text-muted-foreground">
-              No runs match the current filters.
-            </div>
-          )}
+          </div>
         </div>
-
-        <FilterRail
-          metrics={metrics}
-          projects={projects}
-          selectedProjects={selectedProjects}
-          onProjectToggle={(projectId) =>
-            setSelectedProjects((values) => toggleValue(values, projectId))
-          }
-          environments={environments}
-          selectedEnvironments={selectedEnvironments}
-          onEnvironmentToggle={(environment) =>
-            setSelectedEnvironments((values) => toggleValue(values, environment))
-          }
-          tags={allTags}
-          selectedTags={selectedTags}
-          onTagToggle={(tag) => setSelectedTags((values) => toggleValue(values, tag))}
-          onClearFilters={clearAllFilters}
-        />
-      </div>
+      ) : null}
     </div>
   );
 }
@@ -541,6 +584,161 @@ function ColumnMenu({
   );
 }
 
+function AgentFilterRail({
+  agentGroups,
+  selectedAgentId,
+  onAgentSelect,
+  metrics,
+  environments,
+  selectedEnvironments,
+  onEnvironmentToggle,
+  tags,
+  selectedTags,
+  onTagToggle,
+  onClearFilters,
+}: {
+  agentGroups: AgentGroup[];
+  selectedAgentId: string | null;
+  onAgentSelect: (id: string | null) => void;
+  metrics: ReturnType<typeof deriveLogMetrics>;
+  environments: string[];
+  selectedEnvironments: string[];
+  onEnvironmentToggle: (env: string) => void;
+  tags: string[];
+  selectedTags: string[];
+  onTagToggle: (tag: string) => void;
+  onClearFilters: () => void;
+}) {
+  return (
+    <aside
+      className="hidden w-56 shrink-0 flex-col gap-3 lg:flex"
+      aria-label="Agent navigation and filters"
+    >
+      {/* Agent selector */}
+      <nav className="landing-framed-surface overflow-hidden" aria-label="Agent list">
+        <div className="border-b border-border/70 px-3 py-2.5">
+          <h2 className="flex items-center gap-2 text-xs font-semibold text-foreground">
+            <Bot className="size-3.5" />
+            Agents
+          </h2>
+        </div>
+        <ul className="p-1.5">
+          <li>
+            <button
+              type="button"
+              aria-pressed={selectedAgentId === null}
+              onClick={() => onAgentSelect(null)}
+              className={cn(
+                "flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                selectedAgentId === null
+                  ? "bg-accent/10 font-medium text-accent"
+                  : "text-muted-foreground hover:bg-elevated hover:text-foreground",
+              )}
+            >
+              <span className="truncate">All agents</span>
+              <span
+                className={cn(
+                  "mono ml-1.5 shrink-0 rounded-full px-2 py-0.5 text-[10px]",
+                  selectedAgentId === null
+                    ? "bg-accent/15 text-accent"
+                    : "bg-elevated text-muted-foreground",
+                )}
+              >
+                {agentGroups.reduce((s, g) => s + g.totalRuns, 0)}
+              </span>
+            </button>
+          </li>
+          {agentGroups.map((group) => (
+            <li key={group.projectId}>
+              <button
+                type="button"
+                aria-pressed={selectedAgentId === group.projectId}
+                onClick={() => onAgentSelect(group.projectId)}
+                className={cn(
+                  "flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  selectedAgentId === group.projectId
+                    ? "bg-accent/10 font-medium text-accent"
+                    : "text-muted-foreground hover:bg-elevated hover:text-foreground",
+                )}
+              >
+                <span className="truncate">{group.label}</span>
+                <span
+                  className={cn(
+                    "mono ml-1.5 shrink-0 rounded-full px-2 py-0.5 text-[10px]",
+                    selectedAgentId === group.projectId
+                      ? "bg-accent/15 text-accent"
+                      : "bg-elevated text-muted-foreground",
+                    group.failedRuns > 0 &&
+                      selectedAgentId !== group.projectId &&
+                      "bg-warning/10 text-warning",
+                  )}
+                >
+                  {group.failedRuns > 0
+                    ? `${group.failedRuns}/${group.totalRuns}`
+                    : group.totalRuns}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      {/* Filtered metrics */}
+      <div className="landing-framed-surface overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border/70 px-3 py-2.5">
+          <h2 className="text-xs font-semibold text-foreground">Filtered metrics</h2>
+          <span className="text-[10px] text-muted-foreground">live</span>
+        </div>
+        <dl className="grid grid-cols-2 gap-px bg-border/50">
+          <MetricTile label="Runs" value={String(metrics.totalRuns)} Icon={Activity} />
+          <MetricTile label="Failures" value={String(metrics.failedRuns)} Icon={AlertCircle} />
+          <MetricTile label="Error rate" value={pct(metrics.errorRate)} Icon={Gauge} />
+          <MetricTile label="P50" value={fmtDuration(metrics.p50LatencyMs)} Icon={Timer} />
+          <MetricTile label="P99" value={fmtDuration(metrics.p99LatencyMs)} Icon={Timer} />
+          <MetricTile label="Tokens" value={numberFormat(metrics.totalTokens)} Icon={FileJson} />
+        </dl>
+      </div>
+
+      {/* Filter shortcuts */}
+      <div className="landing-framed-surface overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border/70 px-3 py-2.5">
+          <h2 className="flex items-center gap-2 text-xs font-semibold text-foreground">
+            <ListFilter className="size-3.5" />
+            Filter shortcuts
+          </h2>
+          <button
+            type="button"
+            onClick={onClearFilters}
+            className="text-[11px] text-accent transition-colors hover:text-accent-bright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Clear
+          </button>
+        </div>
+        <FilterGroup title="Environment">
+          {environments.map((environment) => (
+            <CheckFilter
+              key={environment}
+              label={environment}
+              checked={selectedEnvironments.includes(environment)}
+              onChange={() => onEnvironmentToggle(environment)}
+            />
+          ))}
+        </FilterGroup>
+        <FilterGroup title="Tags" icon={<Tags className="size-3" />}>
+          {tags.map((tag) => (
+            <CheckFilter
+              key={tag}
+              label={tag}
+              checked={selectedTags.includes(tag)}
+              onChange={() => onTagToggle(tag)}
+            />
+          ))}
+        </FilterGroup>
+      </div>
+    </aside>
+  );
+}
+
 function RunsTable({
   runs,
   selectedRunId,
@@ -691,7 +889,7 @@ function RunsTable({
                 ) : null}
                 {showColumn("environment") ? (
                   <TableCell className="hidden py-2 xl:table-cell">
-                    <span className="mono inline-flex items-center rounded-md bg-elevated px-2 py-1 text-[10px] text-muted-foreground">
+                    <span className="mono inline-flex items-center rounded-full bg-elevated px-2.5 py-1 text-[10px] text-muted-foreground">
                       {run.session.environment ?? "unknown"}
                     </span>
                   </TableCell>
@@ -801,7 +999,7 @@ function LatencyBadge({ ms }: { ms: number }) {
   return (
     <span
       className={cn(
-        "mono inline-flex rounded-md border px-1.5 py-0.5 text-[10px]",
+        "mono inline-flex rounded-full border px-2 py-0.5 text-[10px]",
         slow
           ? "border-warning/30 bg-warning/10 text-warning"
           : "border-success/30 bg-success/10 text-success",
@@ -822,6 +1020,8 @@ function TraceDebugger({
   onEventSelect,
   detailTab,
   onDetailTabChange,
+  isExpanded,
+  onExpandToggle,
 }: {
   run: LogRun;
   traceTree: TraceNode[];
@@ -832,11 +1032,21 @@ function TraceDebugger({
   onEventSelect: (event: TraceEvent) => void;
   detailTab: "run" | "feedback" | "metadata";
   onDetailTabChange: (tab: "run" | "feedback" | "metadata") => void;
+  isExpanded: boolean;
+  onExpandToggle: () => void;
 }) {
   return (
-    <div className="grid min-h-[520px] grid-cols-1 gap-3 lg:grid-cols-[minmax(360px,0.95fr)_minmax(420px,1.05fr)]">
+    <div
+      className={cn(
+        "grid grid-cols-1 gap-3 lg:grid-cols-[minmax(360px,0.95fr)_minmax(420px,1.05fr)]",
+        isExpanded ? "h-full min-h-0 flex-1" : "min-h-[520px]",
+      )}
+    >
       <section
-        className="instrument-panel flex min-h-[520px] flex-col overflow-hidden"
+        className={cn(
+          "instrument-panel flex flex-col overflow-hidden",
+          isExpanded ? "min-h-0 flex-1" : "min-h-[520px]",
+        )}
         aria-label="Trace waterfall"
       >
         <div className="instrument-header">
@@ -854,10 +1064,23 @@ function TraceDebugger({
             <button
               type="button"
               onClick={() => onExpandedChange(allExpandable(traceTree))}
-              className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Expand trace tree"
             >
               <PanelRight className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={onExpandToggle}
+              className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={isExpanded ? "Collapse trace view" : "Expand trace to full view"}
+              title={isExpanded ? "Collapse" : "Expand to full view"}
+            >
+              {isExpanded ? (
+                <Minimize2 className="size-3.5" />
+              ) : (
+                <Expand className="size-3.5" />
+              )}
             </button>
           </div>
         </div>
@@ -934,7 +1157,7 @@ function TraceDebugger({
                       ) : null}
                     </button>
                   </span>
-                  <span className="mono ml-2 shrink-0 rounded-md bg-elevated px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  <span className="mono ml-2 shrink-0 rounded-full bg-elevated px-2 py-0.5 text-[10px] text-muted-foreground">
                     {fmtDuration(eventLatency(event))}
                   </span>
                 </div>
@@ -953,6 +1176,7 @@ function TraceDebugger({
           const match = run.events.find((candidate) => candidate.seq === seq);
           if (match) onEventSelect(match);
         }}
+        isExpanded={isExpanded}
       />
     </div>
   );
@@ -964,18 +1188,26 @@ function RunInspector({
   tab,
   onTabChange,
   onEvidenceSelect,
+  isExpanded,
 }: {
   run: LogRun;
   event: TraceEvent | undefined;
   tab: "run" | "feedback" | "metadata";
   onTabChange: (tab: "run" | "feedback" | "metadata") => void;
   onEvidenceSelect: (seq: number) => void;
+  isExpanded?: boolean;
 }) {
   const eventPayload = event?.payload ?? {};
   const eventMetadata = event?.metadata ?? null;
 
   return (
-    <section className="instrument-panel flex min-h-[520px] flex-col overflow-hidden" aria-label="Run inspector">
+    <section
+      className={cn(
+        "instrument-panel flex flex-col overflow-hidden",
+        isExpanded ? "min-h-0 flex-1" : "min-h-[520px]",
+      )}
+      aria-label="Run inspector"
+    >
       <div className="instrument-header">
         <div className="min-w-0">
           <p className="micro">Run inspector</p>
@@ -987,7 +1219,7 @@ function RunInspector({
             {event ? ` · seq ${event.seq}` : ""}
           </p>
         </div>
-        <span className="mono hidden rounded-md border border-border bg-elevated px-2 py-1 text-[10px] text-muted-foreground sm:inline">
+        <span className="mono hidden rounded-full border border-border bg-elevated px-2.5 py-1 text-[10px] text-muted-foreground sm:inline">
           {costEstimate(run.totalTokens)}
         </span>
       </div>
@@ -1057,7 +1289,7 @@ function RunInspector({
                       key={seq}
                       type="button"
                       onClick={() => onEvidenceSelect(seq)}
-                      className="mono min-h-8 rounded-md border border-border bg-elevated px-2 text-[11px] text-accent transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="mono min-h-8 rounded-full border border-border bg-elevated px-2.5 text-[11px] text-accent transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       seq {seq}
                     </button>
@@ -1107,7 +1339,7 @@ function RunInspector({
 
 function Readout({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-border bg-elevated px-3 py-2">
+    <div className="rounded-xl border border-border bg-elevated px-3 py-2">
       <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</dt>
       <dd className="mono mt-1 truncate text-xs text-foreground">{value}</dd>
     </div>
@@ -1124,7 +1356,7 @@ function InspectorSection({
   defaultOpen?: boolean;
 }) {
   return (
-    <details open={defaultOpen} className="group rounded-md border border-border bg-panel/50">
+    <details open={defaultOpen} className="group rounded-xl border border-border bg-panel/50">
       <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between px-3 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         {title}
         <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
@@ -1144,103 +1376,12 @@ function CodeBlock({
   return (
     <pre
       className={cn(
-        "max-h-52 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-canvas p-3 text-xs leading-5",
+        "max-h-52 overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-canvas p-3 text-xs leading-5",
         tone === "error" ? "text-warning" : "text-foreground/90",
       )}
     >
       {children}
     </pre>
-  );
-}
-
-function FilterRail({
-  metrics,
-  projects,
-  selectedProjects,
-  onProjectToggle,
-  environments,
-  selectedEnvironments,
-  onEnvironmentToggle,
-  tags,
-  selectedTags,
-  onTagToggle,
-  onClearFilters,
-}: {
-  metrics: ReturnType<typeof deriveLogMetrics>;
-  projects: Project[];
-  selectedProjects: string[];
-  onProjectToggle: (projectId: string) => void;
-  environments: string[];
-  selectedEnvironments: string[];
-  onEnvironmentToggle: (environment: string) => void;
-  tags: string[];
-  selectedTags: string[];
-  onTagToggle: (tag: string) => void;
-  onClearFilters: () => void;
-}) {
-  return (
-    <aside className="flex flex-col gap-3">
-      <div className="landing-framed-surface overflow-hidden">
-        <div className="flex items-center justify-between border-b border-border/70 px-3 py-2.5">
-          <h2 className="text-xs font-semibold text-foreground">Filtered metrics</h2>
-          <span className="text-[10px] text-muted-foreground">live</span>
-        </div>
-        <dl className="grid grid-cols-2 gap-px bg-border/50">
-          <MetricTile label="Runs" value={String(metrics.totalRuns)} Icon={Activity} />
-          <MetricTile label="Failures" value={String(metrics.failedRuns)} Icon={AlertCircle} />
-          <MetricTile label="Error rate" value={pct(metrics.errorRate)} Icon={Gauge} />
-          <MetricTile label="P50" value={fmtDuration(metrics.p50LatencyMs)} Icon={Timer} />
-          <MetricTile label="P99" value={fmtDuration(metrics.p99LatencyMs)} Icon={Timer} />
-          <MetricTile label="Tokens" value={numberFormat(metrics.totalTokens)} Icon={FileJson} />
-        </dl>
-      </div>
-
-      <div className="landing-framed-surface overflow-hidden">
-        <div className="flex items-center justify-between border-b border-border/70 px-3 py-2.5">
-          <h2 className="flex items-center gap-2 text-xs font-semibold text-foreground">
-            <ListFilter className="size-3.5" />
-            Filter shortcuts
-          </h2>
-          <button
-            type="button"
-            onClick={onClearFilters}
-            className="text-[11px] text-accent transition-colors hover:text-accent-bright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Clear
-          </button>
-        </div>
-        <FilterGroup title="Projects">
-          {projects.map((project) => (
-            <CheckFilter
-              key={project.id}
-              label={project.name}
-              checked={selectedProjects.includes(project.id)}
-              onChange={() => onProjectToggle(project.id)}
-            />
-          ))}
-        </FilterGroup>
-        <FilterGroup title="Environment">
-          {environments.map((environment) => (
-            <CheckFilter
-              key={environment}
-              label={environment}
-              checked={selectedEnvironments.includes(environment)}
-              onChange={() => onEnvironmentToggle(environment)}
-            />
-          ))}
-        </FilterGroup>
-        <FilterGroup title="Tags" icon={<Tags className="size-3" />}>
-          {tags.map((tag) => (
-            <CheckFilter
-              key={tag}
-              label={tag}
-              checked={selectedTags.includes(tag)}
-              onChange={() => onTagToggle(tag)}
-            />
-          ))}
-        </FilterGroup>
-      </div>
-    </aside>
   );
 }
 
@@ -1294,7 +1435,7 @@ function CheckFilter({
   onChange: () => void;
 }) {
   return (
-    <label className="flex min-h-7 cursor-pointer items-center gap-2 rounded-md px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground">
+    <label className="flex min-h-7 cursor-pointer items-center gap-2 rounded-lg px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground">
       <input
         type="checkbox"
         checked={checked}
