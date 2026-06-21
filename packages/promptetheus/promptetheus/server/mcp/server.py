@@ -1,6 +1,6 @@
 """Promptetheus incident-context MCP server.
 
-Exposes seven read-only tools and one write tool to a coding agent (Cursor / Claude
+Exposes six read-only tools and one write tool to a coding agent (Cursor / Claude
 Code) over MCP stdio. Each tool is a thin call into PromptetheusClient, which is a
 client of the FastAPI gateway — the gateway owns workspace scoping and redaction,
 so secrets never reach the agent.
@@ -15,12 +15,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from promptetheus.redaction import build_default_redactor
-
 from .client import PromptetheusClient
 
 SERVER_NAME = "promptetheus"
-_redact_event = build_default_redactor()
 
 
 # ---------------------------------------------------------------------------
@@ -49,25 +46,6 @@ def get_failure_evidence(
         "critical_step_seq": context.get("critical_step_seq"),
         "events": context.get("events"),
     }
-
-
-def get_trace_events(client: PromptetheusClient, trace_id: str) -> dict[str, Any]:
-    """Return the trace event timeline with payloads redacted for agent use."""
-
-    events = []
-    for event in client.get_trace_events(trace_id):
-        redacted = _redact_event(dict(event))
-        events.append(
-            {
-                "type": redacted.get("type"),
-                "session_id": redacted.get("session_id"),
-                "timestamp": redacted.get("timestamp"),
-                "seq": redacted.get("seq"),
-                "payload": redacted.get("payload") or {},
-                "metadata": redacted.get("metadata"),
-            }
-        )
-    return {"trace_id": trace_id, "events": events}
 
 
 def get_replay_timeline(
@@ -137,7 +115,7 @@ def _load_fastmcp() -> Any:
 
 
 def build_server(client: PromptetheusClient | None = None) -> Any:
-    """Build a FastMCP server with the Promptetheus context tools registered.
+    """Build a FastMCP server with the seven incident-context tools registered.
 
     Args:
         client: An optional PromptetheusClient (tests inject one wired to an
@@ -160,10 +138,6 @@ def build_server(client: PromptetheusClient | None = None) -> Any:
     )
     def _get_failure_evidence(incident_id: str) -> dict[str, Any]:
         return get_failure_evidence(api, incident_id)
-
-    @server.tool(name="get_trace_events", description=get_trace_events.__doc__)
-    def _get_trace_events(trace_id: str) -> dict[str, Any]:
-        return get_trace_events(api, trace_id)
 
     @server.tool(name="get_replay_timeline", description=get_replay_timeline.__doc__)
     def _get_replay_timeline(incident_id: str) -> dict[str, Any]:
@@ -205,7 +179,6 @@ __all__ = [
     "get_incident",
     "get_regression_case",
     "get_replay_timeline",
-    "get_trace_events",
     "link_pr_to_incident",
     "run",
     "search_similar_incidents",
