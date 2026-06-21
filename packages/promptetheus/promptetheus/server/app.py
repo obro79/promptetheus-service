@@ -673,6 +673,15 @@ def create_app(
         analysis = result.as_dict()
         app.state.store.set_analysis(id, analysis)
         incidents = assemble_incidents(app.state.store, session, result)
+        # A run that produced an incident IS a failed run (regardless of the
+        # status the agent claimed in session_end — the silent-failure case).
+        # Reflect that on the session so the logs failed-filter surfaces it.
+        try:
+            app.state.store.update_session(
+                id, {"status": "failed" if incidents else "passed"}
+            )
+        except Exception:
+            pass
         app.state.store.add_audit(
             {
                 "workspace_id": session.get("workspace_id"),

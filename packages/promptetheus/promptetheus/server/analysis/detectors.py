@@ -668,16 +668,16 @@ ALL_DETECTORS: list[tuple[str, Any, bool]] = [
 
 # Human-readable goal-constraint phrasing + the missing safeguard, per label.
 _LABEL_CONSTRAINT: dict[str, str] = {
-    "browser_goal_mismatch": "the requested booking constraints",
+    "browser_goal_mismatch": "the user's stated goal",
     "ignored_ui_warning": "a surfaced UI warning",
-    "false_success_claim": "the actual final browser state",
+    "false_success_claim": "the actual final outcome",
     "forbidden_action": "the goal's stop-boundary",
 }
 
 _LABEL_SAFEGUARD: dict[str, str] = {
-    "browser_goal_mismatch": "no final browser-state verification before claiming success",
+    "browser_goal_mismatch": "no final outcome verification before claiming success",
     "ignored_ui_warning": "no check that surfaced warnings were resolved before proceeding",
-    "false_success_claim": "no final browser-state verification before claiming success",
+    "false_success_claim": "no final outcome verification before claiming success",
     "forbidden_action": "no stop-boundary guard before the committing action",
 }
 
@@ -697,9 +697,9 @@ def root_cause_sentence(detections: list[Detection], user_goal: str) -> str:
     safeguard = _LABEL_SAFEGUARD.get(primary.label, "no verification before completion")
 
     if primary.critical_step_seq is not None:
-        step_phrase = f"the browser action at step {primary.critical_step_seq}"
+        step_phrase = f"the action at step {primary.critical_step_seq}"
     else:
-        step_phrase = "the failing browser action"
+        step_phrase = "the failing action"
 
     goal_text = user_goal.strip()
     goal_clause = f' for goal "{goal_text}"' if goal_text else ""
