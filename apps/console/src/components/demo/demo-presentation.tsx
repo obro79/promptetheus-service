@@ -78,6 +78,7 @@ const agentTracks = [
     icon: Waypoints,
     failVideo: "/assets/demo-agents/browser-fail.webm",
     passVideo: "/assets/demo-agents/browser-pass.webm",
+    installVideo: undefined,
     failed: "Books the wrong time slot and claims the task is complete.",
     install:
       "Add the Promptetheus decorator before the browser agent entrypoint.",
@@ -92,6 +93,7 @@ const agentTracks = [
     icon: Radio,
     failVideo: "/assets/demo-agents/voice-fail.webm",
     passVideo: "/assets/demo-agents/voice-pass.webm",
+    installVideo: "/assets/demo-agents/voice-agent-installation.mp4",
     failed: "Misses the escalation handoff after silence and user frustration.",
     install:
       "Wrap the voice agent so transcript, silence, and handoff events are captured.",
@@ -106,6 +108,7 @@ const agentTracks = [
     icon: MessageSquare,
     failVideo: "/assets/demo-agents/chat-agent-failed.webm",
     passVideo: "/assets/demo-agents/chat-agent-successful.webm",
+    installVideo: undefined,
     failed:
       "Repeats stale advice and loops the customer back to the wrong step.",
     install:
@@ -262,6 +265,7 @@ const SECTIONS: DemoSection[] = [
       agent: agent.label,
       icon: agent.icon,
       caption: agent.install,
+      video: agent.installVideo,
       tone: "install",
     })),
   },
