@@ -75,7 +75,7 @@ export function LandingPage({ stats }: { stats: LandingStats }) {
           title={landingSections.agents.title}
         />
 
-        <div className="grid gap-4 md:grid-cols-3 md:items-start">
+        <div className="grid gap-4 md:grid-cols-3 md:items-stretch">
           {landingAgents.map((agent) => (
             <HomeAgentCard key={agent.title} agent={agent} />
           ))}
@@ -224,7 +224,7 @@ function HomeAgentCard({
   agent: (typeof landingAgents)[number];
 }) {
   return (
-    <article className="surface flex flex-col overflow-hidden rounded-[1.45rem] border-border/80 bg-panel/90 shadow-[0_22px_64px_hsl(var(--shadow-color)/0.13)]">
+    <article className="landing-agent-card surface flex h-full flex-col overflow-hidden rounded-[1.45rem] border-border/80 bg-panel/90 shadow-[0_22px_64px_hsl(var(--shadow-color)/0.13)]">
       <div className="border-b border-border/50 px-4 py-3">
         <h3 className="text-sm font-semibold text-foreground">{agent.title}</h3>
       </div>
@@ -233,7 +233,7 @@ function HomeAgentCard({
         <AgentVisualSlot agent={agent} />
       </div>
 
-      <div className="px-4 py-3">
+      <div className="landing-agent-card-task px-4 py-3">
         <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/75">
           Production task
         </p>
@@ -314,14 +314,37 @@ function ChatMiniScene() {
   return (
     <div className="landing-agent-scene landing-agent-mini-scene" aria-hidden="true">
       <div className="landing-chat-reel landing-chat-window landing-agent-mini-chat-window">
-        <div className="landing-chat-bubble landing-chat-user">
+        <div className="landing-chat-bubble landing-chat-user landing-chat-mini-user-1">
           I still cannot access my workspace.
         </div>
-        <div className="landing-chat-bubble landing-chat-agent">
+        <div className="landing-chat-indicator landing-chat-thinking landing-chat-mini-thinking-1">
+          <span>Thinking</span>
+          <span className="landing-chat-indicator-dots">
+            <span />
+            <span />
+            <span />
+          </span>
+        </div>
+        <div className="landing-chat-indicator landing-chat-typing landing-chat-mini-typing-1">
+          <span className="landing-chat-indicator-dots">
+            <span />
+            <span />
+            <span />
+          </span>
+        </div>
+        <div className="landing-chat-bubble landing-chat-agent landing-chat-mini-agent-1">
           Try refreshing and signing in again.
         </div>
-        <div className="landing-chat-bubble landing-chat-user">
+        <div className="landing-chat-bubble landing-chat-user landing-chat-mini-user-2">
           That loops me back to billing.
+        </div>
+        <div className="landing-chat-indicator landing-chat-thinking landing-chat-mini-thinking-2">
+          <span>Thinking</span>
+          <span className="landing-chat-indicator-dots">
+            <span />
+            <span />
+            <span />
+          </span>
         </div>
       </div>
     </div>
@@ -333,36 +356,26 @@ const voiceWaveHeights = [36, 62, 44, 78, 54, 88, 48, 70, 40] as const;
 function VoiceMiniScene() {
   return (
     <div
-      className="landing-agent-scene landing-agent-mini-scene landing-speaking-scene"
+      className="landing-agent-scene landing-agent-mini-scene landing-speaking-scene landing-agent-mini-voice-scene"
       aria-hidden="true"
     >
-      <div className="landing-voice-component landing-agent-mini-voice-component">
-        <div className="landing-voice-status">
-          <span />
-          Live trace
-        </div>
-        <div className="landing-voice-core">
-          <span className="landing-voice-ring landing-voice-ring-one" />
-          <span className="landing-voice-ring landing-voice-ring-two" />
-          <span className="landing-voice-avatar">AI</span>
-        </div>
-        <div className="landing-waveform">
-          {voiceWaveHeights.map((height, index) => (
-            <span
-              key={`${height}-${index}`}
-              style={
-                {
-                  "--wave-height": `${height}%`,
-                  "--wave-index": index,
-                } as CSSProperties
-              }
-            />
-          ))}
-        </div>
-        <div className="landing-voice-transcript-card">
-          <span>Caller: I need a human now.</span>
-          <span>Agent: I can continue helping.</span>
-        </div>
+      <div className="landing-voice-core landing-agent-mini-voice-core">
+        <span className="landing-voice-ring landing-voice-ring-one" />
+        <span className="landing-voice-ring landing-voice-ring-two" />
+        <span className="landing-voice-avatar" aria-hidden="true" />
+      </div>
+      <div className="landing-waveform landing-agent-mini-voice-waveform">
+        {voiceWaveHeights.map((height, index) => (
+          <span
+            key={`${height}-${index}`}
+            style={
+              {
+                "--wave-height": `${height}%`,
+                "--wave-index": index,
+              } as CSSProperties
+            }
+          />
+        ))}
       </div>
     </div>
   );
@@ -377,10 +390,13 @@ function HomeIncidentLoop() {
   );
 }
 
-const loopTerminalLines = [
-  "$ uv add promptetheus",
+const loopInstallCommand = "$ uv add promptetheus-service";
+const loopImportLine = "+ import promptetheus as pt";
+const loopDecoratorLine = '+ @pt.observe("refund-agent")';
+const loopTerminalOutputLines = [
   "resolved 18 packages in 142ms",
-  "installed promptetheus, httpx, pydantic",
+  "installed promptetheus-service, httpx, pydantic",
+  "Built promptetheus-service @ file:///…",
 ] as const;
 
 function IncidentInstrumentationPanel() {
@@ -390,20 +406,18 @@ function IncidentInstrumentationPanel() {
       aria-label="Animated instrumentation setup with package install and trace wrapper"
     >
       <div className="landing-loop-install-sequence" aria-hidden="true">
-        <div className="landing-loop-terminal">
-          <div className="landing-loop-panel-bar">
-            <span />
-            <span />
-            <span />
-            <p>terminal</p>
-          </div>
-          <div className="landing-loop-terminal-lines">
-            {loopTerminalLines.map((line, index) => (
+        <div className="landing-loop-terminal landing-loop-terminal-bare">
+          <div className="landing-loop-terminal-body">
+            <div className="landing-loop-terminal-typewriter">
               <code
-                key={line}
-                className={index === 0 ? "landing-loop-terminal-command" : undefined}
-                style={{ "--loop-index": index } as CSSProperties}
+                className="landing-loop-terminal-command"
+                style={{ "--type-chars": loopInstallCommand.length } as CSSProperties}
               >
+                {loopInstallCommand}
+              </code>
+            </div>
+            {loopTerminalOutputLines.map((line) => (
+              <code key={line} className="landing-loop-terminal-output">
                 {line}
               </code>
             ))}
@@ -418,70 +432,68 @@ function IncidentInstrumentationPanel() {
             <p>agent.py</p>
           </div>
           <div className="landing-loop-editor-lines">
-            <code className="landing-loop-code-import" style={{ "--loop-index": 0 } as CSSProperties}>
-              + import promptetheus as pt
-            </code>
+            <div className="landing-loop-editor-typewriter">
+              <code
+                className="landing-loop-code-import"
+                style={{ "--type-chars": loopImportLine.length } as CSSProperties}
+              >
+                {loopImportLine}
+              </code>
+            </div>
             <code className="landing-loop-code-existing">  from agents import refund_agent</code>
-            <code className="landing-loop-code-decorator" style={{ "--loop-index": 1 } as CSSProperties}>
-              + @pt.observe(&quot;refund-agent&quot;)
-            </code>
+            <div className="landing-loop-editor-typewriter">
+              <code
+                className="landing-loop-code-decorator"
+                style={{ "--type-chars": loopDecoratorLine.length } as CSSProperties}
+              >
+                {loopDecoratorLine}
+              </code>
+            </div>
             <code className="landing-loop-code-existing">  def run_agent(task):</code>
             <code className="landing-loop-code-existing">      return refund_agent.run(task)</code>
           </div>
         </div>
-
-        <div className="landing-loop-install-badge">wrapper added</div>
       </div>
     </div>
   );
 }
 
 function IncidentTraceStreamPanel() {
-  const centerEventIndex = landingIncidentLoopStreamEvents.findIndex(
-    (event) => event.type === "browser_action",
-  );
-  const streamCenterIndex = centerEventIndex >= 0 ? centerEventIndex : 0;
-  const centerPhase = 4;
-
   return (
     <div
       className="landing-loop-stream-panel landing-workflow-asset-stream"
       aria-label="Live trace event stream"
     >
-      <div className="landing-stream-window landing-loop-stream-window" aria-hidden="true">
-        <div className="landing-stream-header">
-          <span />
-          <p>trace bus</p>
-          <strong>2.4k events/min</strong>
+      <div className="landing-loop-stream-terminal" aria-hidden="true">
+        <div className="landing-loop-stream-terminal-bar">
+          <span>tail -f trace.log</span>
         </div>
-
-        <div className="landing-stream-viewport">
-          <div className="landing-stream-highlight" />
-          <div className="landing-stream-lane landing-loop-stream-lane">
-            {landingIncidentLoopStreamEvents.map((event, index) => {
-              const streamPhase =
-                (index - streamCenterIndex + centerPhase + landingIncidentLoopStreamEvents.length) %
-                landingIncidentLoopStreamEvents.length;
-
-              return (
-                <div
-                  key={`${event.type}-${index}`}
-                  className={cn("landing-stream-event", streamEventToneClassNames[event.tone])}
-                  style={{ "--stream-phase": streamPhase } as CSSProperties}
-                >
-                  <span>{event.type.replaceAll("_", " ")}</span>
-                  <p>{event.body}</p>
-                  <em>{event.meta}</em>
-                </div>
-              );
-            })}
+        <div className="landing-loop-stream-terminal-viewport">
+          <div className="landing-loop-stream-terminal-scroll">
+            {[0, 1].map((copy) => (
+              <div
+                key={copy}
+                className="landing-loop-stream-chunk"
+                aria-hidden={copy === 1 ? true : undefined}
+              >
+                {landingIncidentLoopStreamEvents.map((event, index) => (
+                  <div
+                    key={`${copy}-${event.type}-${index}`}
+                    className={cn(
+                      "landing-loop-stream-line",
+                      streamEventToneClassNames[event.tone],
+                    )}
+                  >
+                    <span className="landing-loop-stream-ts">{event.meta}</span>
+                    <span className="landing-loop-stream-kind">
+                      {event.type.replaceAll("_", " ")}
+                    </span>
+                    <span className="landing-loop-stream-text">{event.body}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
-        </div>
-
-        <div className="landing-stream-footer">
-          <span>WebSocket ingest</span>
-          <span>FastAPI gateway</span>
-          <span>Supabase write</span>
         </div>
       </div>
     </div>
