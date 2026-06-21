@@ -5,6 +5,8 @@
  */
 import type {
   AnalysisResult,
+  EvalScoreboard,
+  EvalScoreboardRow,
   Incident,
   IncidentContext,
   Project,
@@ -89,6 +91,69 @@ export function getIncidentContext(id: string): IncidentContext | undefined {
     events: getEvents(sessionId),
     artifacts: getArtifacts(sessionId),
     regression_runs: getRegressionRuns(id),
+  };
+}
+
+// ── Eval scoreboard ───────────────────────────────────────────────────────────
+// Mirrors GET /api/evals/scoreboard. Derived from the healed-state incidents in
+// the seed so the page renders rich demo data; swapping to the live endpoint is
+// a one-line change (see fetchEvalScoreboard in promptetheus-api.ts).
+
+function _hash(value: string): number {
+  let h = 0;
+  for (let i = 0; i < value.length; i += 1) h = (h * 31 + value.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function _between(value: string, lo: number, hi: number): number {
+  return Number((lo + ((_hash(value) % 1000) / 1000) * (hi - lo)).toFixed(2));
+}
+
+/** Per-incident eval verdicts + workspace rollup (mock of the scoreboard API). */
+export function getEvalScoreboard(): EvalScoreboard {
+  const healed = incidents.filter((i) =>
+    i.status === "fixing" || i.status === "fixed" || i.status === "triaged",
+  );
+
+  const rows: EvalScoreboardRow[] = healed.map((incident, index) => {
+    // One representative blocked fix near the end: the judge caught a candidate
+    // that still contradicted the evidence, so the gate held the PR back.
+    const blocked = healed.length > 2 && index === healed.length - 1;
+    const fallback = incident.status === "triaged" && index % 2 === 0;
+    const afterPassed = !blocked;
+    return {
+      incident_id: incident.id,
+      label: incident.label,
+      before_passed: false,
+      after_passed: afterPassed,
+      confidence: afterPassed
+        ? _between(incident.id, 0.82, 0.97)
+        : _between(incident.id, 0.18, 0.44),
+      attempts: 1 + (_hash(incident.id) % 3),
+      fallback,
+      passed: afterPassed,
+      reason: afterPassed
+        ? "Fixed answer is consistent with the retrieved evidence."
+        : "Candidate still contradicts the retrieved evidence — gate blocked the PR.",
+    };
+  });
+
+  const total = rows.length;
+  const passed = rows.filter((row) => row.passed).length;
+  const flips = rows.filter((row) => !row.before_passed && row.after_passed).length;
+  const fallbackCount = rows.filter((row) => row.fallback).length;
+  const avgConfidence = total
+    ? Number((rows.reduce((acc, row) => acc + row.confidence, 0) / total).toFixed(2))
+    : 0;
+
+  return {
+    total,
+    passed,
+    pass_rate: total ? Number((passed / total).toFixed(2)) : 0,
+    flips,
+    avg_confidence: avgConfidence,
+    fallback_count: fallbackCount,
+    rows,
   };
 }
 

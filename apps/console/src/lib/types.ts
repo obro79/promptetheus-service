@@ -140,6 +140,95 @@ export interface RegressionRun {
   created_at: string;
 }
 
+/** One attempt in the self-healing loop trail (POST /api/incidents/{id}/heal). */
+export interface HealAttempt {
+  kind: string;
+  attempt: number;
+  runner: "deterministic" | "claude" | "codex" | null;
+  diagnosis: string | null;
+  critique: {
+    approved: boolean;
+    confidence: number;
+    reason: string;
+  } | null;
+  regression: {
+    before_fail?: number;
+    after_pass?: number;
+    after_fail?: number;
+    [key: string]: unknown;
+  } | null;
+  eval: EvalReport | null;
+  passed: boolean;
+}
+
+/** One eval case scored before vs after the fix (server.evals). */
+export interface EvalCaseResult {
+  case_id: string;
+  assertion: string;
+  before_passed: boolean;
+  after_passed: boolean;
+  confidence: number;
+  reason: string;
+}
+
+/** Aggregate eval verdict for one heal attempt. */
+export interface EvalReport {
+  passed: boolean;
+  meaningful: boolean;
+  fallback: boolean;
+  before_fail: number;
+  after_fail: number;
+  note: string | null;
+  cases: EvalCaseResult[];
+}
+
+/** One incident's decisive eval outcome (GET /api/evals/scoreboard). */
+export interface EvalScoreboardRow {
+  incident_id: string;
+  label: string;
+  before_passed: boolean;
+  after_passed: boolean;
+  confidence: number;
+  attempts: number;
+  fallback: boolean;
+  passed: boolean;
+  reason: string | null;
+}
+
+/** Workspace-level eval rollup + per-incident rows. */
+export interface EvalScoreboard {
+  total: number;
+  passed: number;
+  pass_rate: number;
+  flips: number;
+  avg_confidence: number;
+  fallback_count: number;
+  rows: EvalScoreboardRow[];
+}
+
+/** A PR (real or fallback preview) attached to a verified heal. */
+export interface HealPr {
+  branch?: string;
+  title?: string;
+  body?: string;
+  changed_files?: string[];
+  fallback?: boolean;
+  pr_url?: string | null;
+}
+
+/** Result of the self-healing loop (POST /api/incidents/{id}/heal). */
+export interface HealReport {
+  status: "pr_opened" | "escalated";
+  incident_id: string;
+  attempts: number;
+  source: string;
+  pr: HealPr | null;
+  trail: HealAttempt[];
+  reason: string | null;
+  workflow_run_id: string | null;
+  orchestrator: string;
+}
+
 /** The incident-context bundle (GET /api/incidents/{id}/context). */
 export interface IncidentContext {
   incident: Incident;

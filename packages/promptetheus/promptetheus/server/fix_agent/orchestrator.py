@@ -3,11 +3,14 @@
 `run_loop` dispatches on `PROMPTETHEUS_ORCHESTRATOR` (default `inprocess`):
 
 - **inprocess** — call `heal_incident` directly. Guaranteed-to-work demo safety net.
-- **agentspan** — drive the loop as an Orkes Conductor (Agentspan) workflow so the
-  workflow run id / graph is a first-class demo artifact for the Orkes prize. The
-  loop *steps* are the same in-process callables; Agentspan only sequences them. If
-  the Agentspan SDK is missing or unreachable, this falls back to the in-process
-  path so the demo never depends on it.
+- **agentspan** — run the heal as a real Agentspan execution (the durable agent
+  runtime at https://agentspan.ai) so the execution id / live graph in the
+  Agentspan UI (http://localhost:6767) is a first-class demo artifact for the
+  prize. The bounded loop itself is exposed to the runtime as a single `@tool`,
+  so the proven deterministic loop still does the healing — Agentspan provides
+  the durable, trackable execution wrapper. If the Agentspan SDK is missing or
+  the server is unreachable, this falls back to the in-process path so the demo
+  never depends on it.
 
 Everything Agentspan-related is lazy-imported and defensively wrapped — a missing
 dep or a booth-credential snag can never break `inprocess` or tests.
@@ -21,7 +24,12 @@ from typing import Any
 from promptetheus.server.fix_agent.loop import heal_incident
 from promptetheus.server.models import HealReport
 
-_WORKFLOW_NAME = os.environ.get("PROMPTETHEUS_AGENTSPAN_WORKFLOW", "promptetheus_heal")
+#: The Agentspan agent's model, in Agentspan's "provider/model" form. Defaults to
+#: the project's house model; override if the Agentspan gateway routes a different
+#: id (their docs example uses "anthropic/claude-sonnet-4-6").
+_AGENTSPAN_MODEL = os.environ.get(
+    "PROMPTETHEUS_AGENTSPAN_MODEL", "anthropic/claude-opus-4-8"
+)
 
 
 def _mode(explicit: str | None) -> str:
@@ -47,45 +55,71 @@ def run_loop(
     return report
 
 
-def _agentspan_run_id(incident: dict[str, Any]) -> str | None:
-    """Start an Orkes Conductor workflow run for this heal, returning its id.
-
-    Best-effort: returns None when the SDK/creds are absent so the caller falls
-    back to in-process. The heal steps execute in-process (shared callables); the
-    workflow run is the trackable Agentspan artifact for the demo/prize.
-    """
-
-    base = os.environ.get("CONDUCTOR_SERVER_URL") or os.environ.get("ORKES_SERVER_URL")
-    if not base:
-        return None
-    try:
-        from conductor.client.configuration.configuration import Configuration  # type: ignore
-        from conductor.client.orkes_clients import OrkesClients  # type: ignore
-
-        config = Configuration(server_api_url=base)
-        workflow_client = OrkesClients(configuration=config).get_workflow_client()
-        run_id = workflow_client.start_workflow_by_name(
-            name=_WORKFLOW_NAME,
-            input={
-                "incident_id": incident.get("id"),
-                "workspace_id": incident.get("workspace_id"),
-                "label": incident.get("label"),
-            },
-        )
-        return str(run_id) if run_id else None
-    except Exception:
-        return None
-
-
 def _run_agentspan(
     store: Any, incident: dict[str, Any], *, max_attempts: int | None
 ) -> HealReport | None:
-    run_id = _agentspan_run_id(incident)
-    if run_id is None:
+    """Run the heal as a durable Agentspan execution; return its HealReport.
+
+    The bounded loop is exposed to the Agentspan runtime as a single `@tool`, so
+    the LLM agent invokes it and Agentspan records a durable, trackable execution
+    (visible in the UI at http://localhost:6767). `AgentResult.workflow_id` — the
+    execution id — is stamped onto the report as the demo artifact.
+
+    Best-effort: returns None on any failure (SDK absent, server unreachable, the
+    agent never calling the tool) so the caller falls back to in-process. The heal
+    itself still runs deterministically inside the tool regardless of the LLM.
+    """
+
+    # The tool captures the authoritative HealReport so we never depend on the
+    # LLM's narration of the result — the deterministic loop is the source of truth.
+    holder: dict[str, HealReport] = {}
+
+    # The whole construction (import, @tool decoration, Agent build, run) is guarded
+    # so any Agentspan failure — missing dep, bad model route, server unreachable —
+    # degrades to the in-process loop instead of breaking the heal.
+    try:
+        from agentspan.agents import Agent, AgentRuntime, tool  # type: ignore
+
+        @tool
+        def heal_incident_tool(incident_id: str) -> dict[str, Any]:
+            """Run the bounded self-healing loop for the incident and return its report.
+
+            Args:
+                incident_id: The id of the incident to heal.
+            """
+
+            report = heal_incident(store, incident, max_attempts=max_attempts)
+            holder["report"] = report
+            return report.as_dict()
+
+        agent = Agent(
+            name="promptetheus-healer",
+            model=_AGENTSPAN_MODEL,
+            tools=[heal_incident_tool],
+            instructions=(
+                "You remediate a failed AI-agent incident. Call heal_incident_tool "
+                "exactly once with the given incident id, then stop and report whether "
+                "a pull request was opened. Do not call any other tool."
+            ),
+            max_turns=4,
+        )
+
+        with AgentRuntime() as runtime:
+            result = runtime.run(agent, f"Heal incident {incident.get('id')}.")
+    except Exception:
         return None
-    report = heal_incident(store, incident, max_attempts=max_attempts)
+
+    # If the agent declined to call the tool, still heal deterministically so the
+    # agentspan path is never weaker than in-process.
+    report = holder.get("report") or heal_incident(
+        store, incident, max_attempts=max_attempts
+    )
     report.orchestrator = "agentspan"
-    report.workflow_run_id = run_id
+    # The docs call this `workflow_id`; the runtime logs it as `execution_id`.
+    # Read both so the trackable id (the demo artifact) is always captured.
+    report.workflow_run_id = (
+        getattr(result, "workflow_id", None) or getattr(result, "execution_id", None)
+    )
     return report
 
 

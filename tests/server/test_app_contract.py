@@ -1042,3 +1042,37 @@ def test_api_contract_sample_shapes(client: testclient.TestClient) -> None:
     )
     assert batch.status_code == samples["append_events_batch"]["status"]
     assert "accepted" in batch.json()
+
+
+# ---------------------------------------------------------------------------
+# Eval scoreboard (GET /api/evals/scoreboard)
+# ---------------------------------------------------------------------------
+
+
+def test_eval_scoreboard_aggregates_heal_attempts(
+    client: testclient.TestClient, monkeypatch
+) -> None:
+    # No key -> the eval gate uses its deterministic before-fail/after-pass
+    # fallback, which is still a meaningful, scoreboard-able verdict.
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    incident_id = _make_incident(client)
+
+    healed = client.post(
+        f"/api/incidents/{incident_id}/heal", json={}, headers=CONSOLE_AUTH
+    )
+    assert healed.status_code == 200
+
+    board = client.get("/api/evals/scoreboard", headers=CONSOLE_AUTH)
+    assert board.status_code == 200
+    scoreboard = board.json()["scoreboard"]
+
+    assert scoreboard["total"] >= 1
+    assert scoreboard["flips"] >= 1
+    row = next(r for r in scoreboard["rows"] if r["incident_id"] == incident_id)
+    assert row["before_passed"] is False
+    assert row["after_passed"] is True
+    assert 0.0 <= row["confidence"] <= 1.0
+
+
+def test_eval_scoreboard_is_console_only(client: testclient.TestClient) -> None:
+    assert client.get("/api/evals/scoreboard", headers=KEY_AUTH).status_code == 403

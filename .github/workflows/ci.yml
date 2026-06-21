@@ -16,7 +16,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install service dependencies
-        run: python -m pip install -e "packages/promptetheus[dev,mcp]"
+        run: python -m pip install -e "packages/promptetheus[dev,mcp,agent]"
 
       - name: Generate schema.ts
         run: python scripts/generate_schema_ts.py
