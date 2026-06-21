@@ -2,6 +2,17 @@
 
 **Incident response for production AI agents.**
 
+![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?style=flat-square&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-Trace%20Gateway-009688?style=flat-square&logo=fastapi&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-Console-000000?style=flat-square&logo=nextdotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-UI-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth-3FCF8E?style=flat-square&logo=supabase&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Storage-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-Warm%20Memory-DC382D?style=flat-square&logo=redis&logoColor=white)
+![GitHub](https://img.shields.io/badge/GitHub-PR%20Handoff-181717?style=flat-square&logo=github&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-Console-000000?style=flat-square&logo=vercel&logoColor=white)
+![Railway](https://img.shields.io/badge/Railway-Service-0B0D0E?style=flat-square&logo=railway&logoColor=white)
+
 AI agents fail in ways that are hard to debug: they click the wrong button, ignore a user
 correction, retrieve the right policy and answer the opposite, or claim success without doing the
 work. Promptetheus captures the run, detects the likely failure, replays the exact bad step, and
