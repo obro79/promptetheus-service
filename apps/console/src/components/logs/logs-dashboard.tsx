@@ -1,29 +1,23 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import {
   Activity,
   AlertCircle,
-  BarChart3,
   Bot,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   CircleDot,
   Columns3,
-  Database,
   FileJson,
   Filter,
   Gauge,
-  Home,
   ListFilter,
-  ListTree,
   MessageSquare,
-  MoreHorizontal,
   PanelRight,
+  RotateCcw,
   Search,
-  Settings,
   Sparkles,
   Tags,
   Terminal,
@@ -33,6 +27,9 @@ import {
 } from "lucide-react";
 
 import { JsonViewer } from "@/components/common/json-viewer";
+import { LabelTag } from "@/components/common/label-tag";
+import { StatusPill } from "@/components/common/status-pill";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -41,6 +38,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type {
   AnalysisResult,
   Incident,
@@ -54,7 +60,6 @@ import {
   buildLogRuns,
   buildTraceTree,
   deriveLogMetrics,
-  eventSummary,
   eventTitle,
   filterLogRuns,
   flattenTraceTree,
@@ -103,15 +108,6 @@ const COLUMN_LABELS: Record<LogColumn, string> = {
   feedback: "Feedback",
   tokens: "Tokens",
 };
-
-const NAV_ITEMS: Array<{ label: string; href: string; Icon: LucideIcon; active?: boolean }> = [
-  { label: "Home", href: "/", Icon: Home },
-  { label: "Logs", href: "/logs", Icon: ListTree, active: true },
-  { label: "Monitoring", href: "/incidents", Icon: BarChart3 },
-  { label: "Datasets", href: "/sessions", Icon: Database },
-  { label: "Prompts", href: "/agents", Icon: Sparkles },
-  { label: "Settings", href: "/settings/projects", Icon: Settings },
-];
 
 const EVENT_ICON: Partial<Record<TraceEvent["type"], LucideIcon>> = {
   user_message: MessageSquare,
@@ -253,6 +249,11 @@ export function LogsDashboard({
     [selectedRun, selectedSeq],
   );
 
+  const hasSidebarFilters =
+    selectedProjects.length > 0 ||
+    selectedEnvironments.length > 0 ||
+    selectedTags.length > 0;
+
   React.useEffect(() => {
     if (filteredRuns.length && !filteredRuns.some((run) => run.session.id === selectedRunId)) {
       setSelectedRunId(filteredRuns[0].session.id);
@@ -279,291 +280,228 @@ export function LogsDashboard({
     }
   };
 
+  const clearAllFilters = () => {
+    setQuery("");
+    setStatus("all");
+    setFailedOnly(false);
+    setSelectedProjects([]);
+    setSelectedEnvironments([]);
+    setSelectedTags([]);
+  };
+
   return (
-    <div className="min-h-dvh bg-[#07080c] text-[#e7eaf0]">
-      <div className="flex min-h-dvh">
-        <LogsSidebar />
-        <main className="min-w-0 flex-1">
-          <HeaderBar timeRange={timeRange} onTimeRangeChange={setTimeRange} />
+    <div className="flex flex-col gap-3">
+      <LogFiltersBar
+        query={query}
+        onQueryChange={setQuery}
+        status={status}
+        onStatusChange={setStatus}
+        failedOnly={failedOnly}
+        onFailedOnlyChange={setFailedOnly}
+        timeRange={timeRange}
+        onTimeRangeChange={setTimeRange}
+        visibleColumns={visibleColumns}
+        onVisibleColumnsChange={setVisibleColumns}
+        resultCount={filteredRuns.length}
+        hasFilters={
+          Boolean(query) ||
+          status !== "all" ||
+          failedOnly ||
+          timeRange !== "7d" ||
+          hasSidebarFilters
+        }
+        onClear={clearAllFilters}
+      />
 
-          <div className="grid min-h-[calc(100dvh-56px)] grid-cols-1 xl:grid-cols-[minmax(0,1fr)_286px]">
-            <section className="min-w-0 border-r border-[#222733]">
-              <div className="border-b border-[#222733] px-4 py-3 lg:px-5">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                    <div className="relative min-w-[260px] flex-1 sm:max-w-[520px]">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[#7d8596]" />
-                      <input
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Search runs, inputs, outputs, errors..."
-                        aria-label="Search logs"
-                        className="h-9 w-full rounded-md border border-[#252b37] bg-[#0d1017] pl-9 pr-9 text-xs text-[#f4f6fa] outline-none placeholder:text-[#677083] focus:border-[#3d8bfd] focus:ring-2 focus:ring-[#3d8bfd]/20"
-                      />
-                      {query ? (
-                        <button
-                          type="button"
-                          onClick={() => setQuery("")}
-                          aria-label="Clear search"
-                          className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded text-[#8b94a7] hover:bg-[#1b202b] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3d8bfd]"
-                        >
-                          <X className="size-3.5" />
-                        </button>
-                      ) : null}
-                    </div>
-                    <StatusSegment value={status} onChange={setStatus} />
-                    <button
-                      type="button"
-                      aria-pressed={failedOnly}
-                      onClick={() => setFailedOnly((value) => !value)}
-                      className={cn(
-                        "inline-flex h-9 items-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3d8bfd]",
-                        failedOnly
-                          ? "border-[#f97316]/40 bg-[#2a1710] text-[#fbbf24]"
-                          : "border-[#252b37] bg-[#0d1017] text-[#aab2c3] hover:bg-[#151a24] hover:text-white",
-                      )}
-                    >
-                      <ListFilter className="size-3.5" />
-                      Failed only
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <ColumnMenu
-                      visibleColumns={visibleColumns}
-                      onVisibleColumnsChange={setVisibleColumns}
-                    />
-                    <button
-                      type="button"
-                      className="inline-flex h-9 items-center gap-2 rounded-md border border-[#252b37] bg-[#0d1017] px-3 text-xs font-medium text-[#aab2c3] hover:bg-[#151a24] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3d8bfd]"
-                    >
-                      <MoreHorizontal className="size-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="flex min-w-0 flex-col gap-3">
+          <RunsTable
+            runs={filteredRuns}
+            selectedRunId={selectedRun?.session.id}
+            showColumn={showColumn}
+            sortKey={sortKey}
+            sortDirection={sortDirection}
+            onSort={onSort}
+            onSelect={(run) => setSelectedRunId(run.session.id)}
+          />
 
-              <RunsTable
-                runs={filteredRuns}
-                selectedRunId={selectedRun?.session.id}
-                showColumn={showColumn}
-                sortKey={sortKey}
-                sortDirection={sortDirection}
-                onSort={onSort}
-                onSelect={(run) => setSelectedRunId(run.session.id)}
-              />
-
-              {selectedRun ? (
-                <TraceDebugger
-                  run={selectedRun}
-                  traceTree={traceTree}
-                  visibleTrace={visibleTrace}
-                  expanded={expanded}
-                  onExpandedChange={setExpanded}
-                  selectedEvent={selectedEvent}
-                  onEventSelect={(event) => {
-                    setSelectedSeq(event.seq);
-                    setDetailTab("run");
-                  }}
-                  detailTab={detailTab}
-                  onDetailTabChange={setDetailTab}
-                />
-              ) : (
-                <div className="flex min-h-[320px] items-center justify-center border-t border-[#222733] text-sm text-[#8b94a7]">
-                  No runs match the current filters.
-                </div>
-              )}
-            </section>
-
-            <RightRail
-              metrics={metrics}
-              projects={projects}
-              selectedProjects={selectedProjects}
-              onProjectToggle={(projectId) => setSelectedProjects((values) => toggleValue(values, projectId))}
-              environments={environments}
-              selectedEnvironments={selectedEnvironments}
-              onEnvironmentToggle={(environment) =>
-                setSelectedEnvironments((values) => toggleValue(values, environment))
-              }
-              tags={allTags}
-              selectedTags={selectedTags}
-              onTagToggle={(tag) => setSelectedTags((values) => toggleValue(values, tag))}
-              onClearFilters={() => {
-                setQuery("");
-                setStatus("all");
-                setFailedOnly(false);
-                setSelectedProjects([]);
-                setSelectedEnvironments([]);
-                setSelectedTags([]);
+          {selectedRun ? (
+            <TraceDebugger
+              run={selectedRun}
+              traceTree={traceTree}
+              visibleTrace={visibleTrace}
+              expanded={expanded}
+              onExpandedChange={setExpanded}
+              selectedEvent={selectedEvent}
+              onEventSelect={(event) => {
+                setSelectedSeq(event.seq);
+                setDetailTab("run");
               }}
+              detailTab={detailTab}
+              onDetailTabChange={setDetailTab}
             />
-          </div>
-        </main>
+          ) : (
+            <div className="landing-framed-surface flex min-h-[320px] items-center justify-center p-6 text-sm text-muted-foreground">
+              No runs match the current filters.
+            </div>
+          )}
+        </div>
+
+        <FilterRail
+          metrics={metrics}
+          projects={projects}
+          selectedProjects={selectedProjects}
+          onProjectToggle={(projectId) =>
+            setSelectedProjects((values) => toggleValue(values, projectId))
+          }
+          environments={environments}
+          selectedEnvironments={selectedEnvironments}
+          onEnvironmentToggle={(environment) =>
+            setSelectedEnvironments((values) => toggleValue(values, environment))
+          }
+          tags={allTags}
+          selectedTags={selectedTags}
+          onTagToggle={(tag) => setSelectedTags((values) => toggleValue(values, tag))}
+          onClearFilters={clearAllFilters}
+        />
       </div>
     </div>
   );
 }
 
-function LogsSidebar() {
-  return (
-    <aside className="relative hidden w-[216px] shrink-0 border-r border-[#222733] bg-[#0a0c12] lg:block">
-      <div className="flex h-14 items-center gap-2 border-b border-[#222733] px-3">
-        <div className="flex size-7 items-center justify-center rounded-md bg-[#f4f6fa] text-[11px] font-bold text-[#07080c]">
-          P
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-white">Promptetheus</p>
-          <p className="text-[10px] text-[#7d8596]">Observability</p>
-        </div>
-      </div>
-      <nav className="space-y-5 px-2 py-3" aria-label="Logs navigation">
-        <div className="space-y-1">
-          {NAV_ITEMS.slice(0, 3).map((item) => (
-            <SideLink key={item.href} {...item} />
-          ))}
-        </div>
-        <div>
-          <p className="px-2 pb-1 text-[10px] font-semibold uppercase text-[#677083]">
-            Evaluation
-          </p>
-          <div className="space-y-1">
-            {NAV_ITEMS.slice(3, 4).map((item) => (
-              <SideLink key={item.href} {...item} />
-            ))}
-          </div>
-        </div>
-        <div>
-          <p className="px-2 pb-1 text-[10px] font-semibold uppercase text-[#677083]">
-            Prompt Engineering
-          </p>
-          <div className="space-y-1">
-            {NAV_ITEMS.slice(4).map((item) => (
-              <SideLink key={item.href} {...item} />
-            ))}
-          </div>
-        </div>
-      </nav>
-      <div className="absolute bottom-0 left-0 right-0 hidden border-t border-[#222733] p-3 lg:block">
-        <div className="flex items-center gap-2">
-          <span className="flex size-7 items-center justify-center rounded-full bg-[#182133] text-[10px] font-semibold text-[#8ab4ff]">
-            OF
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-xs text-[#e7eaf0]">Owen Fisher</p>
-            <p className="truncate text-[10px] text-[#7d8596]">Mock workspace</p>
-          </div>
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-function SideLink({
-  label,
-  href,
-  Icon,
-  active,
-}: {
-  label: string;
-  href: string;
-  Icon: LucideIcon;
-  active?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "flex min-h-8 items-center gap-2 rounded-md px-2 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3d8bfd]",
-        active
-          ? "bg-[#171c27] text-white"
-          : "text-[#9aa3b5] hover:bg-[#121721] hover:text-white",
-      )}
-    >
-      <Icon className="size-3.5" />
-      {label}
-    </Link>
-  );
-}
-
-function HeaderBar({
+function LogFiltersBar({
+  query,
+  onQueryChange,
+  status,
+  onStatusChange,
+  failedOnly,
+  onFailedOnlyChange,
   timeRange,
   onTimeRangeChange,
+  visibleColumns,
+  onVisibleColumnsChange,
+  resultCount,
+  hasFilters,
+  onClear,
 }: {
+  query: string;
+  onQueryChange: (value: string) => void;
+  status: LogFilters["status"];
+  onStatusChange: (value: LogFilters["status"]) => void;
+  failedOnly: boolean;
+  onFailedOnlyChange: (value: boolean) => void;
   timeRange: LogTimeRange;
   onTimeRangeChange: (value: LogTimeRange) => void;
+  visibleColumns: LogColumn[];
+  onVisibleColumnsChange: (columns: LogColumn[]) => void;
+  resultCount: number;
+  hasFilters: boolean;
+  onClear: () => void;
 }) {
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-[#222733] bg-[#090b11]/95 px-4 backdrop-blur lg:px-5">
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5 text-[11px] text-[#7d8596]">
-          <span>Acme</span>
-          <ChevronRight className="size-3" />
-          <span>Observability</span>
-          <ChevronRight className="size-3" />
-          <span className="text-[#d8dde8]">Logs</span>
-        </div>
-        <h1 className="text-base font-semibold leading-tight text-white">
-          Logs
-        </h1>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="hidden rounded-md border border-[#252b37] bg-[#0d1017] px-2 py-1 text-[11px] text-[#9aa3b5] sm:inline-flex">
-          Retention 14d
-        </span>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="inline-flex h-8 items-center gap-2 rounded-md border border-[#252b37] bg-[#0d1017] px-2.5 text-xs text-[#d8dde8] hover:bg-[#151a24] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3d8bfd]">
-              <Timer className="size-3.5" />
-              {TIME_RANGES.find((range) => range.value === timeRange)?.label}
-              <ChevronDown className="size-3" />
+    <div className="flex flex-col gap-3">
+      <div className="landing-framed-surface flex flex-col overflow-hidden lg:flex-row lg:items-stretch">
+        <label className="relative min-w-0 flex-1 border-b border-border/50 transition-colors focus-within:bg-elevated/55 lg:border-b-0 lg:border-r">
+          <span className="sr-only">Search logs</span>
+          <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder="Search runs, inputs, outputs, errors…"
+            aria-label="Search logs"
+            className="h-14 w-full bg-transparent pl-11 pr-12 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/60"
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => onQueryChange("")}
+              aria-label="Clear search"
+              className="absolute right-1 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <X className="size-3.5" />
             </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="border-[#252b37] bg-[#0d1017] text-[#d8dde8]">
-            <DropdownMenuLabel>Time range</DropdownMenuLabel>
-            {TIME_RANGES.map((range) => (
-              <DropdownMenuCheckboxItem
-                key={range.value}
-                checked={timeRange === range.value}
-                onCheckedChange={() => onTimeRangeChange(range.value)}
-              >
-                Last {range.label}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <button className="hidden h-8 items-center gap-2 rounded-md border border-[#252b37] bg-[#0d1017] px-2.5 text-xs text-[#d8dde8] hover:bg-[#151a24] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3d8bfd] md:inline-flex">
-          <BarChart3 className="size-3.5" />
-          Dashboard
-        </button>
-      </div>
-    </header>
-  );
-}
+          ) : null}
+        </label>
 
-function StatusSegment({
-  value,
-  onChange,
-}: {
-  value: LogFilters["status"];
-  onChange: (value: LogFilters["status"]) => void;
-}) {
-  return (
-    <div className="inline-flex h-9 items-center rounded-md border border-[#252b37] bg-[#0d1017] p-0.5">
-      {STATUS_FILTERS.map((filter) => (
-        <button
-          key={filter.value}
-          type="button"
-          aria-pressed={value === filter.value}
-          onClick={() => onChange(filter.value)}
-          className={cn(
-            "h-7 rounded px-2 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3d8bfd]",
-            value === filter.value
-              ? "bg-[#202735] text-white"
-              : "text-[#8b94a7] hover:text-white",
-          )}
-        >
-          {filter.label}
-        </button>
-      ))}
+        <div className="flex flex-wrap items-center gap-2 border-b border-border/50 p-2 lg:border-b-0 lg:border-r">
+          {STATUS_FILTERS.map((filter) => {
+            const active = status === filter.value;
+            return (
+              <button
+                key={filter.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => onStatusChange(filter.value)}
+                className={cn(
+                  "inline-flex min-h-8 items-center rounded-full px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                  active
+                    ? "bg-accent/10 text-accent shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 p-2">
+          <Button
+            type="button"
+            variant={failedOnly ? "default" : "outline"}
+            size="sm"
+            aria-pressed={failedOnly}
+            onClick={() => onFailedOnlyChange(!failedOnly)}
+          >
+            <ListFilter className="size-3.5" />
+            Failed only
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Timer className="size-3.5" />
+                {TIME_RANGES.find((range) => range.value === timeRange)?.label}
+                <ChevronDown className="size-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Time range</DropdownMenuLabel>
+              {TIME_RANGES.map((range) => (
+                <DropdownMenuCheckboxItem
+                  key={range.value}
+                  checked={timeRange === range.value}
+                  onCheckedChange={() => onTimeRangeChange(range.value)}
+                >
+                  Last {range.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <ColumnMenu
+            visibleColumns={visibleColumns}
+            onVisibleColumnsChange={onVisibleColumnsChange}
+          />
+
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className="mono whitespace-nowrap text-[10px] text-muted-foreground">
+              {resultCount} results
+            </span>
+            {hasFilters ? (
+              <button
+                type="button"
+                onClick={onClear}
+                aria-label="Clear all filters"
+                title="Clear all filters"
+                className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <RotateCcw className="size-3.5" />
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -578,12 +516,12 @@ function ColumnMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="inline-flex h-9 items-center gap-2 rounded-md border border-[#252b37] bg-[#0d1017] px-3 text-xs font-medium text-[#aab2c3] hover:bg-[#151a24] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3d8bfd]">
+        <Button variant="outline" size="sm">
           <Columns3 className="size-3.5" />
           Columns
-        </button>
+        </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-[360px] overflow-auto border-[#252b37] bg-[#0d1017] text-[#d8dde8]">
+      <DropdownMenuContent align="end" className="max-h-[360px] overflow-auto">
         <DropdownMenuLabel>Visible columns</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {(Object.keys(COLUMN_LABELS) as LogColumn[]).map((column) => (
@@ -620,37 +558,88 @@ function RunsTable({
   onSort: (key: LogSortKey) => void;
   onSelect: (run: LogRun) => void;
 }) {
+  if (runs.length === 0) {
+    return (
+      <div className="landing-framed-surface flex min-h-[260px] items-center justify-center p-6 text-sm text-muted-foreground">
+        No runs match the current filters.
+      </div>
+    );
+  }
+
   return (
-    <div className="h-[42dvh] min-h-[340px] overflow-auto border-b border-[#222733]">
-      <table className="w-full min-w-full table-fixed border-collapse text-left text-xs sm:min-w-[640px] md:min-w-[940px] xl:min-w-[1180px]">
-        <thead className="sticky top-0 z-10 bg-[#111722] text-[11px] text-[#aab2c3]">
-          <tr className="border-b border-[#2a303c]">
-            {showColumn("status") ? <ColumnHead label="Status" className="w-[92px]" /> : null}
-            {showColumn("run") ? (
-              <SortableHead label="Run" sortId="run" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="w-[230px]" />
+    <div className="landing-framed-surface max-h-[42dvh] min-h-[340px] overflow-auto">
+      <Table>
+        <TableHeader className="sticky top-0 z-10 bg-muted/35">
+          <TableRow className="hover:bg-transparent">
+            {showColumn("status") ? (
+              <TableHead className="w-[96px]">Status</TableHead>
             ) : null}
-            {showColumn("input") ? <ColumnHead label="Input" className="hidden w-[300px] sm:table-cell md:w-[260px]" /> : null}
-            {showColumn("output") ? <ColumnHead label="Output" className="hidden w-[260px] md:table-cell" /> : null}
-            {showColumn("error") ? <ColumnHead label="Error" className="hidden w-[220px] lg:table-cell" /> : null}
-            {showColumn("project") ? <ColumnHead label="Project" className="hidden w-[150px] xl:table-cell" /> : null}
-            {showColumn("environment") ? <ColumnHead label="Env" className="hidden w-[110px] xl:table-cell" /> : null}
+            {showColumn("run") ? (
+              <SortableHead
+                label="Run"
+                sortId="run"
+                sortKey={sortKey}
+                sortDirection={sortDirection}
+                onSort={onSort}
+                className="min-w-[230px]"
+              />
+            ) : null}
+            {showColumn("input") ? (
+              <TableHead className="hidden min-w-[260px] sm:table-cell">Input</TableHead>
+            ) : null}
+            {showColumn("output") ? (
+              <TableHead className="hidden min-w-[220px] md:table-cell">Output</TableHead>
+            ) : null}
+            {showColumn("error") ? (
+              <TableHead className="hidden min-w-[200px] lg:table-cell">Error</TableHead>
+            ) : null}
+            {showColumn("project") ? (
+              <TableHead className="hidden w-[150px] xl:table-cell">Project</TableHead>
+            ) : null}
+            {showColumn("environment") ? (
+              <TableHead className="hidden w-[110px] xl:table-cell">Env</TableHead>
+            ) : null}
             {showColumn("start_time") ? (
-              <SortableHead label="Start Time" sortId="start_time" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="hidden w-[142px] 2xl:table-cell" />
+              <SortableHead
+                label="Start Time"
+                sortId="start_time"
+                sortKey={sortKey}
+                sortDirection={sortDirection}
+                onSort={onSort}
+                className="hidden w-[142px] 2xl:table-cell"
+              />
             ) : null}
             {showColumn("latency") ? (
-              <SortableHead label="Latency" sortId="latency" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="hidden w-[100px] 2xl:table-cell" />
+              <SortableHead
+                label="Latency"
+                sortId="latency"
+                sortKey={sortKey}
+                sortDirection={sortDirection}
+                onSort={onSort}
+                className="hidden w-[100px] 2xl:table-cell"
+              />
             ) : null}
-            {showColumn("feedback") ? <ColumnHead label="Feedback" className="hidden w-[112px] 2xl:table-cell" /> : null}
+            {showColumn("feedback") ? (
+              <TableHead className="hidden w-[112px] 2xl:table-cell">Feedback</TableHead>
+            ) : null}
             {showColumn("tokens") ? (
-              <SortableHead label="Tokens" sortId="tokens" sortKey={sortKey} sortDirection={sortDirection} onSort={onSort} className="hidden w-[98px] 2xl:table-cell" />
+              <SortableHead
+                label="Tokens"
+                sortId="tokens"
+                sortKey={sortKey}
+                sortDirection={sortDirection}
+                onSort={onSort}
+                className="hidden w-[98px] 2xl:table-cell"
+              />
             ) : null}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {runs.map((run) => {
             const selected = run.session.id === selectedRunId;
+            const failed = ["failed", "error"].includes(run.session.status);
             return (
-              <tr
+              <TableRow
                 key={run.session.id}
                 tabIndex={0}
                 role="button"
@@ -664,81 +653,80 @@ function RunsTable({
                   }
                 }}
                 className={cn(
-                  "h-10 cursor-pointer border-b border-[#1c222d] outline-none transition-colors hover:bg-[#101722] focus-visible:bg-[#141c29] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#3d8bfd]",
-                  selected && "bg-[#122033] hover:bg-[#122033]",
+                  "cursor-pointer outline-none focus-visible:bg-elevated focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
+                  selected && "bg-accent/[0.06] hover:bg-accent/[0.06]",
+                  failed && !selected && "hover:bg-warning/[0.04]",
                 )}
               >
                 {showColumn("status") ? (
-                  <td className="px-3 py-1.5">
-                    <StatusBadge status={run.session.status} />
-                  </td>
+                  <TableCell className="py-2">
+                    <StatusPill status={run.session.status} />
+                  </TableCell>
                 ) : null}
                 {showColumn("run") ? (
-                  <td className="px-3 py-1.5">
+                  <TableCell className="py-2">
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-[#f4f6fa]">
+                      <p className="truncate text-sm font-medium text-foreground">
                         {run.session.user_goal ?? run.session.id}
                       </p>
-                      <p className="mono truncate text-[10px] text-[#6f788b]">
+                      <p className="mono truncate text-[10px] text-muted-foreground">
                         {shortId(run.session.id, 14)}
                       </p>
                     </div>
-                  </td>
+                  </TableCell>
                 ) : null}
-                {showColumn("input") ? <PreviewCell value={run.inputPreview} className="hidden sm:table-cell" /> : null}
-                {showColumn("output") ? <PreviewCell value={run.outputPreview} className="hidden md:table-cell" /> : null}
-                {showColumn("error") ? <PreviewCell value={run.errorPreview} tone="error" className="hidden lg:table-cell" /> : null}
+                {showColumn("input") ? (
+                  <PreviewCell value={run.inputPreview} className="hidden sm:table-cell" />
+                ) : null}
+                {showColumn("output") ? (
+                  <PreviewCell value={run.outputPreview} className="hidden md:table-cell" />
+                ) : null}
+                {showColumn("error") ? (
+                  <PreviewCell value={run.errorPreview} tone="error" className="hidden lg:table-cell" />
+                ) : null}
                 {showColumn("project") ? (
-                  <td className="hidden truncate px-3 py-1.5 text-[#aab2c3] xl:table-cell">{run.project?.name ?? run.session.project_id}</td>
+                  <TableCell className="hidden truncate py-2 text-muted-foreground xl:table-cell">
+                    {run.project?.name ?? run.session.project_id}
+                  </TableCell>
                 ) : null}
                 {showColumn("environment") ? (
-                  <td className="hidden px-3 py-1.5 xl:table-cell">
-                    <span className="mono rounded bg-[#151a24] px-1.5 py-1 text-[10px] text-[#aab2c3]">
+                  <TableCell className="hidden py-2 xl:table-cell">
+                    <span className="mono inline-flex items-center rounded-md bg-elevated px-2 py-1 text-[10px] text-muted-foreground">
                       {run.session.environment ?? "unknown"}
                     </span>
-                  </td>
+                  </TableCell>
                 ) : null}
                 {showColumn("start_time") ? (
-                  <td className="mono hidden whitespace-nowrap px-3 py-1.5 text-[11px] text-[#9aa3b5] 2xl:table-cell" title={run.session.started_at}>
+                  <TableCell
+                    className="mono hidden whitespace-nowrap py-2 text-xs text-muted-foreground 2xl:table-cell"
+                    title={run.session.started_at}
+                  >
                     {fmtRelative(run.session.started_at)}
-                  </td>
+                  </TableCell>
                 ) : null}
                 {showColumn("latency") ? (
-                  <td className="hidden px-3 py-1.5 2xl:table-cell">
+                  <TableCell className="hidden py-2 2xl:table-cell">
                     <LatencyBadge ms={run.latencyMs} />
-                  </td>
+                  </TableCell>
                 ) : null}
                 {showColumn("feedback") ? (
-                  <td className="hidden px-3 py-1.5 2xl:table-cell">
-                    <span className="mono text-[11px] text-[#aab2c3]">
+                  <TableCell className="hidden py-2 2xl:table-cell">
+                    <span className="mono text-xs text-muted-foreground">
                       {run.confidence !== null ? pct(run.confidence) : "none"}
                     </span>
-                  </td>
+                  </TableCell>
                 ) : null}
                 {showColumn("tokens") ? (
-                  <td className="mono hidden px-3 py-1.5 text-[11px] text-[#aab2c3] 2xl:table-cell">
+                  <TableCell className="mono hidden py-2 text-xs text-muted-foreground 2xl:table-cell">
                     {numberFormat(run.totalTokens)}
-                  </td>
+                  </TableCell>
                 ) : null}
-              </tr>
+              </TableRow>
             );
           })}
-        </tbody>
-      </table>
-      {runs.length === 0 ? (
-        <div className="flex h-full min-h-[260px] items-center justify-center text-sm text-[#8b94a7]">
-          No runs match the current filters.
-        </div>
-      ) : null}
+        </TableBody>
+      </Table>
     </div>
-  );
-}
-
-function ColumnHead({ label, className }: { label: string; className?: string }) {
-  return (
-    <th scope="col" className={cn("border-r border-[#252b37] px-3 py-2 font-medium", className)}>
-      {label}
-    </th>
   );
 }
 
@@ -759,20 +747,24 @@ function SortableHead({
 }) {
   const active = sortId === sortKey;
   return (
-    <th
-      scope="col"
+    <TableHead
+      className={className}
       aria-sort={active ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
-      className={cn("border-r border-[#252b37] px-0 py-0 font-medium", className)}
     >
       <button
         type="button"
         onClick={() => onSort(sortId)}
-        className="flex h-8 w-full items-center gap-1 px-3 text-left hover:bg-[#192131] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#3d8bfd]"
+        className="inline-flex items-center gap-1 text-left font-medium transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {label}
-        <ChevronDown className={cn("size-3 transition-transform", active && sortDirection === "asc" && "rotate-180")} />
+        <ChevronDown
+          className={cn(
+            "size-3 transition-transform",
+            active && sortDirection === "asc" && "rotate-180",
+          )}
+        />
       </button>
-    </th>
+    </TableHead>
   );
 }
 
@@ -786,46 +778,35 @@ function PreviewCell({
   className?: string;
 }) {
   return (
-    <td className={cn("px-3 py-1.5", className)}>
+    <TableCell className={cn("py-2", className)}>
       {value ? (
         <span
           className={cn(
-            "block truncate",
-            tone === "error" ? "text-[#fca5a5]" : "text-[#aab2c3]",
+            "block truncate text-xs",
+            tone === "error" ? "text-warning" : "text-muted-foreground",
           )}
           title={value}
         >
           {value}
         </span>
       ) : (
-        <span className="text-[#4f586a]">-</span>
+        <span className="text-muted-foreground/40">—</span>
       )}
-    </td>
-  );
-}
-
-function StatusBadge({ status }: { status: TraceSession["status"] }) {
-  const className =
-    status === "passed"
-      ? "border-[#22c55e]/30 bg-[#052e1a] text-[#86efac]"
-      : status === "running"
-        ? "border-[#60a5fa]/30 bg-[#0b2444] text-[#93c5fd]"
-        : "border-[#ef4444]/35 bg-[#2a1014] text-[#fca5a5]";
-  return (
-    <span className={cn("inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase", className)}>
-      <span className="size-1.5 rounded-full bg-current" />
-      {status}
-    </span>
+    </TableCell>
   );
 }
 
 function LatencyBadge({ ms }: { ms: number }) {
-  const className =
-    ms >= 12000
-      ? "border-[#f97316]/30 bg-[#2b170a] text-[#fdba74]"
-      : "border-[#22c55e]/30 bg-[#052e1a] text-[#86efac]";
+  const slow = ms >= 12000;
   return (
-    <span className={cn("mono rounded border px-1.5 py-0.5 text-[10px]", className)}>
+    <span
+      className={cn(
+        "mono inline-flex rounded-md border px-1.5 py-0.5 text-[10px]",
+        slow
+          ? "border-warning/30 bg-warning/10 text-warning"
+          : "border-success/30 bg-success/10 text-success",
+      )}
+    >
       {fmtDuration(ms)}
     </span>
   );
@@ -853,44 +834,51 @@ function TraceDebugger({
   onDetailTabChange: (tab: "run" | "feedback" | "metadata") => void;
 }) {
   return (
-    <section className="grid min-h-[520px] grid-cols-1 border-b border-[#222733] lg:grid-cols-[minmax(360px,0.95fr)_minmax(420px,1.05fr)]">
-      <div className="min-w-0 border-r border-[#222733] bg-[#090b11]">
-        <div className="flex h-11 items-center justify-between border-b border-[#222733] px-3">
+    <div className="grid min-h-[520px] grid-cols-1 gap-3 lg:grid-cols-[minmax(360px,0.95fr)_minmax(420px,1.05fr)]">
+      <section
+        className="instrument-panel flex min-h-[520px] flex-col overflow-hidden"
+        aria-label="Trace waterfall"
+      >
+        <div className="instrument-header">
           <div>
-            <p className="text-[10px] font-semibold uppercase text-[#8b94a7]">Trace</p>
-            <p className="mono text-[10px] text-[#626c7f]">
+            <p className="micro">Trace waterfall</p>
+            <p className="mono mt-1 text-[10px] text-muted-foreground">
               {run.events.length} events · {traceTree.length} roots
             </p>
           </div>
           <div className="flex items-center gap-1">
-            <button className="flex h-7 items-center gap-1 rounded border border-[#252b37] bg-[#0d1017] px-2 text-[11px] text-[#d8dde8]">
+            <Button variant="outline" size="sm" type="button">
               <Filter className="size-3" />
               Waterfall
-            </button>
+            </Button>
             <button
               type="button"
               onClick={() => onExpandedChange(allExpandable(traceTree))}
-              className="flex size-7 items-center justify-center rounded border border-[#252b37] bg-[#0d1017] text-[#9aa3b5] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3d8bfd]"
+              className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Expand trace tree"
             >
               <PanelRight className="size-3.5" />
             </button>
           </div>
         </div>
-        <ol className="max-h-[520px] overflow-auto py-1" aria-label="Trace waterfall">
+        <ol className="min-h-0 flex-1 overflow-auto py-1">
           {visibleTrace.map(({ node, depth }) => {
             const event = node.event;
             const selected = selectedEvent?.seq === event.seq;
             const Icon = EVENT_ICON[event.type] ?? FileJson;
             const hasChildren = node.children.length > 0;
+            const failed =
+              event.type === "error" ||
+              (event.type === "goal_check" &&
+                (event.payload as { passed?: boolean }).passed === false);
             return (
               <li key={node.id}>
                 <div
                   className={cn(
-                    "grid h-9 w-full grid-cols-[minmax(0,1fr)_auto] items-center border-l-2 pr-3 text-left text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#3d8bfd]",
+                    "grid h-9 w-full grid-cols-[minmax(0,1fr)_auto] items-center border-l-2 pr-3 text-left text-xs transition-colors",
                     selected
-                      ? "border-l-[#3d8bfd] bg-[#16324f] text-white"
-                      : "border-l-transparent text-[#c5cad6] hover:bg-[#101722]",
+                      ? "border-l-accent bg-accent/10 text-foreground"
+                      : "border-l-transparent text-muted-foreground hover:bg-elevated/70",
                   )}
                   style={{ paddingLeft: 8 + depth * 18 }}
                   aria-current={selected ? "true" : undefined}
@@ -905,10 +893,17 @@ function TraceDebugger({
                           else next.add(node.id);
                           onExpandedChange(next);
                         }}
-                        className="flex size-4 items-center justify-center rounded hover:bg-[#222a38] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3d8bfd]"
-                        aria-label={expanded.has(node.id) ? "Collapse trace node" : "Expand trace node"}
+                        className="flex size-4 items-center justify-center rounded hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        aria-label={
+                          expanded.has(node.id) ? "Collapse trace node" : "Expand trace node"
+                        }
                       >
-                        <ChevronRight className={cn("size-3 transition-transform", expanded.has(node.id) && "rotate-90")} />
+                        <ChevronRight
+                          className={cn(
+                            "size-3 transition-transform",
+                            expanded.has(node.id) && "rotate-90",
+                          )}
+                        />
                       </button>
                     ) : (
                       <span className="size-4" />
@@ -916,18 +911,30 @@ function TraceDebugger({
                     <button
                       type="button"
                       onClick={() => onEventSelect(event)}
-                      className="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3d8bfd]"
+                      className="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                      <Icon className={cn("size-3.5 shrink-0", event.type === "error" ? "text-[#f87171]" : event.type === "llm_call" ? "text-[#f59e0b]" : "text-[#38bdf8]")} />
-                      <span className="truncate">{eventTitle(event)}</span>
+                      <Icon
+                        className={cn(
+                          "size-3.5 shrink-0",
+                          failed
+                            ? "text-warning"
+                            : event.type === "llm_call"
+                              ? "text-accent"
+                              : "text-muted-foreground",
+                        )}
+                      />
+                      <span className="truncate text-foreground">{eventTitle(event)}</span>
                       {event.type === "llm_call" ? (
-                        <span className="hidden rounded border border-[#313949] px-1 text-[10px] text-[#9aa3b5] sm:inline">
-                          {String((event.payload as Record<string, unknown>).model ?? "model")}
-                        </span>
+                        <LabelTag
+                          label={String(
+                            (event.payload as Record<string, unknown>).model ?? "model",
+                          )}
+                          className="hidden sm:inline-flex"
+                        />
                       ) : null}
                     </button>
                   </span>
-                  <span className="mono ml-2 shrink-0 rounded bg-[#141a25] px-1.5 py-0.5 text-[10px] text-[#9aa3b5]">
+                  <span className="mono ml-2 shrink-0 rounded-md bg-elevated px-1.5 py-0.5 text-[10px] text-muted-foreground">
                     {fmtDuration(eventLatency(event))}
                   </span>
                 </div>
@@ -935,7 +942,7 @@ function TraceDebugger({
             );
           })}
         </ol>
-      </div>
+      </section>
 
       <RunInspector
         run={run}
@@ -943,11 +950,11 @@ function TraceDebugger({
         tab={detailTab}
         onTabChange={onDetailTabChange}
         onEvidenceSelect={(seq) => {
-          const event = run.events.find((candidate) => candidate.seq === seq);
-          if (event) onEventSelect(event);
+          const match = run.events.find((candidate) => candidate.seq === seq);
+          if (match) onEventSelect(match);
         }}
       />
-    </section>
+    </div>
   );
 }
 
@@ -966,47 +973,38 @@ function RunInspector({
 }) {
   const eventPayload = event?.payload ?? {};
   const eventMetadata = event?.metadata ?? null;
+
   return (
-    <div className="min-w-0 bg-[#0b0d12]">
-      <div className="flex h-14 items-center justify-between border-b border-[#222733] px-4">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-[#1d4ed8] text-white">
-            <Activity className="size-4" />
-          </span>
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold text-white">
-              {event ? eventTitle(event) : run.session.user_goal ?? run.session.id}
-            </h2>
-            <p className="mono truncate text-[10px] text-[#7d8596]">
-              {run.session.id}
-              {event ? ` · seq ${event.seq}` : ""}
-            </p>
-          </div>
+    <section className="instrument-panel flex min-h-[520px] flex-col overflow-hidden" aria-label="Run inspector">
+      <div className="instrument-header">
+        <div className="min-w-0">
+          <p className="micro">Run inspector</p>
+          <h2 className="truncate text-sm font-semibold text-foreground">
+            {event ? eventTitle(event) : (run.session.user_goal ?? run.session.id)}
+          </h2>
+          <p className="mono truncate text-[10px] text-muted-foreground">
+            {run.session.id}
+            {event ? ` · seq ${event.seq}` : ""}
+          </p>
         </div>
-        <span className="mono hidden rounded border border-[#2b3240] px-2 py-1 text-[10px] text-[#9aa3b5] sm:inline">
+        <span className="mono hidden rounded-md border border-border bg-elevated px-2 py-1 text-[10px] text-muted-foreground sm:inline">
           {costEstimate(run.totalTokens)}
         </span>
       </div>
-      <div className="flex h-10 items-end gap-5 border-b border-[#222733] px-4">
-        {(["run", "feedback", "metadata"] as const).map((item) => (
-          <button
-            key={item}
-            type="button"
-            onClick={() => onTabChange(item)}
-            className={cn(
-              "h-10 border-b-2 text-xs font-medium capitalize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3d8bfd]",
-              tab === item
-                ? "border-b-[#d8dde8] text-white"
-                : "border-b-transparent text-[#8b94a7] hover:text-white",
-            )}
-          >
-            {item}
-          </button>
-        ))}
-      </div>
-      <div className="max-h-[496px] overflow-auto p-4">
-        {tab === "run" ? (
-          <div className="space-y-4">
+
+      <Tabs
+        value={tab}
+        onValueChange={(value) => onTabChange(value as "run" | "feedback" | "metadata")}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        <TabsList className="mx-3 mt-1 flex">
+          <TabsTrigger value="run">Run</TabsTrigger>
+          <TabsTrigger value="feedback">Feedback</TabsTrigger>
+          <TabsTrigger value="metadata">Metadata</TabsTrigger>
+        </TabsList>
+
+        <div className="min-h-0 flex-1 overflow-auto px-4 pb-4">
+          <TabsContent value="run" className="mt-3 space-y-4">
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
               <Readout label="Status" value={run.session.status} />
               <Readout label="Latency" value={fmtDuration(run.latencyMs)} />
@@ -1025,32 +1023,27 @@ function RunInspector({
               </InspectorSection>
             ) : null}
             <InspectorSection title="Selected event payload">
-              <JsonViewer
-                data={eventPayload}
-                collapseDepth={2}
-                className="border-[#252b37] bg-[#07080c] text-[#d8dde8]"
-              />
+              <JsonViewer data={eventPayload} collapseDepth={2} />
             </InspectorSection>
-          </div>
-        ) : null}
+          </TabsContent>
 
-        {tab === "feedback" ? (
-          <div className="space-y-4">
+          <TabsContent value="feedback" className="mt-3 space-y-4">
             <div className="grid grid-cols-2 gap-2">
-              <Readout label="Confidence" value={run.confidence !== null ? pct(run.confidence) : "pending"} />
+              <Readout
+                label="Confidence"
+                value={run.confidence !== null ? pct(run.confidence) : "pending"}
+              />
               <Readout label="Signals" value={String(run.feedbackCount)} />
             </div>
             <InspectorSection title="Root cause" defaultOpen>
-              <p className="text-sm leading-6 text-[#d8dde8]">
+              <p className="text-sm leading-6 text-foreground/90">
                 {run.analysis?.root_cause ?? "No analysis result has been attached."}
               </p>
             </InspectorSection>
             <InspectorSection title="Labels" defaultOpen>
               <div className="flex flex-wrap gap-1.5">
                 {(run.analysis?.labels ?? run.session.tags).map((label) => (
-                  <span key={label} className="rounded border border-[#2f3746] bg-[#111722] px-2 py-1 text-[11px] text-[#c5cad6]">
-                    {label.replaceAll("_", " ")}
-                  </span>
+                  <LabelTag key={label} label={label.replaceAll("_", " ")} />
                 ))}
               </div>
             </InspectorSection>
@@ -1064,21 +1057,19 @@ function RunInspector({
                       key={seq}
                       type="button"
                       onClick={() => onEvidenceSelect(seq)}
-                      className="mono rounded border border-[#2f3746] bg-[#111722] px-2 py-1 text-[11px] text-[#9ec5ff] hover:bg-[#17233a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3d8bfd]"
+                      className="mono min-h-8 rounded-md border border-border bg-elevated px-2 text-[11px] text-accent transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       seq {seq}
                     </button>
                   ))
                 ) : (
-                  <span className="text-sm text-[#8b94a7]">No evidence refs attached.</span>
+                  <span className="text-sm text-muted-foreground">No evidence refs attached.</span>
                 )}
               </div>
             </InspectorSection>
-          </div>
-        ) : null}
+          </TabsContent>
 
-        {tab === "metadata" ? (
-          <div className="space-y-4">
+          <TabsContent value="metadata" className="mt-3 space-y-4">
             <InspectorSection title="Run metadata" defaultOpen>
               <JsonViewer
                 data={{
@@ -1088,7 +1079,6 @@ function RunInspector({
                   analysis: run.analysis,
                 }}
                 collapseDepth={2}
-                className="border-[#252b37] bg-[#07080c] text-[#d8dde8]"
               />
             </InspectorSection>
             <InspectorSection title="Event envelope" defaultOpen>
@@ -1106,21 +1096,20 @@ function RunInspector({
                     : {}
                 }
                 collapseDepth={2}
-                className="border-[#252b37] bg-[#07080c] text-[#d8dde8]"
               />
             </InspectorSection>
-          </div>
-        ) : null}
-      </div>
-    </div>
+          </TabsContent>
+        </div>
+      </Tabs>
+    </section>
   );
 }
 
 function Readout({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-[#252b37] bg-[#0d1017] px-3 py-2">
-      <dt className="text-[10px] uppercase text-[#7d8596]">{label}</dt>
-      <dd className="mono mt-1 truncate text-xs text-[#f4f6fa]">{value}</dd>
+    <div className="rounded-md border border-border bg-elevated px-3 py-2">
+      <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dd className="mono mt-1 truncate text-xs text-foreground">{value}</dd>
     </div>
   );
 }
@@ -1135,12 +1124,12 @@ function InspectorSection({
   defaultOpen?: boolean;
 }) {
   return (
-    <details open={defaultOpen} className="group rounded-md border border-[#252b37] bg-[#0d1017]">
-      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between px-3 text-xs font-medium text-[#d8dde8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3d8bfd]">
+    <details open={defaultOpen} className="group rounded-md border border-border bg-panel/50">
+      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between px-3 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         {title}
         <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
       </summary>
-      <div className="border-t border-[#252b37] p-3">{children}</div>
+      <div className="border-t border-border/70 p-3">{children}</div>
     </details>
   );
 }
@@ -1155,8 +1144,8 @@ function CodeBlock({
   return (
     <pre
       className={cn(
-        "max-h-52 overflow-auto whitespace-pre-wrap rounded border border-[#252b37] bg-[#07080c] p-3 text-xs leading-5",
-        tone === "error" ? "text-[#fca5a5]" : "text-[#d8dde8]",
+        "max-h-52 overflow-auto whitespace-pre-wrap rounded-md border border-border bg-canvas p-3 text-xs leading-5",
+        tone === "error" ? "text-warning" : "text-foreground/90",
       )}
     >
       {children}
@@ -1164,7 +1153,7 @@ function CodeBlock({
   );
 }
 
-function RightRail({
+function FilterRail({
   metrics,
   projects,
   selectedProjects,
@@ -1190,68 +1179,66 @@ function RightRail({
   onClearFilters: () => void;
 }) {
   return (
-    <aside className="border-t border-[#222733] bg-[#090b11] xl:border-t-0">
-      <div className="sticky top-14 space-y-4 p-4">
-        <section className="rounded-md border border-[#252b37] bg-[#0d1017]">
-          <div className="flex items-center justify-between border-b border-[#252b37] px-3 py-2">
-            <h2 className="text-xs font-semibold text-white">Metrics</h2>
-            <span className="text-[10px] text-[#7d8596]">mock</span>
-          </div>
-          <div className="grid grid-cols-2 gap-px bg-[#252b37]">
-            <MetricTile label="Runs" value={String(metrics.totalRuns)} Icon={Activity} />
-            <MetricTile label="Failures" value={String(metrics.failedRuns)} Icon={AlertCircle} />
-            <MetricTile label="Error rate" value={pct(metrics.errorRate)} Icon={Gauge} />
-            <MetricTile label="P50" value={fmtDuration(metrics.p50LatencyMs)} Icon={Timer} />
-            <MetricTile label="P99" value={fmtDuration(metrics.p99LatencyMs)} Icon={Timer} />
-            <MetricTile label="Tokens" value={numberFormat(metrics.totalTokens)} Icon={FileJson} />
-          </div>
-        </section>
+    <aside className="flex flex-col gap-3">
+      <div className="landing-framed-surface overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border/70 px-3 py-2.5">
+          <h2 className="text-xs font-semibold text-foreground">Filtered metrics</h2>
+          <span className="text-[10px] text-muted-foreground">live</span>
+        </div>
+        <dl className="grid grid-cols-2 gap-px bg-border/50">
+          <MetricTile label="Runs" value={String(metrics.totalRuns)} Icon={Activity} />
+          <MetricTile label="Failures" value={String(metrics.failedRuns)} Icon={AlertCircle} />
+          <MetricTile label="Error rate" value={pct(metrics.errorRate)} Icon={Gauge} />
+          <MetricTile label="P50" value={fmtDuration(metrics.p50LatencyMs)} Icon={Timer} />
+          <MetricTile label="P99" value={fmtDuration(metrics.p99LatencyMs)} Icon={Timer} />
+          <MetricTile label="Tokens" value={numberFormat(metrics.totalTokens)} Icon={FileJson} />
+        </dl>
+      </div>
 
-        <section className="rounded-md border border-[#252b37] bg-[#0d1017]">
-          <div className="flex items-center justify-between border-b border-[#252b37] px-3 py-2">
-            <h2 className="flex items-center gap-2 text-xs font-semibold text-white">
-              <ListFilter className="size-3.5" />
-              Filter Shortcuts
-            </h2>
-            <button
-              type="button"
-              onClick={onClearFilters}
-              className="text-[11px] text-[#8ab4ff] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3d8bfd]"
-            >
-              Clear
-            </button>
-          </div>
-          <FilterGroup title="Projects">
-            {projects.map((project) => (
-              <CheckFilter
-                key={project.id}
-                label={project.name}
-                checked={selectedProjects.includes(project.id)}
-                onChange={() => onProjectToggle(project.id)}
-              />
-            ))}
-          </FilterGroup>
-          <FilterGroup title="Environment">
-            {environments.map((environment) => (
-              <CheckFilter
-                key={environment}
-                label={environment}
-                checked={selectedEnvironments.includes(environment)}
-                onChange={() => onEnvironmentToggle(environment)}
-              />
-            ))}
-          </FilterGroup>
-          <FilterGroup title="Tags" icon={<Tags className="size-3" />}>
-            {tags.map((tag) => (
-              <CheckFilter
-                key={tag}
-                label={tag}
-                checked={selectedTags.includes(tag)}
-                onChange={() => onTagToggle(tag)}
-              />
-            ))}
-          </FilterGroup>
-        </section>
+      <div className="landing-framed-surface overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border/70 px-3 py-2.5">
+          <h2 className="flex items-center gap-2 text-xs font-semibold text-foreground">
+            <ListFilter className="size-3.5" />
+            Filter shortcuts
+          </h2>
+          <button
+            type="button"
+            onClick={onClearFilters}
+            className="text-[11px] text-accent transition-colors hover:text-accent-bright focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Clear
+          </button>
+        </div>
+        <FilterGroup title="Projects">
+          {projects.map((project) => (
+            <CheckFilter
+              key={project.id}
+              label={project.name}
+              checked={selectedProjects.includes(project.id)}
+              onChange={() => onProjectToggle(project.id)}
+            />
+          ))}
+        </FilterGroup>
+        <FilterGroup title="Environment">
+          {environments.map((environment) => (
+            <CheckFilter
+              key={environment}
+              label={environment}
+              checked={selectedEnvironments.includes(environment)}
+              onChange={() => onEnvironmentToggle(environment)}
+            />
+          ))}
+        </FilterGroup>
+        <FilterGroup title="Tags" icon={<Tags className="size-3" />}>
+          {tags.map((tag) => (
+            <CheckFilter
+              key={tag}
+              label={tag}
+              checked={selectedTags.includes(tag)}
+              onChange={() => onTagToggle(tag)}
+            />
+          ))}
+        </FilterGroup>
       </div>
     </aside>
   );
@@ -1267,12 +1254,12 @@ function MetricTile({
   Icon: LucideIcon;
 }) {
   return (
-    <div className="bg-[#0d1017] p-3">
-      <dt className="flex items-center gap-1.5 text-[10px] text-[#7d8596]">
+    <div className="bg-panel px-3 py-2.5">
+      <dt className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
         <Icon className="size-3" />
         {label}
       </dt>
-      <dd className="mono mt-1 truncate text-sm text-[#f4f6fa]">{value}</dd>
+      <dd className="mono mt-1 truncate text-sm text-foreground">{value}</dd>
     </div>
   );
 }
@@ -1287,8 +1274,8 @@ function FilterGroup({
   children: React.ReactNode;
 }) {
   return (
-    <div className="border-b border-[#252b37] p-3 last:border-b-0">
-      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-[#aab2c3]">
+    <div className="border-b border-border/70 p-3 last:border-b-0">
+      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
         {icon}
         {title}
       </p>
@@ -1307,12 +1294,12 @@ function CheckFilter({
   onChange: () => void;
 }) {
   return (
-    <label className="flex min-h-7 cursor-pointer items-center gap-2 rounded px-1.5 text-[11px] text-[#9aa3b5] hover:bg-[#151a24] hover:text-white">
+    <label className="flex min-h-7 cursor-pointer items-center gap-2 rounded-md px-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-elevated hover:text-foreground">
       <input
         type="checkbox"
         checked={checked}
         onChange={onChange}
-        className="size-3 rounded border-[#3a4252] bg-[#090b11] accent-[#3d8bfd]"
+        className="size-3 rounded border-border accent-accent"
       />
       <span className="truncate">{label}</span>
     </label>
