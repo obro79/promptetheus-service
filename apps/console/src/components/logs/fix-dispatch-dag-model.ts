@@ -21,6 +21,7 @@ export type FixDagNodeStatus =
 export type FixDagPhase =
   | "idle"
   | "running"
+  | "waiting_for_pr"
   | "pr_opened"
   | "escalated"
   | "demo"
@@ -195,6 +196,24 @@ export function projectFixDispatchDag({
     });
   }
 
+  if (phase === "waiting_for_pr") {
+    return buildProjection({
+      currentNodeId: "open_pr",
+      detail: "Devin has the session; Promptetheus is checking GitHub for the PR URL.",
+      headline: "Waiting for Devin PR",
+      mode: "running",
+      nodeStatus: (id) => {
+        const index = NODE_ORDER.get(id) ?? 0;
+        if (index < (NODE_ORDER.get("open_pr") ?? 0)) return "complete";
+        if (id === "open_pr") return "active";
+        return "pending";
+      },
+      prPreview: false,
+      prUrl: null,
+      selectedDefaultNodeId: "open_pr",
+    });
+  }
+
   if (phase === "escalated") {
     return buildProjection({
       currentNodeId: "run_evals",
@@ -317,7 +336,7 @@ export function buildFixDagEvidence({
     case "run_evals":
       return buildEvalEvidence(run, mode, evalAttempt, report, error);
     case "open_pr":
-      return buildPrEvidence(run, mode, report);
+      return buildPrEvidence(run, mode, phase, report);
     case "merge_github":
       return buildMergeEvidence(run, mode, report);
   }
@@ -509,7 +528,30 @@ function buildEvalEvidence(
   };
 }
 
-function buildPrEvidence(run: LogRun, mode: FixDagEvidenceMode, report?: HealReport | null): FixDagEvidence {
+function buildPrEvidence(
+  run: LogRun,
+  mode: FixDagEvidenceMode,
+  phase: FixDagPhase,
+  report?: HealReport | null,
+): FixDagEvidence {
+  if (phase === "waiting_for_pr") {
+    return {
+      details: [
+        "Devin is creating the PR from the dispatched session.",
+        "Promptetheus checks GitHub for the incident/session marker and will link the real PR when it appears.",
+      ],
+      items: compactItems([
+        { label: "Incident", value: run.incident?.id ?? "pending" },
+        { label: "Session", value: run.session.id },
+        { label: "State", value: "waiting for Devin PR", tone: "info" },
+      ]),
+      mode,
+      nodeId: "open_pr",
+      subtitle: "Session links stay visible while the real GitHub PR is still being opened.",
+      title: "Devin is creating the PR",
+    };
+  }
+
   const pr = report?.pr ?? null;
   const fallback = pr?.fallback ?? mode !== "live";
   const changedFiles = pr?.changed_files ?? run.incident?.fix_agent_result?.changed_files ?? [];
@@ -517,7 +559,7 @@ function buildPrEvidence(run: LogRun, mode: FixDagEvidenceMode, report?: HealRep
   return {
     details: [
       changedFiles.length ? `Changed files: ${changedFiles.join(", ")}` : "Changed files are preview-only until the live heal report returns.",
-      fallback ? "PR preview only. Connect the API/GitHub integration to open a real pull request." : "Live GitHub PR was opened after evals passed.",
+      fallback ? "Preview only for demo/no-integration paths. A real GitHub PR is required for merge-ready state." : "Live GitHub PR was opened after evals passed.",
     ],
     items: compactItems([
       { label: "Title", value: pr?.title ?? `Fix ${run.incident?.label.replaceAll("_", " ") ?? "incident"}` },
@@ -561,6 +603,7 @@ function buildMergeEvidence(run: LogRun, mode: FixDagEvidenceMode, report?: Heal
 function evidenceMode(phase: FixDagPhase, report?: HealReport | null): FixDagEvidenceMode {
   if (phase === "escalated" || phase === "error") return "blocked";
   if (report) return "live";
+  if (phase === "waiting_for_pr") return "live";
   if (phase === "demo" || phase === "demo_complete" || phase === "running") return "demo";
   return "local";
 }

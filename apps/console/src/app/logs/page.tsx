@@ -10,12 +10,13 @@ import {
 } from "@/components/common/console-primitives";
 import {
   getAnalysis,
+  getArtifacts,
   getEvents,
   getIncidents,
   getProjects,
   getSessions,
 } from "@/lib/data";
-import type { AnalysisResult, TraceEvent } from "@/lib/types";
+import type { AnalysisResult, ReplayArtifact, TraceEvent } from "@/lib/types";
 
 export const metadata = {
   title: "Logs · Promptetheus",
@@ -28,10 +29,12 @@ export default function LogsPage() {
   const incidents = getIncidents();
   const eventsBySession: Record<string, TraceEvent[]> = {};
   const analysesBySession: Record<string, AnalysisResult | undefined> = {};
+  const artifactsBySession: Record<string, ReplayArtifact[]> = {};
 
   for (const session of sessions) {
     eventsBySession[session.id] = getEvents(session.id);
     analysesBySession[session.id] = getAnalysis(session.id);
+    artifactsBySession[session.id] = getArtifacts(session.id);
   }
 
   return (
@@ -63,6 +66,7 @@ export default function LogsPage() {
           incidents={incidents}
           eventsBySession={eventsBySession}
           analysesBySession={analysesBySession}
+          artifactsBySession={artifactsBySession}
         />
       </ConsolePageContent>
     </ConsolePage>

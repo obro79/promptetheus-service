@@ -75,6 +75,7 @@ function Node({ name, value, depth, collapseDepth, isLast }: NodeProps) {
             "size-3 shrink-0 text-muted-foreground/60 transition-transform duration-150",
             open && "rotate-90",
           )}
+          strokeWidth={1.8}
         />
         {keyLabel}
         <span className="text-muted-foreground/60">{open_b}</span>

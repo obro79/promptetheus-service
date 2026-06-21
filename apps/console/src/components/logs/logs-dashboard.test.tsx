@@ -179,6 +179,20 @@ describe("LogsDashboard", () => {
     expect(screen.getByLabelText("Run inspector")).toBeInTheDocument();
   });
 
+  it("embeds replay media in the selected run inspector", () => {
+    renderDashboard();
+
+    expect(screen.getByText("Replay attached")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open replay" }));
+
+    expect(screen.getByRole("region", { name: "Run replay" })).toBeInTheDocument();
+    expect(screen.getByText("Browser failure replay")).toBeInTheDocument();
+    expect(document.querySelector("video")).toHaveAttribute(
+      "src",
+      "/assets/demo-agents/browser-fail-trimmed.mp4",
+    );
+  });
+
   it("filters run rows with status pills and updates the selected trace", () => {
     renderDashboard();
     fireEvent.click(screen.getByRole("button", { name: "Failed only" }));
@@ -232,7 +246,7 @@ describe("LogsDashboard", () => {
     expect(screen.getByText("Ready to dispatch")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create and close test PR" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Dispatch fix for selected run" })).toHaveTextContent(
-      "Dispatch agent PRs",
+      "Ask Devin to open PRs",
     );
     expect(proof.getByText("Read selected run")).toBeInTheDocument();
     expect(dag.compareDocumentPosition(runsList) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

@@ -93,6 +93,7 @@ const event: TraceEvent = {
 function run(overrides: Partial<LogRun> = {}): LogRun {
   return {
     analysis,
+    artifacts: [],
     confidence: 0.9,
     errorPreview: "Selected 2am",
     events: [event],
@@ -160,34 +161,85 @@ function report(overrides: Partial<HealReport> = {}): HealReport {
 
 function agentPrDispatch(overrides: Partial<AgentPrDispatchResult> = {}): AgentPrDispatchResult {
   return {
+    evalGate: {
+      afterFail: null,
+      assertion: "Fix must resolve: The selected time was wrong.",
+      beforeFail: 1,
+      caseCount: 3,
+      confidence: null,
+      note: "Eval set is attached to Devin. The PR is not ready until Devin runs it and reports the result.",
+      status: "pending",
+    },
+    orchestrator: "local_orkes",
     pullRequests: [
       {
         agentType: "browser",
-        branch: "promptetheus/browser-agent-inc_failed",
-        devinReviewRequested: true,
-        number: 21,
-        title: "Add Promptetheus browser agent replay guard",
-        url: "https://github.com/obro79/demo-agents/pull/21",
+        branch: null,
+        devinPrRequested: true,
+        devinReviewRequested: false,
+        externalId: "devin-21",
+        kind: "devin_session",
+        number: null,
+        title: "Devin: Add Promptetheus browser agent replay guard",
+        url: "https://app.devin.ai/sessions/devin-21",
       },
       {
         agentType: "chat",
-        branch: "promptetheus/chat-agent-inc_failed",
-        devinReviewRequested: true,
-        number: 22,
-        title: "Add Promptetheus chat agent recovery marker",
-        url: "https://github.com/obro79/demo-agents/pull/22",
+        branch: null,
+        devinPrRequested: true,
+        devinReviewRequested: false,
+        externalId: "devin-22",
+        kind: "devin_session",
+        number: null,
+        title: "Devin: Add Promptetheus chat agent recovery marker",
+        url: "https://app.devin.ai/sessions/devin-22",
       },
       {
         agentType: "voice",
-        branch: "promptetheus/voice-agent-inc_failed",
-        devinReviewRequested: true,
-        number: 23,
-        title: "Add Promptetheus voice agent interruption guard",
-        url: "https://github.com/obro79/demo-agents/pull/23",
+        branch: null,
+        devinPrRequested: true,
+        devinReviewRequested: false,
+        externalId: "devin-23",
+        kind: "devin_session",
+        number: null,
+        title: "Devin: Add Promptetheus voice agent interruption guard",
+        url: "https://app.devin.ai/sessions/devin-23",
       },
     ],
-    status: "pr_opened",
+    sentryProof: {
+      configured: true,
+      detail: "Sentry DSN is configured; live backend heal/eval spans can be correlated with this workflow id.",
+      traceId: "promptetheus-inc-failed-123",
+    },
+    status: "devin_dispatched",
     targetRepo: "obro79/demo-agents",
+    workflowRunId: "local-orkes-inc-failed-123",
+    workflowStages: [
+      {
+        detail: "Incident trace, root cause, and replay assertion packaged for the workflow.",
+        id: "build_eval_set",
+        label: "Build eval set",
+        status: "passed",
+      },
+      {
+        detail: "3/3 Devin agent tasks created.",
+        id: "dispatch_devin",
+        label: "Dispatch Devin",
+        status: "passed",
+      },
+      {
+        detail: "Waiting for Devin to open a candidate PR from the dispatched task.",
+        id: "wait_for_pr",
+        label: "Wait for PR",
+        status: "running",
+      },
+      {
+        detail: "Eval set is attached to Devin. The PR is not ready until Devin runs it and reports the result.",
+        id: "run_evals",
+        label: "Run evals",
+        status: "pending",
+      },
+    ],
     ...overrides,
   };
 }
@@ -240,6 +292,18 @@ describe("projectFixDispatchDag", () => {
     expect(projection.prPreview).toBe(true);
     expect(projection.nodes.find((node) => node.id === "open_pr")?.status).toBe("preview");
     expect(projection.nodes.find((node) => node.id === "merge_github")?.status).toBe("blocked");
+  });
+
+  it("projects Devin dispatches into a waiting-for-PR state", () => {
+    const projection = projectFixDispatchDag({
+      incident,
+      phase: "waiting_for_pr",
+    });
+
+    expect(projection.headline).toBe("Waiting for Devin PR");
+    expect(projection.prPreview).toBe(false);
+    expect(projection.nodes.find((node) => node.id === "open_pr")?.status).toBe("active");
+    expect(projection.nodes.find((node) => node.id === "merge_github")?.status).toBe("pending");
   });
 
   it("projects API-unavailable demo mode as a preview-only path", () => {
@@ -342,13 +406,13 @@ describe("FixDispatchDag", () => {
     expect(evalProof.getByText("Assertion: Books requested time")).toBeInTheDocument();
   });
 
-  it("shows all agent PR links and Devin review state after logs dispatch", async () => {
+  it("waits for the real Devin-opened PR while keeping session links visible", async () => {
     vi.useFakeTimers();
     const dispatchHeal = vi.fn().mockResolvedValue(agentPrDispatch());
     render(
       <FixDispatchDag
         dispatchHeal={dispatchHeal}
-        dispatchLabel="Dispatch agent PRs"
+        dispatchLabel="Ask Devin to open PRs"
         layout="prominent"
         run={run()}
       />,
@@ -362,24 +426,105 @@ describe("FixDispatchDag", () => {
     });
 
     expect(dispatchHeal).toHaveBeenCalledWith(incident.id, expect.objectContaining({ incident }));
-    expect(screen.getByText("PR ready for GitHub")).toBeInTheDocument();
+    expect(screen.getByText("Waiting for Devin PR")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check for Devin PR" })).toBeInTheDocument();
+    expect(screen.queryByText("PR ready for GitHub")).not.toBeInTheDocument();
 
     const proof = within(screen.getByLabelText("Fix DAG proof"));
-    expect(proof.getByText("Agent PRs")).toBeInTheDocument();
+    expect(proof.getByText("Devin is creating the PR")).toBeInTheDocument();
+    expect(proof.getByText("Local Orkes workflow")).toBeInTheDocument();
+    expect(proof.getByText("local-orkes-inc-failed-123")).toBeInTheDocument();
+    expect(proof.getByText("Eval gate")).toBeInTheDocument();
+    expect(proof.getByText("pending")).toBeInTheDocument();
+    expect(proof.getByText("Fix must resolve: The selected time was wrong.")).toBeInTheDocument();
+    expect(proof.getByText(/Sentry: configured/)).toBeInTheDocument();
+    expect(proof.getByText("Dispatch Devin")).toBeInTheDocument();
+    expect(proof.getByText("Devin sessions")).toBeInTheDocument();
     expect(proof.getByText("obro79/demo-agents")).toBeInTheDocument();
-    expect(proof.getByRole("link", { name: /PR #21/ })).toHaveAttribute(
+    expect(proof.getByRole("link", { name: /Session devin-21/ })).toHaveAttribute(
       "href",
-      "https://github.com/obro79/demo-agents/pull/21",
+      "https://app.devin.ai/sessions/devin-21",
     );
-    expect(proof.getByRole("link", { name: /PR #22/ })).toHaveAttribute(
+    expect(proof.getByRole("link", { name: /Session devin-22/ })).toHaveAttribute(
       "href",
-      "https://github.com/obro79/demo-agents/pull/22",
+      "https://app.devin.ai/sessions/devin-22",
     );
-    expect(proof.getByRole("link", { name: /PR #23/ })).toHaveAttribute(
+    expect(proof.getByRole("link", { name: /Session devin-23/ })).toHaveAttribute(
       "href",
-      "https://github.com/obro79/demo-agents/pull/23",
+      "https://app.devin.ai/sessions/devin-23",
     );
-    expect(proof.getAllByText("Devin requested")).toHaveLength(3);
+    expect(proof.getAllByText("Devin creating PR")).toHaveLength(3);
+    expect(screen.queryByRole("link", { name: "Open PR in GitHub" })).not.toBeInTheDocument();
+  });
+
+  it("polls Devin PR status and promotes only when a real GitHub PR is found", async () => {
+    vi.useFakeTimers();
+    const dispatchHeal = vi.fn().mockResolvedValue(agentPrDispatch());
+    const trackedResult = agentPrDispatch({
+      pullRequests: [
+        {
+          ...agentPrDispatch().pullRequests[0],
+          openedPrBranch: "devin/browser-agent-fix",
+          openedPrNumber: 77,
+          openedPrTitle: "Add Promptetheus browser agent replay guard",
+          openedPrUrl: "https://github.com/obro79/demo-agents/pull/77",
+          prDetectedAt: "2026-06-21T12:00:00Z",
+        },
+        ...agentPrDispatch().pullRequests.slice(1),
+      ],
+      status: "pr_opened",
+      trackingStatus: "tracking",
+      workflowStages: agentPrDispatch().workflowStages?.map((stage) =>
+        stage.id === "wait_for_pr"
+          ? { ...stage, detail: "1/3 Devin-opened GitHub PR detected.", status: "passed" }
+          : stage,
+      ),
+    });
+    const checkDispatchStatus = vi.fn().mockResolvedValue(trackedResult);
+    render(
+      <FixDispatchDag
+        checkDispatchStatus={checkDispatchStatus}
+        dispatchHeal={dispatchHeal}
+        dispatchLabel="Ask Devin to open PRs"
+        layout="prominent"
+        run={run()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Dispatch fix for selected run" }));
+
+    await act(async () => {
+      await Promise.resolve();
+      vi.advanceTimersByTime(2200);
+    });
+
+    expect(screen.getByText("Waiting for Devin PR")).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(5000);
+      await Promise.resolve();
+    });
+
+    expect(checkDispatchStatus).toHaveBeenCalledWith({
+      dispatchResult: expect.objectContaining({ status: "devin_dispatched" }),
+      incidentId: incident.id,
+      sessionId: session.id,
+    });
+    expect(screen.getByText("PR ready for GitHub")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open PR in GitHub" })).toHaveAttribute(
+      "href",
+      "https://github.com/obro79/demo-agents/pull/77",
+    );
+    const proof = within(screen.getByLabelText("Fix DAG proof"));
+    expect(proof.getByRole("link", { name: /PR #77/ })).toHaveAttribute(
+      "href",
+      "https://github.com/obro79/demo-agents/pull/77",
+    );
+    expect(proof.getByRole("link", { name: /Session devin-21/ })).toHaveAttribute(
+      "href",
+      "https://app.devin.ai/sessions/devin-21",
+    );
+    expect(proof.getByText("PR opened")).toBeInTheDocument();
   });
 
   it("falls back to demo mode when the API is unavailable", async () => {
